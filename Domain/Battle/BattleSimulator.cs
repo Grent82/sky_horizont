@@ -1,3 +1,4 @@
+using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Fleets;
 using SkyHorizont.Domain.Galaxy.Planet;
 
@@ -6,7 +7,17 @@ namespace SkyHorizont.Domain.Battle
     public class BattleSimulator : IBattleSimulator
     {
         private const int MaxRounds = 10;
-        private readonly Random _random = new();
+        private readonly Random _random;
+
+        public ICommanderRepository CommanderRepo { get; }
+        public int? Seed { get; }
+
+        public BattleSimulator(ICommanderRepository commanderRepo, int seed = 0)
+        {
+            CommanderRepo = commanderRepo;
+            Seed = seed;
+            _random = new(seed);
+        }
 
         public BattleResult SimulateFleetBattle(Fleet attacker, Fleet defender)
         {
@@ -92,28 +103,24 @@ namespace SkyHorizont.Domain.Battle
 
             return result;
         }
-        
+
         private double CommanderAttackModifier(Fleet fleet) =>
         fleet.AssignedCommanderId.HasValue
-            ? 1.0 + SkillBonus(fleet.AssignedCommanderId.Value, "attack")
+            ? 1.0 + CommanderRepo.GetById(fleet.AssignedCommanderId.Value).GetAttackBonus()
             : 1.0;
 
         private double CommanderDefenseModifier(Fleet fleet) =>
             fleet.AssignedCommanderId.HasValue
-                ? 1.0 + SkillBonus(fleet.AssignedCommanderId.Value, "defense")
+                ? 1.0 + CommanderRepo.GetById(fleet.AssignedCommanderId.Value).GetDefenseBonus()
                 : 1.0;
 
         private double RetreatChance(Fleet defender, double atkPower, double defPower)
         {
             double baseChance = 0.4; // 40% if heavily outnumbered
             if (defender.AssignedCommanderId.HasValue)
-                baseChance += SkillModifier(defender.AssignedCommanderId.Value, "retreat");
+                baseChance += CommanderRepo.GetById(defender.AssignedCommanderId.Value).GetRetreatModifier();
             return Math.Clamp(baseChance, 0, 1);
         }
-
-        private double SkillBonus(Guid commanderId, string type) { /* load personality or skill */ return 0.1; }
-
-        private double SkillModifier(Guid commanderId, string type) { /* e.g. -0.05 for brave trait */ return -0.05; }
 
     }
 }

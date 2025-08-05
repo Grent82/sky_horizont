@@ -118,6 +118,15 @@ namespace SkyHorizont.Domain.Entity
             if (success) GainMerit(meritReward);
         }
 
+        public double GetAttackBonus()
+            => Skills.Military * 0.001 + Personality.Boldness * 0.001;
+
+        public double GetDefenseBonus()
+            => Skills.Intelligence * 0.001 + Personality.Loyalty * 0.001;
+
+        public double GetRetreatModifier()
+            => (Personality.Boldness - 50) * -0.001;
+
         public override string ToString() => $"{Name} (Rank: {Rank}, Merit: {Merit})";
     }
 }
