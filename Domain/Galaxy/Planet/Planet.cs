@@ -19,7 +19,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public double BaseAttack { get; private set; }
         public double BaseDefense { get; private set; }
         public int StationedTroops { get; private set; }
-        private Fleet? _stationedFleet;
+        private readonly List<Fleet> _stationedFleets = new();
 
         public Planet(
             Guid id,
@@ -77,26 +77,27 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public double EffectiveAttack(double researchAttackBonusPct)
             => BaseAttack * (1 + researchAttackBonusPct)
                + StationedTroops * 0.1
-               + (_stationedFleet?.CalculateStrength().MilitaryPower ?? 0);
+               + _stationedFleets.Sum(f => f.CalculateStrength().MilitaryPower);
 
         public double EffectiveDefense(double researchDefenseBonusPct)
             => BaseDefense * (1 + researchDefenseBonusPct)
                + StationedTroops * 0.2
-               + (_stationedFleet?.CalculateStrength().MilitaryPower ?? 0);
+               + _stationedFleets.Sum(f => f.CalculateStrength().MilitaryPower);
 
         public void StationFleet(Fleet fleet)
         {
             if (fleet.FactionId != ControllingFactionId)
                 throw new DomainException("Fleet must belong to owning faction.");
-            _stationedFleet = fleet;
+            if (!_stationedFleets.Any(f => f.Id == fleet.Id))
+                _stationedFleets.Add(fleet);
         }
 
-        public void RemoveStationedFleet()
+        public void RemoveStationedFleet(Fleet fleet)
         {
-            _stationedFleet = null;
+            _stationedFleets.RemoveAll(f => f.Id == fleet.Id);
         }
 
-        public Fleet? GetStationedFleet() => _stationedFleet;
+        public IReadOnlyList<Fleet> GetStationedFleets() => _stationedFleets.AsReadOnly();
 
         public void SetStationedTroops(int troops)
         {

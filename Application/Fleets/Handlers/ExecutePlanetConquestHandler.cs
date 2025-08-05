@@ -39,14 +39,13 @@ namespace SkyHorizont.Application.Fleets.Handlers
             // Simulate the battle
             cmd.BattleResult = _battleSimulator.SimulatePlanetConquest(fleet, planet, researchAtkPct, researchDefPct);
 
-            var defenderFleet = planet.GetStationedFleet();
-            if (defenderFleet != null)
+            foreach (var def in planet.GetStationedFleets().ToList())
             {
                 if (!cmd.BattleResult.DefenseRetreated)
                 {
-                    planet.RemoveStationedFleet();
+                    planet.RemoveStationedFleet(def);
                 }
-                // If defender retreated, fleet remains but with reduced ships already removed
+                // else leaving fleets with reduced forces intact
             }
 
             if (cmd.BattleResult.AttackerWins)
@@ -57,7 +56,7 @@ namespace SkyHorizont.Application.Fleets.Handlers
             else
             {
                 // outcome is failure or retreat—treat fleetBattle separately
-                _battleOutcomeService.ProcessFleetBattle(fleet, defenderFleet, cmd.BattleResult);
+                _battleOutcomeService.ProcessFleetBattle(fleet, null, cmd.BattleResult);
             }
 
             _planetRepo.Save(planet);

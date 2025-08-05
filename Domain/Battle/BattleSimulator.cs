@@ -19,59 +19,61 @@ namespace SkyHorizont.Domain.Battle
             _random = new(seed);
         }
 
-        public BattleResult SimulateFleetBattle(Fleet attacker, Fleet defender)
+        public BattleResult SimulateFleetBattle(Fleet attacker, IEnumerable<Fleet> defenders)
         {
             var rng = new Random(_random.Next());
-            double atkPower = attacker.CalculateStrength().MilitaryPower * CommanderAttackModifier(attacker);
-            double defPower = defender.CalculateStrength().MilitaryPower * CommanderDefenseModifier(defender);
 
-            int atkRounds = 0, defRounds = 0;
+            double atkPower = attacker.CalculateStrength().MilitaryPower * CommanderAttackModifier(attacker);
+            double defPower = defenders.Sum(f => f.CalculateStrength().MilitaryPower * CommanderDefenseModifier(f));
 
             for (int round = 0; round < MaxRounds && atkPower > 0 && defPower > 0; round++)
             {
                 defPower -= atkPower * 0.1;
                 atkPower -= defPower * 0.1;
-                atkRounds++; defRounds++;
             }
 
             bool attackerWins = atkPower >= defPower;
+            bool defenderRetreats = !attackerWins && (atkPower / defPower) >= 2.0;
 
-            bool defenderRetreats = rng.NextDouble() < RetreatChance(defender, atkPower, defPower);
+            foreach (var fleet in defenders)
+            {
+                var lost = fleet.ComputeLostShips(defPower, defenderRetreats);
+                foreach (var shipId in lost)
+                    fleet.DestroyShip(shipId);
+            }
 
-            var lostDefenders = defender.ComputeLostShips(defPower, defenderRetreats);
-            foreach (var id in lostDefenders)
-                defender.DestroyShip(id);
+            var defenderFaction = defenders.FirstOrDefault()?.FactionId ?? Guid.Empty;
 
             return new BattleResult(
                 Guid.NewGuid(),
-                attackerWins || defenderRetreats ? attacker.FactionId : defender.FactionId,
-                attackerWins || defenderRetreats ? defender.FactionId : attacker.FactionId,
-                attackerWins ? attacker : defender,
-                defenderRetreats ? defender : attacker,
+                attackerWins || defenderRetreats ? attacker.FactionId : defenderFaction,
+                attackerWins || defenderRetreats ? defenderFaction : attacker.FactionId,
+                attackerWins ? attacker : (defenderRetreats ? attacker : null),
+                defenderRetreats ? defenders.FirstOrDefault() : (attackerWins ? null : attacker),
                 occupationDurationHours: 0,
                 outcomeMerit: attackerWins ? 50 : 10,
                 lootCredits: (int)(atkPower * 0.5),
                 planetCaptureBonus: 0,
-                defenderRetreats,
-                attackerWins
+                defenseRetreated: defenderRetreats,
+                attackerWins: attackerWins
             );
         }
-
 
         public BattleResult SimulatePlanetConquest(
             Fleet attacker, Planet planet,
             double researchAtkPct, double researchDefPct)
         {
             var rng = new Random(_random.Next());
-            var defenderFleet = planet.GetStationedFleet();
-            BattleResult? fleetBattle = null;
+            var defenderFleets = planet.GetStationedFleets();
+            
+            BattleResult? fleetBattleResult = null;
 
-            if (defenderFleet != null)
+            if (defenderFleets.Any())
             {
-                fleetBattle = SimulateFleetBattle(attacker, defenderFleet);
+                fleetBattleResult = SimulateFleetBattle(attacker, defenderFleets);
             }
 
-            double defenderFleetPower = defenderFleet?.CalculateStrength().MilitaryPower ?? 0;
+            double defenderFleetPower = defenderFleets.Sum(f => f.CalculateStrength().MilitaryPower);
             double defPower = planet.EffectiveDefense(researchDefPct) + defenderFleetPower;
             double atkPower = attacker.CalculateStrength().MilitaryPower * CommanderAttackModifier(attacker)
                           + researchAtkPct;
@@ -85,14 +87,14 @@ namespace SkyHorizont.Domain.Battle
             }
 
             bool attackerWins = atkPower >= defPower + troops;
-            bool defenderRetreated = fleetBattle?.DefenseRetreated ?? false;
+            bool defenderRetreated = fleetBattleResult?.DefenseRetreated ?? false;
 
             var result = new BattleResult(
                 Guid.NewGuid(),
                 attackerWins || defenderRetreated ? attacker.FactionId : planet.ControllingFactionId,
                 attackerWins || defenderRetreated ? planet.ControllingFactionId : attacker.FactionId,
                 attackerWins ? attacker : (defenderRetreated ? attacker : null),
-                defenderRetreated ? defenderFleet : (attackerWins ? null : attacker),
+                defenderRetreated ? defenderFleets.FirstOrDefault() : (attackerWins ? null : attacker),
                 attackerWins ? 24 : 0,
                 outcomeMerit: attackerWins ? 100 : 20,
                 lootCredits: attackerWins ? (int)(planet.BaseDefense * 2) : 0,
@@ -121,6 +123,5 @@ namespace SkyHorizont.Domain.Battle
                 baseChance += CommanderRepo.GetById(defender.AssignedCommanderId.Value).GetRetreatModifier();
             return Math.Clamp(baseChance, 0, 1);
         }
-
     }
 }
