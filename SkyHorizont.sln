@@ -3,7 +3,10 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkyHorizont", "SkyHorizont\SkyHorizont.csproj", "{E6A3C48E-66A9-4BAE-AA19-C4108128AE87}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkyHorizont.Domain", "Domain\Domain.csproj", "{E6A3C48E-66A9-4BAE-AA19-C4108128AE87}"
+Project("{FAE04EC2-401F-11D5-BF8B-00C08F79EFBD}") = "SkyHorizont.Application", "Application\Application.csproj", "{A1A3C48E-66B9-4BAE-AA19-C4108128AE25}"
+Project("{FAE04EC4-501F-11D7-BF2B-00C04F79EFBE}") = "SkyHorizont.Infrastructure", "Infrastructure\Infrastructure.csproj", "{C3A3C48E-66C9-4BAE-AA19-C4108128AE33}"
+Project("{FAE04EC8-601F-11D9-BF6B-00C04F79EFBF}") = "SkyHorizont.Tests", "Tests\Tests.csproj", "{D5A3C48E-66DA9-4BAE-AA19-C4108128AE67}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -18,5 +21,17 @@ Global
 		{E6A3C48E-66A9-4BAE-AA19-C4108128AE87}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E6A3C48E-66A9-4BAE-AA19-C4108128AE87}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E6A3C48E-66A9-4BAE-AA19-C4108128AE87}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1A3C48E-66B9-4BAE-AA19-C4108128AE25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1A3C48E-66B9-4BAE-AA19-C4108128AE25}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1A3C48E-66B9-4BAE-AA19-C4108128AE25}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1A3C48E-66B9-4BAE-AA19-C4108128AE25}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3A3C48E-66C9-4BAE-AA19-C4108128AE33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3A3C48E-66C9-4BAE-AA19-C4108128AE33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3A3C48E-66C9-4BAE-AA19-C4108128AE33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3A3C48E-66C9-4BAE-AA19-C4108128AE33}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D5A3C48E-66DA9-4BAE-AA19-C4108128AE67}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED5A3C48E-66DA9-4BAE-AA19-C4108128AE67}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D5A3C48E-66DA9-4BAE-AA19-C4108128AE67}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D5A3C48E-66DA9-4BAE-AA19-C4108128AE67}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
