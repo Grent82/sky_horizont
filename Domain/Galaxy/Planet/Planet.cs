@@ -121,7 +121,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             GovernorId = null;
         }
         
-        internal void ConqueredBy(Guid newFaction, BattleResult result, IBattleOutcomeService outcomeService)
+        public void ConqueredBy(Guid newFaction, BattleResult result, IBattleOutcomeService outcomeService)
         {
             ChangeControl(newFaction);
             outcomeService.ProcessPlanetConquest(this, result.WinnerFleet!, result);

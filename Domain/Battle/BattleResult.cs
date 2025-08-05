@@ -10,20 +10,30 @@ namespace SkyHorizont.Domain.Battle
         public Fleet? WinnerFleet { get; }
         public Fleet? LoserFleet { get; }
         public int OccupationDurationHours { get; }
+        public int OutcomeMerit { get; }
+        public int LootCredits { get; }
+        public int PlanetCaptureBonus { get; }
 
-        public BattleResult(Guid battleId,
-                            Guid winnerFaction,
-                            Guid loserFaction,
-                            Fleet? winnerFleet,
-                            Fleet? loserFleet,
-                            int hoursOccupied = 0)
+        public BattleResult(
+            Guid battleId,
+            Guid winningFactionId,
+            Guid losingFactionId,
+            Fleet? winnerFleet,
+            Fleet? loserFleet,
+            int occupationDurationHours,
+            int outcomeMerit,
+            int lootCredits,
+            int planetCaptureBonus)
         {
             BattleId = battleId;
-            WinningFactionId = winnerFaction;
-            LosingFactionId = loserFaction;
+            WinningFactionId = winningFactionId;
+            LosingFactionId = losingFactionId;
             WinnerFleet = winnerFleet;
             LoserFleet = loserFleet;
-            OccupationDurationHours = hoursOccupied;
+            OccupationDurationHours = occupationDurationHours;
+            OutcomeMerit = outcomeMerit;
+            LootCredits = lootCredits;
+            PlanetCaptureBonus = planetCaptureBonus;
         }
     }
 }
