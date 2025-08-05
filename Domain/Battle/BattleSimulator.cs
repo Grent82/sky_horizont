@@ -10,8 +10,10 @@ namespace SkyHorizont.Domain.Battle
 
         public BattleResult SimulateFleetBattle(Fleet attacker, Fleet defender)
         {
-            double atkPower = attacker.CalculateStrength().MilitaryPower;
-            double defPower = defender.CalculateStrength().MilitaryPower;
+            var rng = new Random(_random.Next());
+            double atkPower = attacker.CalculateStrength().MilitaryPower * CommanderAttackModifier(attacker);
+            double defPower = defender.CalculateStrength().MilitaryPower * CommanderDefenseModifier(defender);
+
             int atkRounds = 0, defRounds = 0;
 
             for (int round = 0; round < MaxRounds && atkPower > 0 && defPower > 0; round++)
@@ -22,9 +24,8 @@ namespace SkyHorizont.Domain.Battle
             }
 
             bool attackerWins = atkPower >= defPower;
-            double ratio = defPower > 0 ? atkPower / defPower : double.PositiveInfinity;
 
-            bool defenderRetreats = !attackerWins && ratio <= 0.5;
+            bool defenderRetreats = rng.NextDouble() < RetreatChance(defender, atkPower, defPower);
 
             var lostDefenders = defender.ComputeLostShips(defPower, defenderRetreats);
             foreach (var id in lostDefenders)
@@ -50,20 +51,19 @@ namespace SkyHorizont.Domain.Battle
             Fleet attacker, Planet planet,
             double researchAtkPct, double researchDefPct)
         {
+            var rng = new Random(_random.Next());
             var defenderFleet = planet.GetStationedFleet();
             BattleResult? fleetBattle = null;
 
             if (defenderFleet != null)
             {
                 fleetBattle = SimulateFleetBattle(attacker, defenderFleet);
-
-                // defender lost ships already removed inside SimulateFleetBattle
             }
 
             double defenderFleetPower = defenderFleet?.CalculateStrength().MilitaryPower ?? 0;
             double defPower = planet.EffectiveDefense(researchDefPct) + defenderFleetPower;
-            double atkPower = attacker.CalculateStrength().MilitaryPower
-                            + (attacker.AssignedCommanderId.HasValue ? 10 : 0);
+            double atkPower = attacker.CalculateStrength().MilitaryPower * CommanderAttackModifier(attacker)
+                          + researchAtkPct;
 
             int troops = planet.StationedTroops;
 
@@ -92,6 +92,28 @@ namespace SkyHorizont.Domain.Battle
 
             return result;
         }
+        
+        private double CommanderAttackModifier(Fleet fleet) =>
+        fleet.AssignedCommanderId.HasValue
+            ? 1.0 + SkillBonus(fleet.AssignedCommanderId.Value, "attack")
+            : 1.0;
+
+        private double CommanderDefenseModifier(Fleet fleet) =>
+            fleet.AssignedCommanderId.HasValue
+                ? 1.0 + SkillBonus(fleet.AssignedCommanderId.Value, "defense")
+                : 1.0;
+
+        private double RetreatChance(Fleet defender, double atkPower, double defPower)
+        {
+            double baseChance = 0.4; // 40% if heavily outnumbered
+            if (defender.AssignedCommanderId.HasValue)
+                baseChance += SkillModifier(defender.AssignedCommanderId.Value, "retreat");
+            return Math.Clamp(baseChance, 0, 1);
+        }
+
+        private double SkillBonus(Guid commanderId, string type) { /* load personality or skill */ return 0.1; }
+
+        private double SkillModifier(Guid commanderId, string type) { /* e.g. -0.05 for brave trait */ return -0.05; }
 
     }
 }
