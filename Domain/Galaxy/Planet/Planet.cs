@@ -20,7 +20,6 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public double BaseDefense { get; private set; }
         public int StationedTroops { get; private set; }
         private Fleet? _stationedFleet;
-        public Fleet? StationedFleet => _stationedFleet;
 
         public Planet(
             Guid id,
@@ -77,7 +76,8 @@ namespace SkyHorizont.Domain.Galaxy.Planet
 
         public double EffectiveAttack(double researchAttackBonusPct)
             => BaseAttack * (1 + researchAttackBonusPct)
-               + StationedTroops * 0.1;
+               + StationedTroops * 0.1
+               + (_stationedFleet?.CalculateStrength().MilitaryPower ?? 0);
 
         public double EffectiveDefense(double researchDefenseBonusPct)
             => BaseDefense * (1 + researchDefenseBonusPct)
@@ -90,6 +90,13 @@ namespace SkyHorizont.Domain.Galaxy.Planet
                 throw new DomainException("Fleet must belong to owning faction.");
             _stationedFleet = fleet;
         }
+
+        public void RemoveStationedFleet()
+        {
+            _stationedFleet = null;
+        }
+
+        public Fleet? GetStationedFleet() => _stationedFleet;
 
         public void SetStationedTroops(int troops)
         {

@@ -1,4 +1,3 @@
-// SkyHorizont.Infrastructure/DomainServices/BattleOutcomeService.cs
 using SkyHorizont.Domain.Battle;
 using SkyHorizont.Domain.Faction;
 using SkyHorizont.Domain.Fleets;

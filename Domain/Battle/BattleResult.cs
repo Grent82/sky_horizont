@@ -13,6 +13,8 @@ namespace SkyHorizont.Domain.Battle
         public int OutcomeMerit { get; }
         public int LootCredits { get; }
         public int PlanetCaptureBonus { get; }
+        public bool DefenseRetreated { get; }
+        public bool AttackerWins { get; }
 
         public BattleResult(
             Guid battleId,
@@ -23,7 +25,9 @@ namespace SkyHorizont.Domain.Battle
             int occupationDurationHours,
             int outcomeMerit,
             int lootCredits,
-            int planetCaptureBonus)
+            int planetCaptureBonus,
+            bool defenseRetreated,
+            bool attackerWins)
         {
             BattleId = battleId;
             WinningFactionId = winningFactionId;
@@ -34,6 +38,8 @@ namespace SkyHorizont.Domain.Battle
             OutcomeMerit = outcomeMerit;
             LootCredits = lootCredits;
             PlanetCaptureBonus = planetCaptureBonus;
+            DefenseRetreated = defenseRetreated;
+            AttackerWins = attackerWins;
         }
     }
 }

@@ -53,6 +53,16 @@ namespace SkyHorizont.Domain.Fleets
                 throw new DomainException($"Ship {shipId} not part of fleet.");
         }
 
+        public IEnumerable<Guid> ComputeLostShips(double remainingPower, bool retreat)
+        {
+            var sorted = Ships.OrderBy(s => s.CurrentDefense).ToList();
+            int toRemove = retreat
+                ? (int)(Ships.Count * 0.4)  // ~40% losses on retreat :contentReference[oaicite:3]{index=3}
+                : Ships.Count;              // full destruction if no retreat
+
+            return sorted.Take(toRemove).Select(s => s.Id);
+        }
+
         public void EnqueueOrder(FleetOrder order)
         {
             if (order.Status != TaskStatus.Pending)

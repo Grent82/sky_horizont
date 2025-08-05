@@ -6,6 +6,6 @@ namespace SkyHorizont.Application.Fleets.Commands
     {
         public Guid PlanetId { get; init; }
         public Guid AttackerFleetId { get; init; }
-        public BattleResult BattleResult { get; init; }
+        public BattleResult BattleResult { get; set; }
     }
 }

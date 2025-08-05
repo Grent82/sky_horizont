@@ -12,44 +12,61 @@ namespace SkyHorizont.Application.Fleets.Handlers
         private readonly ICommanderRepository _commanderRepo;
         private readonly IPlanetRepository _planetRepo;
         private readonly IFleetRepository _fleetRepo;
+        private readonly IBattleSimulator _battleSimulator;
         private readonly IBattleOutcomeService _battleOutcomeService;
 
         public ExecutePlanetConquestHandler(
             ICommanderRepository commanderRepo,
             IPlanetRepository planetRepo,
             IFleetRepository fleetRepo,
+            IBattleSimulator battleSimulator,
             IBattleOutcomeService battleOutcomeService)
         {
             _commanderRepo = commanderRepo;
             _planetRepo = planetRepo;
             _fleetRepo = fleetRepo;
+            _battleSimulator = battleSimulator;
             _battleOutcomeService = battleOutcomeService;
         }
 
-        public void Handle(ExecutePlanetConquestCommand cmd)
+        public void Handle(ExecutePlanetConquestCommand cmd, double researchAtkPct, double researchDefPct)
         {
             var planet = _planetRepo.GetById(cmd.PlanetId)
                          ?? throw new NotFoundException("Planet not found");
             var fleet = _fleetRepo.GetById(cmd.AttackerFleetId)
                         ?? throw new NotFoundException("Fleet not found");
 
-            planet.ConqueredBy(fleet.FactionId, cmd.BattleResult, _battleOutcomeService);
+            // Simulate the battle
+            cmd.BattleResult = _battleSimulator.SimulatePlanetConquest(fleet, planet, researchAtkPct, researchDefPct);
 
-            // Delegate side effects via service
-            _battleOutcomeService.ProcessPlanetConquest(planet, fleet, cmd.BattleResult);
+            var defenderFleet = planet.GetStationedFleet();
+            if (defenderFleet != null)
+            {
+                if (!cmd.BattleResult.DefenseRetreated)
+                {
+                    planet.RemoveStationedFleet();
+                }
+                // If defender retreated, fleet remains but with reduced ships already removed
+            }
 
-            // Persist entities and commander merit changes
+            if (cmd.BattleResult.AttackerWins)
+            {
+                planet.ConqueredBy(fleet.FactionId, cmd.BattleResult, _battleOutcomeService);
+                _battleOutcomeService.ProcessPlanetConquest(planet, fleet, cmd.BattleResult);
+            }
+            else
+            {
+                // outcome is failure or retreat—treat fleetBattle separately
+                _battleOutcomeService.ProcessFleetBattle(fleet, defenderFleet, cmd.BattleResult);
+            }
+
             _planetRepo.Save(planet);
             _fleetRepo.Save(fleet);
 
             if (fleet.AssignedCommanderId.HasValue)
             {
                 var cmdr = _commanderRepo.GetById(fleet.AssignedCommanderId.Value);
-                if (cmdr != null)
-                {
-                    // merit applied via service, but ensure persistence
-                    _commanderRepo.Save(cmdr);
-                }
+                if (cmdr != null) _commanderRepo.Save(cmdr);
             }
         }
     }
