@@ -12,6 +12,7 @@ internal class InMemoryCommanderFundsRepository : ICommanderFundsRepository
 
     public int GetBalance(Guid commanderId) =>
         _context.CommanderFunds.TryGetValue(commanderId, out var b) ? b : 0;
+        
     public void AddBalance(Guid commanderId, int amount)
     {
         _context.CommanderFunds[commanderId] = GetBalance(commanderId) + amount;

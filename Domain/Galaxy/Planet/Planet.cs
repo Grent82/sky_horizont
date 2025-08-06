@@ -135,6 +135,21 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             outcomeService.ProcessPlanetConquest(this, result.WinnerFleet!, result);
         }
 
+        public IReadOnlyList<Guid> GetAssignedSubCommanders()
+        {
+            var list = new List<Guid>();
+            if (GovernorId.HasValue && GovernorId != Guid.Empty)
+                list.Add(GovernorId.Value);
+
+            foreach (var fleet in _stationedFleets)
+            {
+                if (fleet.AssignedCommanderId.HasValue && fleet.AssignedCommanderId != GovernorId)
+                    list.Add(fleet.AssignedCommanderId.Value);
+            }
+
+            return list.Distinct().ToList();
+        }
+
         public override string ToString() =>
             $"{Name} (Faction: {ControllingFactionId}, Governor: {GovernorId})";
     }

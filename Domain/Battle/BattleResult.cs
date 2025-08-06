@@ -2,7 +2,7 @@ using SkyHorizont.Domain.Fleets;
 
 namespace SkyHorizont.Domain.Battle
 {
-    public class BattleResult
+    public struct BattleResult
     {
         public Guid BattleId { get; }
         public Guid WinningFactionId { get; }
@@ -12,7 +12,7 @@ namespace SkyHorizont.Domain.Battle
         public int OccupationDurationHours { get; }
         public int OutcomeMerit { get; }
         public int LootCredits { get; }
-        public int PlanetCaptureBonus { get; }
+        public int PlanetCaptureBonus { get; set; }
         public bool DefenseRetreated { get; }
         public bool AttackerWins { get; }
 

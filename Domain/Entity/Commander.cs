@@ -17,6 +17,13 @@ namespace SkyHorizont.Domain.Entity
             // Leader is maximum
         };
 
+        #region Variables
+        private int _balance;
+        
+        #endregion
+
+        #region Getter / Setter
+
         public Guid Id { get; }
         public string Name { get; private set; }
         public int Age { get; private set; }
@@ -31,6 +38,9 @@ namespace SkyHorizont.Domain.Entity
 
         public bool IsAssigned => AssignedTask is not null;
         public EntityTask? AssignedTask { get; private set; }
+
+        public int Balance => _balance;
+        #endregion
 
         public Commander(
             Guid id,
@@ -87,7 +97,7 @@ namespace SkyHorizont.Domain.Entity
 
         private void Promote()
         {
-            if (Rank == Rank.General) return;
+            if (Rank == Rank.Leader) return;
             Rank = Rank + 1;
             // ToDo: automate some side‑effect? e.g. talent bonus
         }
@@ -96,10 +106,10 @@ namespace SkyHorizont.Domain.Entity
         {
             return type switch
             {
-                TaskType.Research    => Skills.Research >= 50,
-                TaskType.Espionage   => Skills.Intelligence >= 50,
-                TaskType.Govern      => Skills.Economy >= 30,
-                TaskType.Attack      => Skills.Military >= 40,
+                TaskType.Research => Skills.Research >= 50,
+                TaskType.Espionage => Skills.Intelligence >= 50,
+                TaskType.Govern => Skills.Economy >= 30,
+                TaskType.Attack => Skills.Military >= 40,
                 _ => true
             };
         }
@@ -128,5 +138,14 @@ namespace SkyHorizont.Domain.Entity
             => (Personality.Boldness - 50) * -0.001;
 
         public override string ToString() => $"{Name} (Rank: {Rank}, Merit: {Merit})";
+        
+        public void Credit(int amount) => _balance += amount;
+
+        public bool Deduct(int amount)
+        {
+            if (_balance < amount) return false;
+            _balance -= amount;
+            return true;
+        }
     }
 }
