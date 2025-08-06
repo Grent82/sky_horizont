@@ -92,7 +92,7 @@ namespace SkyHorizont.Domain.Fleets
 
         internal void RewardAfterBattle(BattleResult result, IBattleOutcomeService outcomeService)
         {
-            outcomeService.ProcessFleetBattle(this, result.LoserFleet, result);
+            outcomeService.ProcessFleetBattle(this, result.LoserFleet!, result);
         }
     }
 }

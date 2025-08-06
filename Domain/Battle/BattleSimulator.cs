@@ -33,7 +33,7 @@ namespace SkyHorizont.Domain.Battle
             }
 
             bool attackerWins = atkPower >= defPower;
-            bool defenderRetreats = !attackerWins && (atkPower / defPower) >= 2.0;
+            bool defenderRetreats = !attackerWins && (rng.NextDouble() < RetreatChance(defenders, atkPower, defPower));
 
             foreach (var fleet in defenders)
             {
@@ -108,20 +108,30 @@ namespace SkyHorizont.Domain.Battle
 
         private double CommanderAttackModifier(Fleet fleet) =>
         fleet.AssignedCommanderId.HasValue
-            ? 1.0 + CommanderRepo.GetById(fleet.AssignedCommanderId.Value).GetAttackBonus()
+            ? 1.0 + CommanderRepo.GetById(fleet.AssignedCommanderId.Value)!.GetAttackBonus()
             : 1.0;
 
         private double CommanderDefenseModifier(Fleet fleet) =>
             fleet.AssignedCommanderId.HasValue
-                ? 1.0 + CommanderRepo.GetById(fleet.AssignedCommanderId.Value).GetDefenseBonus()
+                ? 1.0 + CommanderRepo.GetById(fleet.AssignedCommanderId.Value)!.GetDefenseBonus()
                 : 1.0;
 
-        private double RetreatChance(Fleet defender, double atkPower, double defPower)
+        private double RetreatChance(IEnumerable<Fleet> defenders, double atkPower, double defPower)
         {
-            double baseChance = 0.4; // 40% if heavily outnumbered
-            if (defender.AssignedCommanderId.HasValue)
-                baseChance += CommanderRepo.GetById(defender.AssignedCommanderId.Value).GetRetreatModifier();
-            return Math.Clamp(baseChance, 0, 1);
+            double ratio = defPower > 0 ? atkPower / defPower : double.PositiveInfinity;
+            double baseChance = ratio >= 2.0 ? 0.4 : 0.0;
+
+            // If any defending fleet has a commander, apply best modifier (e.g. boldness)
+            foreach (var def in defenders)
+            {
+                if (def.AssignedCommanderId.HasValue)
+                {
+                    var cmd = CommanderRepo.GetById(def.AssignedCommanderId.Value);
+                    baseChance += cmd!.GetRetreatModifier();
+                }
+            }
+
+            return Math.Clamp(baseChance, 0.0, 1.0);
         }
     }
 }

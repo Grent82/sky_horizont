@@ -33,11 +33,10 @@ namespace SkyHorizont.Application.Fleets.Handlers
         {
             var planet = _planetRepo.GetById(cmd.PlanetId)
                          ?? throw new NotFoundException("Planet not found");
-            var fleet = _fleetRepo.GetById(cmd.AttackerFleetId)
+            var attackerFleet = _fleetRepo.GetById(cmd.AttackerFleetId)
                         ?? throw new NotFoundException("Fleet not found");
 
-            // Simulate the battle
-            cmd.BattleResult = _battleSimulator.SimulatePlanetConquest(fleet, planet, researchAtkPct, researchDefPct);
+            cmd.BattleResult = _battleSimulator.SimulatePlanetConquest(attackerFleet, planet, researchAtkPct, researchDefPct);
 
             foreach (var def in planet.GetStationedFleets().ToList())
             {
@@ -45,26 +44,27 @@ namespace SkyHorizont.Application.Fleets.Handlers
                 {
                     planet.RemoveStationedFleet(def);
                 }
-                // else leaving fleets with reduced forces intact
             }
 
             if (cmd.BattleResult.AttackerWins)
             {
-                planet.ConqueredBy(fleet.FactionId, cmd.BattleResult, _battleOutcomeService);
-                _battleOutcomeService.ProcessPlanetConquest(planet, fleet, cmd.BattleResult);
+                planet.ConqueredBy(attackerFleet.FactionId, cmd.BattleResult, _battleOutcomeService);
+                _battleOutcomeService.ProcessPlanetConquest(planet, attackerFleet, cmd.BattleResult);
             }
             else
             {
-                // outcome is failure or retreat—treat fleetBattle separately
-                _battleOutcomeService.ProcessFleetBattle(fleet, null, cmd.BattleResult);
+                var defenderFleet = cmd.BattleResult.DefenseRetreated
+                    ? cmd.BattleResult.LoserFleet!
+                    : cmd.BattleResult.WinnerFleet!;
+                _battleOutcomeService.ProcessFleetBattle(attackerFleet, defenderFleet, cmd.BattleResult); // ToDO
             }
 
             _planetRepo.Save(planet);
-            _fleetRepo.Save(fleet);
+            _fleetRepo.Save(attackerFleet);
 
-            if (fleet.AssignedCommanderId.HasValue)
+            if (attackerFleet.AssignedCommanderId.HasValue)
             {
-                var cmdr = _commanderRepo.GetById(fleet.AssignedCommanderId.Value);
+                var cmdr = _commanderRepo.GetById(attackerFleet.AssignedCommanderId.Value);
                 if (cmdr != null) _commanderRepo.Save(cmdr);
             }
         }
