@@ -1,4 +1,4 @@
-using SkyHorizont.Domain.Faction;
+using SkyHorizont.Domain.Factions;
 
 namespace SkyHorizont.Infrastruture.DomainService
 {

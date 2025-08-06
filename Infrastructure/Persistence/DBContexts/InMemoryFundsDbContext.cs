@@ -1,6 +1,8 @@
+using SkyHorizont.Infrastructure.Persistence.Interfaces;
+
 namespace SkyHorizont.Infrastructure.Persistence
 {
-    public class InMemoryFundsDbContext : IFundsDbContext
+    public class InMemoryFundsDbContext : IFactionFundsDbContext
     {
         public IDictionary<Guid, int> FactionFunds { get; } = new Dictionary<Guid, int>();
 

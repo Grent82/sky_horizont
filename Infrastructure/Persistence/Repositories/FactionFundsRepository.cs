@@ -1,12 +1,13 @@
 using SkyHorizont.Domain.Factions;
+using SkyHorizont.Infrastructure.Persistence.Interfaces;
 
 namespace SkyHorizont.Infrastructure.Persistence
 {
     public class FactionFundsRepository : IFactionFundsRepository
     {
-        private readonly IFundsDbContext _context;
+        private readonly IFactionFundsDbContext _context;
 
-        public FactionFundsRepository(IFundsDbContext context)
+        public FactionFundsRepository(IFactionFundsDbContext context)
         {
             _context = context;
         }
