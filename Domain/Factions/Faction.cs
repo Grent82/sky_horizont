@@ -1,7 +1,7 @@
 
 using SkyHorizont.Domain.Shared;
 
-namespace SkyHorizont.Domain.Faction
+namespace SkyHorizont.Domain.Factions
 {
     public class Faction
     {

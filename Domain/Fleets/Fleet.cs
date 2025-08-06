@@ -1,5 +1,5 @@
 using SkyHorizont.Domain.Battle;
-using SkyHorizont.Domain.Faction;
+using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Shared;
 using TaskStatus = SkyHorizont.Domain.Entity.Task.TaskStatus;
 

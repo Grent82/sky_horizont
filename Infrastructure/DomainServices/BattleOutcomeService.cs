@@ -1,5 +1,5 @@
 using SkyHorizont.Domain.Battle;
-using SkyHorizont.Domain.Faction;
+using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Fleets;
 using SkyHorizont.Domain.Galaxy.Planet;
 

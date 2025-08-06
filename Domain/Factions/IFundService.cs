@@ -1,4 +1,4 @@
-namespace SkyHorizont.Domain.Faction
+namespace SkyHorizont.Domain.Factions
 {
     /// <summary>
     /// A domain-level service interface for checking and deducting faction credits.

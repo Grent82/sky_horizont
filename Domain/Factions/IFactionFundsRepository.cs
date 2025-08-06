@@ -1,4 +1,4 @@
-namespace SkyHorizont.Domain.Faction
+namespace SkyHorizont.Domain.Factions
 {
     public interface IFactionFundsRepository
     {

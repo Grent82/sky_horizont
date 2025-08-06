@@ -1,4 +1,4 @@
-using SkyHorizont.Domain.Faction;
+using SkyHorizont.Domain.Factions;
 using SkyHorizont.Infrastructure.Persistence;
 
 namespace SkyHorizont.Infrastruture.Repositories
