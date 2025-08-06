@@ -1,6 +1,6 @@
 using SkyHorizont.Domain.Galaxy.Planet;
 
-namespace SkyHorizont.Infrastructure.Repositories
+namespace SkyHorizont.Infrastructure.Persistence
 {
     public class InMemoryPlanetRepository : IPlanetRepository
     {

@@ -1,6 +1,6 @@
 using SkyHorizont.Domain.Fleets;
 
-namespace SkyHorizont.Infrastructure.Repositories
+namespace SkyHorizont.Infrastructure.Persistence
 {
     public class InMemoryFleetRepository : IFleetRepository
     {

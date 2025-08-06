@@ -1,6 +1,6 @@
 using SkyHorizont.Domain.Entity;
 
-namespace SkyHorizont.Infrastructure.Repositories
+namespace SkyHorizont.Infrastructure.Persistence
 {
     public class InMemoryCommanderRepository : ICommanderRepository
     {

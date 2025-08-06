@@ -1,7 +1,6 @@
 using SkyHorizont.Domain.Factions;
-using SkyHorizont.Infrastructure.Persistence;
 
-namespace SkyHorizont.Infrastruture.Repositories
+namespace SkyHorizont.Infrastructure.Persistence
 {
     public class FactionFundsRepository : IFactionFundsRepository
     {
