@@ -12,6 +12,9 @@ namespace SkyHorizont.Infrastructure.Persistence
             _context = context;
         }
 
+        public IEnumerable<Fleet> GetAll() =>_context.Fleets.Values;
+    
+
         public Fleet? GetById(Guid fleetId) =>
             _context.Fleets.TryGetValue(fleetId, out var cmd) ? cmd : null;
 

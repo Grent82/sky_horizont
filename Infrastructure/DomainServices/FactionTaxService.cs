@@ -3,7 +3,7 @@ using SkyHorizont.Domain.Factions;
 
 namespace SkyHorizont.Infrastructure.DomainServices
 {
-    internal class FactionTaxService : IFactionTaxService
+    public class FactionTaxService : IFactionTaxService
     {
         private readonly IFactionFundsRepository _factionFundsRepo;
         private readonly ICommanderFundsRepository _commanderFundsRepo;

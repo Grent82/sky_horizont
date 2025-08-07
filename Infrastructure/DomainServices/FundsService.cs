@@ -1,6 +1,6 @@
 using SkyHorizont.Domain.Factions;
 
-namespace SkyHorizont.Infrastruture.DomainService
+namespace SkyHorizont.Infrastructure.DomainServices
 {
     public class FundsService : IFundsService
     {

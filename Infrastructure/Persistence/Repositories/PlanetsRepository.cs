@@ -12,6 +12,8 @@ namespace SkyHorizont.Infrastructure.Persistence
             _context = context;
         }
 
+        public IEnumerable<Planet> GetAll() =>_context.Planets.Values;
+
         public Planet? GetById(Guid planetId) =>
             _context.Planets.TryGetValue(planetId, out var cmd) ? cmd : null;
 

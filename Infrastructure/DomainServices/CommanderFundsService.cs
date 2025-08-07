@@ -2,7 +2,7 @@ using SkyHorizont.Domain.Entity;
 
 namespace SkyHorizont.Infrastructure.DomainServices
 {
-    internal class CommanderFundsService : ICommanderFundsService
+    public class CommanderFundsService : ICommanderFundsService
     {
         private readonly ICommanderFundsRepository _repo;
         public CommanderFundsService(ICommanderFundsRepository repo) => _repo = repo;
