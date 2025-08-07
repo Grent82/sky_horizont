@@ -1,5 +1,3 @@
-// SkyHorizont.Infrastructure.DomainServices/BattleOutcomeService.cs
-
 using SkyHorizont.Domain.Battle;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Factions;
@@ -14,31 +12,46 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IFactionFundsRepository _factionFundRepo;
         private readonly IFactionTaxService _factionTaxService;
         private readonly ICommanderRepository _commanderRepo;
+        private readonly IMoraleService _moraleService;
 
         public BattleOutcomeService(
             ICommanderFundsService commanderFundsService,
             IFactionFundsRepository factionFundRepo,
             IFactionTaxService factionTaxService,
-            ICommanderRepository commanderRepo)
+            ICommanderRepository commanderRepo,
+            IMoraleService moraleService)
         {
             _commanderFundsService = commanderFundsService;
             _factionFundRepo = factionFundRepo;
             _factionTaxService = factionTaxService;
             _commanderRepo = commanderRepo;
+            _moraleService = moraleService;
         }
 
         public void ProcessFleetBattle(Fleet attacker, Fleet defender, BattleResult result)
         {
-            if (attacker.AssignedCommanderId.HasValue)
+            if (attacker.AssignedCommanderId is Guid attackerCmdId)
             {
-                var cmd = _commanderRepo.GetById(attacker.AssignedCommanderId.Value);
-                cmd?.GainMerit(result.OutcomeMerit);
+                var commander = _commanderRepo.GetById(attackerCmdId);
+                if (commander != null)
+                {
+                    commander.GainMerit(result.OutcomeMerit);
+                    _commanderFundsService.CreditCommander(commander.Id, result.LootCredits);
+
+                    // Bonus for thrill-seeking commanders
+                    if (PersonalityTraits.ThrillSeeker(commander.Personality))
+                    {
+                        int bonus = (int)(result.LootCredits * 0.1);
+                        _commanderFundsService.CreditCommander(commander.Id, bonus);
+                    }
+
+                    _moraleService.AdjustMoraleForVictory(commander.Id, result);
+                }
             }
 
-            // Distribute loot from fleet battle to commander(s)
-            if (attacker.AssignedCommanderId.HasValue)
+            if (defender.AssignedCommanderId is Guid defenderCmdId)
             {
-                _commanderFundsService.CreditCommander(attacker.AssignedCommanderId.Value, result.LootCredits);
+                _moraleService.AdjustMoraleForDefeat(defenderCmdId, result);
             }
         }
 
@@ -48,16 +61,22 @@ namespace SkyHorizont.Infrastructure.DomainServices
             planet.StationFleet(attackerFleet);
             planet.SetStationedTroops(result.OccupationDurationHours * 10);
 
-            if (attackerFleet.AssignedCommanderId.HasValue)
+            if (attackerFleet.AssignedCommanderId is Guid leaderId)
             {
-                var leader = _commanderRepo.GetById(attackerFleet.AssignedCommanderId.Value);
-                leader?.GainMerit(result.OutcomeMerit);
-
-                if (leader?.Personality.Type == PersonalityType.Aggressive)
+                var leader = _commanderRepo.GetById(leaderId);
+                if (leader != null)
                 {
-                    int bonus = (int)(result.PlanetCaptureBonus * 0.2);
-                    _commanderFundsService.CreditCommander(leader.Id, bonus);
-                    result = result with { PlanetCaptureBonus = result.PlanetCaptureBonus - bonus };
+                    leader.GainMerit(result.OutcomeMerit);
+
+                    // Bonus for achievement-oriented commanders
+                    if (PersonalityTraits.AchievementOriented(leader.Personality))
+                    {
+                        int bonus = (int)(result.PlanetCaptureBonus * 0.2);
+                        _commanderFundsService.CreditCommander(leader.Id, bonus);
+                        result = result with { PlanetCaptureBonus = result.PlanetCaptureBonus - bonus };
+                    }
+
+                    _moraleService.AdjustMoraleForConquest(leader.Id, planet);
                 }
             }
 
@@ -65,8 +84,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             if (attackerFleet.AssignedCommanderId.HasValue)
             {
-                var subordinateIds = planet.GetAssignedSubCommanders();
-                _factionTaxService.DistributeLoot(attackerFleet.AssignedCommanderId.Value, result.LootCredits, subordinateIds);
+                var subordinates = planet.GetAssignedSubCommanders();
+                _factionTaxService.DistributeLoot(attackerFleet.AssignedCommanderId.Value, result.LootCredits, subordinates);
             }
         }
     }

@@ -18,6 +18,8 @@ namespace SkyHorizont.Domain.Fleets
         public IReadOnlyCollection<Ship> Ships => _ships.Values;
         public IReadOnlyList<FleetOrder> Orders => _orders.AsReadOnly();
 
+        public IList<Guid> CapturedCommanderIds { get; } = new List<Guid>();
+
         public double AverageFleetSpeed => _ships.Values.Any()
             ? _ships.Values.Average(s => s.Speed)
             : 0;
@@ -94,5 +96,8 @@ namespace SkyHorizont.Domain.Fleets
         {
             outcomeService.ProcessFleetBattle(this, result.LoserFleet!, result);
         }
+
+        public void AddCaptured(Guid cmdrId) => CapturedCommanderIds.Add(cmdrId);
+        public void ClearCapturedAfterResolution() => CapturedCommanderIds.Clear();
     }
 }

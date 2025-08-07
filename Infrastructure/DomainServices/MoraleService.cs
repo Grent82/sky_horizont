@@ -1,4 +1,6 @@
+using SkyHorizont.Domain.Battle;
 using SkyHorizont.Domain.Entity;
+using SkyHorizont.Domain.Galaxy.Planet;
 
 namespace SkyHorizont.Infrastructure.DomainServices
 {
@@ -9,6 +11,21 @@ namespace SkyHorizont.Infrastructure.DomainServices
         public MoraleService(ICommanderRepository commanderRepository)
         {
             _commanderRepository = commanderRepository;
+        }
+
+        public void AdjustMoraleForConquest(Guid id, Planet planet)
+        {
+            
+        }
+
+        public void AdjustMoraleForDefeat(Guid defenderCmdId, BattleResult result)
+        {
+            
+        }
+
+        public void AdjustMoraleForVictory(Guid id, BattleResult result)
+        {
+            
         }
 
         public void ApplyMoraleEffects()

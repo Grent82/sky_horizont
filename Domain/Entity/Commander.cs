@@ -1,4 +1,3 @@
-
 using SkyHorizont.Domain.Entity.Task;
 using SkyHorizont.Domain.Shared;
 
@@ -8,21 +7,14 @@ namespace SkyHorizont.Domain.Entity
     {
         private static readonly Dictionary<Rank, int> MeritThresholds = new()
         {
-            // ToDo: adapt values; see whats better fit
             { Rank.Lieutenant, 100 },
             { Rank.Captain,    300 },
             { Rank.Major,      700 },
             { Rank.Colonel,    1500 },
             { Rank.General,    3000 },
-            // Leader is maximum
         };
 
-        #region Variables
         private int _balance;
-        
-        #endregion
-
-        #region Getter / Setter
 
         public Guid Id { get; }
         public string Name { get; private set; }
@@ -38,9 +30,7 @@ namespace SkyHorizont.Domain.Entity
 
         public bool IsAssigned => AssignedTask is not null;
         public EntityTask? AssignedTask { get; private set; }
-
         public int Balance => _balance;
-        #endregion
 
         public Commander(
             Guid id,
@@ -99,7 +89,7 @@ namespace SkyHorizont.Domain.Entity
         {
             if (Rank == Rank.Leader) return;
             Rank = Rank + 1;
-            // ToDo: automate some side‑effect? e.g. talent bonus
+            // Optional side-effects
         }
 
         public bool CanPerform(TaskType type)
@@ -129,16 +119,19 @@ namespace SkyHorizont.Domain.Entity
         }
 
         public double GetAttackBonus()
-            => Skills.Military * 0.001 + Personality.Boldness * 0.001;
+            => Skills.Military * 0.001 + Personality.GetAttackBonus();
 
         public double GetDefenseBonus()
-            => Skills.Intelligence * 0.001 + Personality.Loyalty * 0.001;
+            => Skills.Intelligence * 0.001 + Personality.GetDefenseBonus();
 
         public double GetRetreatModifier()
-            => (Personality.Boldness - 50) * -0.001;
+            => Personality.GetRetreatModifier();
+
+        public double GetAffectionModifier()
+            => Personality.GetAffectionModifier();
 
         public override string ToString() => $"{Name} (Rank: {Rank}, Merit: {Merit})";
-        
+
         public void Credit(int amount) => _balance += amount;
 
         public bool Deduct(int amount)
