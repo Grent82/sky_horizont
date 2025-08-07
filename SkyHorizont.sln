@@ -7,6 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkyHorizont.Domain", "Domai
 Project("{FAE04EC2-401F-11D5-BF8B-00C08F79EFBD}") = "SkyHorizont.Application", "Application\Application.csproj", "{A1A3C48E-66B9-4BAE-AA19-C4108128AE25}"
 Project("{FAE04EC4-501F-11D7-BF2B-00C04F79EFBE}") = "SkyHorizont.Infrastructure", "Infrastructure\Infrastructure.csproj", "{C3A3C48E-66C9-4BAE-AA19-C4108128AE33}"
 Project("{FAE04EC8-601F-11D9-BF6B-00C04F79EFBF}") = "SkyHorizont.Tests", "Tests\Tests.csproj", "{D5A3C48E-66DA9-4BAE-AA19-C4108128AE67}"
+Project("{AAE04AD4-701F-12D9-BF6B-00C04F79EFBA}") = "SkyHorizont.Web", "Web\Web.csproj", "{F6A3C48F-66DF9-4BAF-AF19-C4108128AF68}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -30,8 +31,12 @@ Global
 		{C3A3C48E-66C9-4BAE-AA19-C4108128AE33}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C3A3C48E-66C9-4BAE-AA19-C4108128AE33}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D5A3C48E-66DA9-4BAE-AA19-C4108128AE67}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{ED5A3C48E-66DA9-4BAE-AA19-C4108128AE67}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D5A3C48E-66DA9-4BAE-AA19-C4108128AE67}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D5A3C48E-66DA9-4BAE-AA19-C4108128AE67}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D5A3C48E-66DA9-4BAE-AA19-C4108128AE67}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F6A3C48F-66DF9-4BAF-AF19-C4108128AF68}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F6A3C48F-66DF9-4BAF-AF19-C4108128AF68}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F6A3C48F-66DF9-4BAF-AF19-C4108128AF68}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F6A3C48F-66DF9-4BAF-AF19-C4108128AF68}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
