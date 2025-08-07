@@ -2,7 +2,7 @@ namespace SkyHorizont.Domain.Entity.Lineage
 {
     public interface ILineageRepository
     {
-        EntityLineage? FindByChildId(Guid commanderId);
+        EntityLineage? FindByChildId(Guid characterId);
 
         IEnumerable<EntityLineage> FindBySomeParentIds(IEnumerable<Guid> parentIds);
 

@@ -3,7 +3,7 @@ using SkyHorizont.Domain.Shared;
 
 namespace SkyHorizont.Domain.Entity
 {
-    public class Commander
+    public class Character
     {
         private static readonly Dictionary<Rank, int> MeritThresholds = new()
         {
@@ -32,7 +32,7 @@ namespace SkyHorizont.Domain.Entity
         public EntityTask? AssignedTask { get; private set; }
         public int Balance => _balance;
 
-        public Commander(
+        public Character(
             Guid id,
             string name,
             int age,
@@ -55,7 +55,7 @@ namespace SkyHorizont.Domain.Entity
         public bool AssignTo(EntityTask task)
         {
             if (IsAssigned)
-                throw new DomainException($"Commander {Name} is already assigned to a task.");
+                throw new DomainException($"Character {Name} is already assigned to a task.");
 
             if (!CanPerform(task.Type))
                 return false;

@@ -5,13 +5,13 @@ namespace SkyHorizont.Domain.Factions
 {
     public class Faction
     {
-        private readonly HashSet<Guid> _commanderIds = new();
+        private readonly HashSet<Guid> _characterIds = new();
         private readonly HashSet<Guid> _planetIds = new();
 
         public Guid Id { get; }
         public string Name { get; private set; }
         public Guid LeaderId { get; private set; }
-        public IReadOnlyCollection<Guid> CommanderIds => _commanderIds.ToList().AsReadOnly();
+        public IReadOnlyCollection<Guid> CharacterIds => _characterIds.ToList().AsReadOnly();
         public IReadOnlyCollection<Guid> PlanetIds => _planetIds.ToList().AsReadOnly();
 
         // Diplomacy with others: key = other‑faction ID
@@ -23,19 +23,19 @@ namespace SkyHorizont.Domain.Factions
             Id = id;
             Name = name ?? throw new ArgumentNullException(nameof(name));
             LeaderId = leaderId;
-            _commanderIds = new();
+            _characterIds = new();
             _planetIds = new();
         }
 
-        public void AddCommander(Guid commanderId)
+        public void AddCharacter(Guid characterId)
         {
-            if (!_commanderIds.Contains(commanderId))
-                _commanderIds.Add(commanderId);
+            if (!_characterIds.Contains(characterId))
+                _characterIds.Add(characterId);
         }
 
-        public void RemoveCommander(Guid commanderId)
+        public void RemoveCharacter(Guid characterId)
         {
-            _commanderIds.Remove(commanderId);
+            _characterIds.Remove(characterId);
         }
 
         public void ProposeDiplomacy(Faction other, int proposedChange)
@@ -71,9 +71,9 @@ namespace SkyHorizont.Domain.Factions
 
         public void ChangeLeader(Guid newLeader)
         {
-            if (! _commanderIds.Contains(newLeader))
+            if (! _characterIds.Contains(newLeader))
                 throw new DomainException(
-                    $"Commander {newLeader} is not part of faction {Name}.");
+                    $"Character {newLeader} is not part of faction {Name}.");
 
             LeaderId = newLeader;
         }

@@ -34,7 +34,7 @@ namespace SkyHorizont.Domain.Fleets
         public void TakeDamage(double incomingAttack)
         {
             // Simple model: defense reduces incoming damage
-            double damage = Math.Max(0, incomingAttack - CurrentDefense); // ToDo: add commander skill to reduce damage
+            double damage = Math.Max(0, incomingAttack - CurrentDefense); // ToDo: add character skill to reduce damage
             // reduce defense durability or combat power accordingly
             CurrentDefense = Math.Max(0, CurrentDefense - damage * 0.5);
             CurrentAttack = Math.Max(0, CurrentAttack - damage * 0.2);

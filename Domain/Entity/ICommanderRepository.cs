@@ -1,8 +1,8 @@
 namespace SkyHorizont.Domain.Entity
 {
-    public interface ICommanderRepository
+    public interface ICharacterRepository
     {
-        Commander? GetById(Guid commanderId);
-        void Save(Commander commander);
+        Character? GetById(Guid characterId);
+        void Save(Character character);
     }
 }

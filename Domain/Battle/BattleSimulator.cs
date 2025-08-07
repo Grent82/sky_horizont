@@ -9,12 +9,12 @@ namespace SkyHorizont.Domain.Battle
         private const int MaxRounds = 10;
         private readonly Random _random;
 
-        public ICommanderRepository CommanderRepo { get; }
+        public ICharacterRepository CharacterRepo { get; }
         public int? Seed { get; }
 
-        public BattleSimulator(ICommanderRepository commanderRepo, int seed = 0)
+        public BattleSimulator(ICharacterRepository characterRepo, int seed = 0)
         {
-            CommanderRepo = commanderRepo;
+            CharacterRepo = characterRepo;
             Seed = seed;
             _random = new(seed);
         }
@@ -23,8 +23,8 @@ namespace SkyHorizont.Domain.Battle
         {
             var rng = new Random(_random.Next());
 
-            double atkPower = attacker.CalculateStrength().MilitaryPower * CommanderAttackModifier(attacker);
-            double defPower = defenders.Sum(f => f.CalculateStrength().MilitaryPower * CommanderDefenseModifier(f));
+            double atkPower = attacker.CalculateStrength().MilitaryPower * CharacterAttackModifier(attacker);
+            double defPower = defenders.Sum(f => f.CalculateStrength().MilitaryPower * CharacterDefenseModifier(f));
 
             for (int round = 0; round < MaxRounds && atkPower > 0 && defPower > 0; round++)
             {
@@ -75,7 +75,7 @@ namespace SkyHorizont.Domain.Battle
 
             double defenderFleetPower = defenderFleets.Sum(f => f.CalculateStrength().MilitaryPower);
             double defPower = planet.EffectiveDefense(researchDefPct) + defenderFleetPower;
-            double atkPower = attacker.CalculateStrength().MilitaryPower * CommanderAttackModifier(attacker)
+            double atkPower = attacker.CalculateStrength().MilitaryPower * CharacterAttackModifier(attacker)
                           + researchAtkPct;
 
             int troops = planet.StationedTroops;
@@ -106,14 +106,14 @@ namespace SkyHorizont.Domain.Battle
             return result;
         }
 
-        private double CommanderAttackModifier(Fleet fleet) =>
-        fleet.AssignedCommanderId.HasValue
-            ? 1.0 + CommanderRepo.GetById(fleet.AssignedCommanderId.Value)!.GetAttackBonus()
+        private double CharacterAttackModifier(Fleet fleet) =>
+        fleet.AssignedCharacterId.HasValue
+            ? 1.0 + CharacterRepo.GetById(fleet.AssignedCharacterId.Value)!.GetAttackBonus()
             : 1.0;
 
-        private double CommanderDefenseModifier(Fleet fleet) =>
-            fleet.AssignedCommanderId.HasValue
-                ? 1.0 + CommanderRepo.GetById(fleet.AssignedCommanderId.Value)!.GetDefenseBonus()
+        private double CharacterDefenseModifier(Fleet fleet) =>
+            fleet.AssignedCharacterId.HasValue
+                ? 1.0 + CharacterRepo.GetById(fleet.AssignedCharacterId.Value)!.GetDefenseBonus()
                 : 1.0;
 
         private double RetreatChance(IEnumerable<Fleet> defenders, double atkPower, double defPower)
@@ -121,12 +121,12 @@ namespace SkyHorizont.Domain.Battle
             double ratio = defPower > 0 ? atkPower / defPower : double.PositiveInfinity;
             double baseChance = ratio >= 2.0 ? 0.4 : 0.0;
 
-            // If any defending fleet has a commander, apply best modifier (e.g. boldness)
+            // If any defending fleet has a character, apply best modifier (e.g. boldness)
             foreach (var def in defenders)
             {
-                if (def.AssignedCommanderId.HasValue)
+                if (def.AssignedCharacterId.HasValue)
                 {
-                    var cmd = CommanderRepo.GetById(def.AssignedCommanderId.Value);
+                    var cmd = CharacterRepo.GetById(def.AssignedCharacterId.Value);
                     baseChance += cmd!.GetRetreatModifier();
                 }
             }

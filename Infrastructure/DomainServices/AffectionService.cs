@@ -6,13 +6,13 @@ namespace SkyHorizont.Infrastructure.DomainServices
 {
     public class AffectionService : IAffectionService
     {
-        private readonly ICommanderRepository _cmdRepo;
+        private readonly ICharacterRepository _cmdRepo;
         private readonly IPlanetRepository _planetRepo;
         private readonly IFleetRepository _fleetRepo;
         private readonly IAffectionRepository _affectionRepo;
 
         public AffectionService(
-            ICommanderRepository cmdRepo,
+            ICharacterRepository cmdRepo,
             IPlanetRepository planetRepo,
             IFleetRepository fleetRepo,
             IAffectionRepository affectionRepo)
@@ -27,7 +27,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             foreach (var planet in _planetRepo.GetAll())
             {
-                foreach (var captiveId in planet.CapturedCommanderIds)
+                foreach (var captiveId in planet.CapturedCharacterIds)
                 {
                     if (planet.GovernorId is not Guid captorId) continue;
                     ApplyAffectionChange(captiveId, captorId, isFleet: false);
@@ -36,9 +36,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             foreach (var fleet in _fleetRepo.GetAll())
             {
-                foreach (var captiveId in fleet.CapturedCommanderIds)
+                foreach (var captiveId in fleet.CapturedCharacterIds)
                 {
-                    if (fleet.AssignedCommanderId is not Guid captorId) continue;
+                    if (fleet.AssignedCharacterId is not Guid captorId) continue;
                     ApplyAffectionChange(captiveId, captorId, isFleet: true);
                 }
             }

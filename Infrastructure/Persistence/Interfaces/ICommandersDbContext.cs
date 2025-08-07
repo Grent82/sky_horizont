@@ -2,8 +2,8 @@ using SkyHorizont.Domain.Entity;
 
 namespace SkyHorizont.Infrastructure.Persistence.Interfaces
 {
-    public interface ICommandersDbContext : IBaseDbContext
+    public interface ICharactersDbContext : IBaseDbContext
     {
-        IDictionary<Guid, Commander> Commanders { get; }
+        IDictionary<Guid, Character> Characters { get; }
     }
 }

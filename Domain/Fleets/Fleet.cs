@@ -12,13 +12,13 @@ namespace SkyHorizont.Domain.Fleets
 
         public Guid Id { get; }
         public Guid FactionId { get; private set; }
-        public Guid? AssignedCommanderId { get; private set; }
+        public Guid? AssignedCharacterId { get; private set; }
         public Guid CurrentSystemId { get; internal set; }
         public double TravelProgress { get; internal set; }
         public IReadOnlyCollection<Ship> Ships => _ships.Values;
         public IReadOnlyList<FleetOrder> Orders => _orders.AsReadOnly();
 
-        public IList<Guid> CapturedCommanderIds { get; } = new List<Guid>();
+        public IList<Guid> CapturedCharacterIds { get; } = new List<Guid>();
 
         public double AverageFleetSpeed => _ships.Values.Any()
             ? _ships.Values.Average(s => s.Speed)
@@ -38,7 +38,7 @@ namespace SkyHorizont.Domain.Fleets
             CurrentSystemId = startingSystem;
         }
 
-        public void AssignCommander(Guid commanderId) => AssignedCommanderId = commanderId;
+        public void AssignCharacter(Guid characterId) => AssignedCharacterId = characterId;
 
         public bool AddShip(Ship ship)
         {
@@ -97,7 +97,7 @@ namespace SkyHorizont.Domain.Fleets
             outcomeService.ProcessFleetBattle(this, result.LoserFleet!, result);
         }
 
-        public void AddCaptured(Guid cmdrId) => CapturedCommanderIds.Add(cmdrId);
-        public void ClearCapturedAfterResolution() => CapturedCommanderIds.Clear();
+        public void AddCaptured(Guid cmdrId) => CapturedCharacterIds.Add(cmdrId);
+        public void ClearCapturedAfterResolution() => CapturedCharacterIds.Clear();
     }
 }

@@ -6,7 +6,7 @@ namespace SkyHorizont.Domain.Entity.Task
     {
         public Guid Id { get; }
         public TaskType Type { get; }
-        public Guid AssignedCommanderId { get; private set; }
+        public Guid AssignedCharacterId { get; private set; }
         public Guid TargetId { get; }
         public TaskStatus Status { get; private set; }
         public double Progress { get; private set; } // 0.0–1.0
@@ -21,12 +21,12 @@ namespace SkyHorizont.Domain.Entity.Task
             Status = TaskStatus.Pending;
         }
 
-        internal bool AssignTo(Commander cmd)
+        internal bool AssignTo(Character cmd)
         {
             if (!cmd.CanPerform(Type))
                 return false;
 
-            AssignedCommanderId = cmd.Id;
+            AssignedCharacterId = cmd.Id;
             Status = TaskStatus.Active;
             OnAssigned(cmd);
             return true;
@@ -62,14 +62,14 @@ namespace SkyHorizont.Domain.Entity.Task
         protected virtual bool EvaluateSuccess() =>
             true;  // default: always succeed
 
-        protected virtual void OnAssigned(Commander cmd) { }
+        protected virtual void OnAssigned(Character cmd) { }
 
         protected abstract void OnFinished(bool success);
     }
 
     public class ResearchTask : EntityTask
     {
-        private Commander? _commander;
+        private Character? _character;
         public ResearchTask(Guid id, Guid planetId, int rewardMerit = 20)
             : base(id, TaskType.Research, planetId, rewardMerit) { }
 
@@ -77,31 +77,31 @@ namespace SkyHorizont.Domain.Entity.Task
 
         protected override bool EvaluateSuccess()
         {
-            if (_commander == null)
+            if (_character == null)
                 throw new DomainException("Task not assigned.");
 
             // succeed if research + loyalty × random factor beats threshold
             double threshold = 50.0;
-            double roll = _commander.Skills.Research + (_commander.Personality.Loyalty / 10.0)
+            double roll = _character.Skills.Research + (_character.Personality.Loyalty / 10.0)
                           - new Random().NextDouble() * 20.0;
             return roll >= threshold;
         }
 
-        protected override void OnAssigned(Commander cmd)
+        protected override void OnAssigned(Character cmd)
         {
-            _commander = cmd;
+            _character = cmd;
         }
 
         protected override void OnFinished(bool success)
         {
-            if (_commander != null)
-                _commander.CompleteAssignedTask(success, RewardMerit);
+            if (_character != null)
+                _character.CompleteAssignedTask(success, RewardMerit);
         }
     }
 
     public class EspionageTask : EntityTask
     {
-        private Commander? _commander;
+        private Character? _character;
         public EspionageTask(Guid id, Guid targetFactionOrPlanet, int rewardMerit = 30)
             : base(id, TaskType.Espionage, targetFactionOrPlanet, rewardMerit) { }
 
@@ -109,29 +109,29 @@ namespace SkyHorizont.Domain.Entity.Task
 
         protected override bool EvaluateSuccess()
         {
-            if (_commander == null)
+            if (_character == null)
                 throw new DomainException("Task not assigned.");
-            double roll = _commander.Skills.Intelligence * 1.2
-                          + (_commander.Personality.Boldness * 1.1)
+            double roll = _character.Skills.Intelligence * 1.2
+                          + (_character.Personality.Boldness * 1.1)
                           - new Random().NextDouble() * 30.0;
             return roll >= 60.0;
         }
 
-        protected override void OnAssigned(Commander cmd)
+        protected override void OnAssigned(Character cmd)
         {
-            _commander = cmd;
+            _character = cmd;
         }
 
         protected override void OnFinished(bool success)
         {
-            if (_commander != null)
-                _commander.CompleteAssignedTask(success, RewardMerit);
+            if (_character != null)
+                _character.CompleteAssignedTask(success, RewardMerit);
         }
     }
 
     public class GovernTask : EntityTask
     {
-        private Commander? _commander;
+        private Character? _character;
         public GovernTask(Guid id, Guid planetId, int rewardMerit = 25)
             : base(id, TaskType.Govern, planetId, rewardMerit) { }
 
@@ -139,23 +139,23 @@ namespace SkyHorizont.Domain.Entity.Task
 
         protected override bool EvaluateSuccess()
         {
-            if (_commander == null)
+            if (_character == null)
                 throw new DomainException("Task not assigned.");
 
-            double roll = _commander.Skills.Economy * 1.1
+            double roll = _character.Skills.Economy * 1.1
                           + new Random().NextDouble() * 10.0;
             return roll >= 40.0;
         }
 
-        protected override void OnAssigned(Commander cmd)
+        protected override void OnAssigned(Character cmd)
         {
-            _commander = cmd;
+            _character = cmd;
         }
 
         protected override void OnFinished(bool success)
         {
-            if (_commander != null)
-                _commander.CompleteAssignedTask(success, RewardMerit);
+            if (_character != null)
+                _character.CompleteAssignedTask(success, RewardMerit);
         }
     }
 }

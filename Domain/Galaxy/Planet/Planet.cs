@@ -19,7 +19,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public double BaseAttack { get; private set; }
         public double BaseDefense { get; private set; }
         public int StationedTroops { get; private set; }
-        public IList<Guid> CapturedCommanderIds { get; } = new List<Guid>();
+        public IList<Guid> CapturedCharacterIds { get; } = new List<Guid>();
 
 
         private readonly List<Fleet> _stationedFleets = new();
@@ -46,9 +46,9 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             StationedTroops = troops;
         }
 
-        public void AssignGovernor(Guid commanderId)
+        public void AssignGovernor(Guid characterId)
         {
-            GovernorId = commanderId;
+            GovernorId = characterId;
         }
 
         public Resources HarvestResources(double factor = 1.0)
@@ -138,7 +138,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             outcomeService.ProcessPlanetConquest(this, result.WinnerFleet!, result);
         }
 
-        public IReadOnlyList<Guid> GetAssignedSubCommanders()
+        public IReadOnlyList<Guid> GetAssignedSubCharacters()
         {
             var list = new List<Guid>();
             if (GovernorId.HasValue && GovernorId != Guid.Empty)
@@ -146,15 +146,15 @@ namespace SkyHorizont.Domain.Galaxy.Planet
 
             foreach (var fleet in _stationedFleets)
             {
-                if (fleet.AssignedCommanderId.HasValue && fleet.AssignedCommanderId != GovernorId)
-                    list.Add(fleet.AssignedCommanderId.Value);
+                if (fleet.AssignedCharacterId.HasValue && fleet.AssignedCharacterId != GovernorId)
+                    list.Add(fleet.AssignedCharacterId.Value);
             }
 
             return list.Distinct().ToList();
         }
 
-        public void AddCaptured(Guid cmdrId) => CapturedCommanderIds.Add(cmdrId);
-        public void ClearCapturedAfterResolution() => CapturedCommanderIds.Clear();
+        public void AddCaptured(Guid cmdrId) => CapturedCharacterIds.Add(cmdrId);
+        public void ClearCapturedAfterResolution() => CapturedCharacterIds.Clear();
 
         public override string ToString() =>
             $"{Name} (Faction: {ControllingFactionId}, Governor: {GovernorId})";

@@ -6,12 +6,12 @@
 ```csharp
 // Application layer code, after loading needed repositories via DI
 
-var tree = await _lineageRepo.FindByChildId(playerCommanderId);
+var tree = await _lineageRepo.FindByChildId(playerCharacterId);
 if (tree == null)
     throw new NotFoundException("Lineage missing");
 
-var siblings = _familyTree.GetSiblings(playerCommanderId);
-var grandparents = _familyTree.GetGrandparents(playerCommanderId);
+var siblings = _familyTree.GetSiblings(playerCharacterId);
+var grandparents = _familyTree.GetGrandparents(playerCharacterId);
 
 // Pass those GUIDs to your UI layer, which can fetch Repository details to obtain names, traits, etc.
 ```
@@ -54,7 +54,7 @@ var defenseStrength = planet.EffectiveDefense(defBonusPct);
 if (attackingStrength > defenseStrength)
 {
     planet.ConqueredBy(attackerFleet.FactionId, new BattleResult { WinnerFleet = attackerFleet, LoserFleet = planet.StationedFleet, HoursOfOccupation = 5 });
-    // trigger events, update Commander merits, resources captured, etc.
+    // trigger events, update Character merits, resources captured, etc.
 }
 else
 {

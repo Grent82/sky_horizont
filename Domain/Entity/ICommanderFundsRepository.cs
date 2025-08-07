@@ -1,8 +1,8 @@
 namespace SkyHorizont.Domain.Entity
 {
-    public interface ICommanderFundsRepository
+    public interface ICharacterFundsRepository
     {
-        int GetBalance(Guid commanderId);
-        void AddBalance(Guid commanderId, int amount);
+        int GetBalance(Guid characterId);
+        void AddBalance(Guid characterId, int amount);
     }
 }

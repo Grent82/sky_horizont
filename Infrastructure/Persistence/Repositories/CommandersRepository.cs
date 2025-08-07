@@ -3,21 +3,21 @@ using SkyHorizont.Infrastructure.Persistence.Interfaces;
 
 namespace SkyHorizont.Infrastructure.Persistence
 {
-    public class CommandersRepository : ICommanderRepository
+    public class CharactersRepository : ICharacterRepository
     {
-        private readonly ICommandersDbContext _context;
+        private readonly ICharactersDbContext _context;
 
-        public CommandersRepository(ICommandersDbContext context)
+        public CharactersRepository(ICharactersDbContext context)
         {
             _context = context;
         }
 
-        public Commander? GetById(Guid commanderId) =>
-            _context.Commanders.TryGetValue(commanderId, out var cmd) ? cmd : null;
+        public Character? GetById(Guid characterId) =>
+            _context.Characters.TryGetValue(characterId, out var cmd) ? cmd : null;
 
-        public void Save(Commander commander)
+        public void Save(Character character)
         {
-            _context.Commanders[commander.Id] = commander;
+            _context.Characters[character.Id] = character;
         }
     }
 }

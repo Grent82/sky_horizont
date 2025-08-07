@@ -6,11 +6,11 @@ namespace SkyHorizont.Infrastructure.DomainServices
 {
     public class MoraleService : IMoraleService
     {
-        private readonly ICommanderRepository _commanderRepository;
+        private readonly ICharacterRepository _characterRepository;
 
-        public MoraleService(ICommanderRepository commanderRepository)
+        public MoraleService(ICharacterRepository characterRepository)
         {
-            _commanderRepository = commanderRepository;
+            _characterRepository = characterRepository;
         }
 
         public void AdjustMoraleForConquest(Guid id, Planet planet)
@@ -30,7 +30,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         public void ApplyMoraleEffects()
         {
-            // For each capturing commander, if any captives executed or still held,
+            // For each capturing character, if any captives executed or still held,
             // adjust reputation (neg or pos) accordingly
         }
     }

@@ -1,7 +1,7 @@
 namespace SkyHorizont.Infrastructure.Persistence.Interfaces
 {
-    public interface ICommanderFundsDbContext : IBaseDbContext
+    public interface ICharacterFundsDbContext : IBaseDbContext
     {
-        IDictionary<Guid, int> CommanderFunds { get; }
+        IDictionary<Guid, int> CharacterFunds { get; }
     }
 }

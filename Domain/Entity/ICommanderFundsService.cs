@@ -1,8 +1,8 @@
 namespace SkyHorizont.Domain.Entity
 {
-    public interface ICommanderFundsService
+    public interface ICharacterFundsService
     {
-        void CreditCommander(Guid commanderId, int amount);
-        bool DeductCommander(Guid commanderId, int amount);
+        void CreditCharacter(Guid characterId, int amount);
+        bool DeductCharacter(Guid characterId, int amount);
     }
 }

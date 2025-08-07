@@ -3,9 +3,9 @@ using SkyHorizont.Infrastructure.Persistence.Interfaces;
 
 namespace SkyHorizont.Infrastructure.Persistence
 {
-    public class InMemoryCommandersDbContext : ICommandersDbContext
+    public class InMemoryCharactersDbContext : ICharactersDbContext
     {
-        public IDictionary<Guid, Commander> Commanders { get; } = new Dictionary<Guid, Commander>();
+        public IDictionary<Guid, Character> Characters { get; } = new Dictionary<Guid, Character>();
 
         public void SaveChanges()
         {

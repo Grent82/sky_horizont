@@ -6,14 +6,14 @@ namespace SkyHorizont.Infrastructure.DomainServices
     public class FactionTaxService : IFactionTaxService
     {
         private readonly IFactionFundsRepository _factionFundsRepo;
-        private readonly ICommanderFundsRepository _commanderFundsRepo;
+        private readonly ICharacterFundsRepository _characterFundsRepo;
 
         public FactionTaxService(
             IFactionFundsRepository factionFundsRepo,
-            ICommanderFundsRepository commanderFundsRepo)
+            ICharacterFundsRepository characterFundsRepo)
         {
             _factionFundsRepo = factionFundsRepo;
-            _commanderFundsRepo = commanderFundsRepo;
+            _characterFundsRepo = characterFundsRepo;
         }
 
         public void TaxPlanet(Guid planetId, int percentage)
@@ -25,16 +25,16 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _factionFundsRepo.AddBalance(planetId, income);
         }
 
-        public void DistributeLoot(Guid leaderCommanderId, int totalLoot, IEnumerable<Guid> subCommanderIds)
+        public void DistributeLoot(Guid leaderCharacterId, int totalLoot, IEnumerable<Guid> subCharacterIds)
         {
             if (totalLoot <= 0) return;
-            int share = subCommanderIds.Any()
-                ? totalLoot / (subCommanderIds.Count() + 1)
+            int share = subCharacterIds.Any()
+                ? totalLoot / (subCharacterIds.Count() + 1)
                 : totalLoot;
 
-            _commanderFundsRepo.AddBalance(leaderCommanderId, share);
-            foreach (var subId in subCommanderIds)
-                _commanderFundsRepo.AddBalance(subId, share);
+            _characterFundsRepo.AddBalance(leaderCharacterId, share);
+            foreach (var subId in subCharacterIds)
+                _characterFundsRepo.AddBalance(subId, share);
         }
     }
 }

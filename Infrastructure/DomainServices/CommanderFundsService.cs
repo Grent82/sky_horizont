@@ -2,22 +2,22 @@ using SkyHorizont.Domain.Entity;
 
 namespace SkyHorizont.Infrastructure.DomainServices
 {
-    public class CommanderFundsService : ICommanderFundsService
+    public class CharacterFundsService : ICharacterFundsService
     {
-        private readonly ICommanderFundsRepository _repo;
-        public CommanderFundsService(ICommanderFundsRepository repo) => _repo = repo;
+        private readonly ICharacterFundsRepository _repo;
+        public CharacterFundsService(ICharacterFundsRepository repo) => _repo = repo;
 
-        public void CreditCommander(Guid commanderId, int amount)
+        public void CreditCharacter(Guid characterId, int amount)
         {
             if (amount <= 0) return;
-            _repo.AddBalance(commanderId, amount);
+            _repo.AddBalance(characterId, amount);
         }
 
-        public bool DeductCommander(Guid commanderId, int amount)
+        public bool DeductCharacter(Guid characterId, int amount)
         {
-            var balance = _repo.GetBalance(commanderId);
+            var balance = _repo.GetBalance(characterId);
             if (balance < amount) return false;
-            _repo.AddBalance(commanderId, -amount);
+            _repo.AddBalance(characterId, -amount);
             return true;
         }
     }

@@ -6,7 +6,7 @@ namespace SkyHorizont.Domain.Entity.Lineage
 
     public class EntityLineage
     {
-        public Guid CommanderId { get; }
+        public Guid CharacterId { get; }
 
         private Guid? _bioFatherId;
         private Guid? _bioMotherId;
@@ -16,11 +16,11 @@ namespace SkyHorizont.Domain.Entity.Lineage
         public Guid? BiologicalMotherId => _bioMotherId;
         public IReadOnlyCollection<Guid> AdoptiveParentIds => _adoptiveParentIds;
 
-        public EntityLineage(Guid commanderId)
+        public EntityLineage(Guid characterId)
         {
-            CommanderId = commanderId != Guid.Empty
-                ? commanderId
-                : throw new ArgumentException("CommanderId must be non‑empty", nameof(commanderId));
+            CharacterId = characterId != Guid.Empty
+                ? characterId
+                : throw new ArgumentException("CharacterId must be non‑empty", nameof(characterId));
         }
 
         public void SetBiologicalParents(Guid? fatherId, Guid? motherId)
@@ -56,11 +56,11 @@ namespace SkyHorizont.Domain.Entity.Lineage
 
         private void ThrowIfSelf(Guid? candidate)
         {
-            if (candidate.HasValue && candidate.Value == CommanderId)
+            if (candidate.HasValue && candidate.Value == CharacterId)
                 throw new DomainException("Cannot assign self as a parent.");
         }
 
         public override string ToString()
-            => $"Lineage[{CommanderId}], BioFather = {_bioFatherId}, BioMother = {_bioMotherId}, Adopted({string.Join(',', _adoptiveParentIds)})";
+            => $"Lineage[{CharacterId}], BioFather = {_bioFatherId}, BioMother = {_bioMotherId}, Adopted({string.Join(',', _adoptiveParentIds)})";
     }
 }

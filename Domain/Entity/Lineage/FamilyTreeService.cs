@@ -13,10 +13,10 @@ namespace SkyHorizont.Domain.Entity.Lineage
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
         }
 
-        public IReadOnlyList<Guid> GetSiblings(Guid commanderId)
+        public IReadOnlyList<Guid> GetSiblings(Guid characterId)
         {
-            var self = _repo.FindByChildId(commanderId)
-                       ?? throw new DomainException($"Lineage not set for Commander {commanderId}");
+            var self = _repo.FindByChildId(characterId)
+                       ?? throw new DomainException($"Lineage not set for Character {characterId}");
 
             var parents = self.GetParents(includeAdoptive: true).Select(p => p.ParentId).ToHashSet();
 
@@ -24,8 +24,8 @@ namespace SkyHorizont.Domain.Entity.Lineage
 
             var potentialSibs = _repo.FindBySomeParentIds(parents);
             return potentialSibs
-                .Where(l => l.CommanderId != commanderId && SharesAnyParent(l, parents))
-                .Select(l => l.CommanderId)
+                .Where(l => l.CharacterId != characterId && SharesAnyParent(l, parents))
+                .Select(l => l.CharacterId)
                 .Distinct()
                 .ToList();
         }
@@ -36,10 +36,10 @@ namespace SkyHorizont.Domain.Entity.Lineage
             return biop.Any(parentSet.Contains);
         }
 
-        public IReadOnlyList<Guid> GetGrandparents(Guid commanderId)
+        public IReadOnlyList<Guid> GetGrandparents(Guid characterId)
         {
-            var self = _repo.FindByChildId(commanderId)
-                         ?? throw new DomainException($"Lineage not set for Commander {commanderId}");
+            var self = _repo.FindByChildId(characterId)
+                         ?? throw new DomainException($"Lineage not set for Character {characterId}");
 
             var parents = self.GetParents(includeAdoptive: false).Select(p => p.ParentId).ToArray();
             if (!parents.Any()) return Array.Empty<Guid>();
@@ -58,11 +58,11 @@ namespace SkyHorizont.Domain.Entity.Lineage
             return gp.ToList();
         }
 
-        public IReadOnlyList<Guid> GetAncestors(Guid commanderId, int maxDepth = 3)
+        public IReadOnlyList<Guid> GetAncestors(Guid characterId, int maxDepth = 3)
         {
             var seen = new HashSet<Guid>();
             var queue = new Queue<(Guid id, int depth)>();
-            queue.Enqueue((commanderId, 0));
+            queue.Enqueue((characterId, 0));
 
             while (queue.Count > 0)
             {
@@ -84,10 +84,10 @@ namespace SkyHorizont.Domain.Entity.Lineage
             return seen.ToList();
         }
 
-        public IReadOnlyList<Guid> GetDescendants(Guid commanderId, int maxDepth = 3)
+        public IReadOnlyList<Guid> GetDescendants(Guid characterId, int maxDepth = 3)
         {
-            var seen = new HashSet<Guid> { commanderId };
-            var currentGen = new HashSet<Guid> { commanderId };
+            var seen = new HashSet<Guid> { characterId };
+            var currentGen = new HashSet<Guid> { characterId };
 
             for (int depth = 0; depth < maxDepth; depth++)
             {
@@ -98,8 +98,8 @@ namespace SkyHorizont.Domain.Entity.Lineage
                     var parents = lineage.GetParents(includeAdoptive: true).Select(p => p.ParentId);
                     if (parents.Any(p => currentGen.Contains(p)))
                     {
-                        if (seen.Add(lineage.CommanderId))
-                            nextGen.Add(lineage.CommanderId);
+                        if (seen.Add(lineage.CharacterId))
+                            nextGen.Add(lineage.CharacterId);
                     }
                 }
 
@@ -107,7 +107,7 @@ namespace SkyHorizont.Domain.Entity.Lineage
                 currentGen = nextGen;
             }
 
-            seen.Remove(commanderId);
+            seen.Remove(characterId);
             return seen.ToList();
         }
     }

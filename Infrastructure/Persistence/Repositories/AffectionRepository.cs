@@ -12,16 +12,16 @@ namespace SkyHorizont.Infrastructure.Persistence
             _context = context;
         }
 
-        public void AdjustAffection(Guid sourceCommanderId, Guid targetCommanderId, int delta)
+        public void AdjustAffection(Guid sourceCharacterId, Guid targetCharacterId, int delta)
         {
-            var key = (sourceCommanderId, targetCommanderId);
+            var key = (sourceCharacterId, targetCharacterId);
             _context.Affection.TryGetValue(key, out var current);
             _context.Affection[key] = Math.Clamp(current + delta, -100, 100);
         }
 
-        public int GetAffection(Guid sourceCommanderId, Guid targetCommanderId)
+        public int GetAffection(Guid sourceCharacterId, Guid targetCharacterId)
         {
-            _context.Affection.TryGetValue((sourceCommanderId, targetCommanderId), out var val);
+            _context.Affection.TryGetValue((sourceCharacterId, targetCharacterId), out var val);
             return val;
         }
     }

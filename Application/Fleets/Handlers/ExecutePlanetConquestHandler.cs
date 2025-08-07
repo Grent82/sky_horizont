@@ -9,20 +9,20 @@ namespace SkyHorizont.Application.Fleets.Handlers
 {
     public class ExecutePlanetConquestHandler
     {
-        private readonly ICommanderRepository _commanderRepo;
+        private readonly ICharacterRepository _characterRepo;
         private readonly IPlanetRepository _planetRepo;
         private readonly IFleetRepository _fleetRepo;
         private readonly IBattleSimulator _battleSimulator;
         private readonly IBattleOutcomeService _battleOutcomeService;
 
         public ExecutePlanetConquestHandler(
-            ICommanderRepository commanderRepo,
+            ICharacterRepository characterRepo,
             IPlanetRepository planetRepo,
             IFleetRepository fleetRepo,
             IBattleSimulator battleSimulator,
             IBattleOutcomeService battleOutcomeService)
         {
-            _commanderRepo = commanderRepo;
+            _characterRepo = characterRepo;
             _planetRepo = planetRepo;
             _fleetRepo = fleetRepo;
             _battleSimulator = battleSimulator;
@@ -62,10 +62,10 @@ namespace SkyHorizont.Application.Fleets.Handlers
             _planetRepo.Save(planet);
             _fleetRepo.Save(attackerFleet);
 
-            if (attackerFleet.AssignedCommanderId.HasValue)
+            if (attackerFleet.AssignedCharacterId.HasValue)
             {
-                var cmdr = _commanderRepo.GetById(attackerFleet.AssignedCommanderId.Value);
-                if (cmdr != null) _commanderRepo.Save(cmdr);
+                var cmdr = _characterRepo.GetById(attackerFleet.AssignedCharacterId.Value);
+                if (cmdr != null) _characterRepo.Save(cmdr);
             }
         }
     }

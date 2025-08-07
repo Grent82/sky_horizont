@@ -27,7 +27,7 @@ namespace SkyHorizont.Domain.Galaxy
 
         public void RegisterFactionStrength(Guid factionId, double strength)
         {
-            // ToDo: based on commanders, fleets, and planets
+            // ToDo: based on characters, fleets, and planets
             _factionStrength[factionId] = strength;
         }
 
