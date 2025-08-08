@@ -1,28 +1,25 @@
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Fleets;
 using SkyHorizont.Domain.Galaxy.Planet;
+using SkyHorizont.Domain.Services;
 
 namespace SkyHorizont.Domain.Battle
 {
     public class BattleSimulator : IBattleSimulator
     {
         private const int MaxRounds = 10;
-        private readonly Random _random;
+        private IRandomService _random;
 
         public ICharacterRepository CharacterRepo { get; }
-        public int? Seed { get; }
 
-        public BattleSimulator(ICharacterRepository characterRepo, int seed = 0)
+        public BattleSimulator(ICharacterRepository characterRepo, IRandomService random)
         {
             CharacterRepo = characterRepo;
-            Seed = seed;
-            _random = new(seed);
+            _random = random;
         }
 
         public BattleResult SimulateFleetBattle(Fleet attacker, IEnumerable<Fleet> defenders)
         {
-            var rng = new Random(_random.Next());
-
             double atkPower = attacker.CalculateStrength().MilitaryPower * CharacterAttackModifier(attacker);
             double defPower = defenders.Sum(f => f.CalculateStrength().MilitaryPower * CharacterDefenseModifier(f));
 
@@ -33,7 +30,7 @@ namespace SkyHorizont.Domain.Battle
             }
 
             bool attackerWins = atkPower >= defPower;
-            bool defenderRetreats = !attackerWins && (rng.NextDouble() < RetreatChance(defenders, atkPower, defPower));
+            bool defenderRetreats = !attackerWins && (_random.NextDouble() < RetreatChance(defenders, atkPower, defPower));
 
             foreach (var fleet in defenders)
             {
@@ -63,7 +60,6 @@ namespace SkyHorizont.Domain.Battle
             Fleet attacker, Planet planet,
             double researchAtkPct, double researchDefPct)
         {
-            var rng = new Random(_random.Next());
             var defenderFleets = planet.GetStationedFleets();
             
             BattleResult? fleetBattleResult = null;

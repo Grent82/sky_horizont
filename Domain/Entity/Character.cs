@@ -46,7 +46,7 @@ namespace SkyHorizont.Domain.Entity
             Sex sex,
             Personality personality,
             SkillSet skills,
-            Rank initialRank = Rank.Lieutenant,
+            Rank initialRank = Rank.Civilian,
             int initialMerit = 0)
         {
             Id = id;

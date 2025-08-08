@@ -9,16 +9,27 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly ICharacterRepository _characters;
         private readonly ILineageRepository _lineage;
         private readonly IGameClockService _clock;
+        private readonly IRandomService _rng;
+        private readonly IMortalityModel _mortality;
+        private readonly INameGenerator _names;
+        private readonly IPersonalityInheritanceService _inherit;
 
-        private readonly int _elderlyAge = 95;
-
-        public CharacterLifecycleService(ICharacterRepository characters,
-                                         ILineageRepository lineage,
-                                         IGameClockService clock)
+        public CharacterLifecycleService(
+            ICharacterRepository characters,
+            ILineageRepository lineage,
+            IGameClockService clock,
+            IRandomService rng,
+            IMortalityModel mortality,
+            INameGenerator names,
+            IPersonalityInheritanceService inherit)
         {
             _characters = characters;
             _lineage = lineage;
             _clock = clock;
+            _rng = rng;
+            _mortality = mortality;
+            _names = names;
+            _inherit = inherit;
         }
 
         public void ProcessLifecycleTurn()
@@ -30,8 +41,12 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 if (!character.IsAlive) continue;
 
                 // Birthday month → increment age
-                if (character.BirthMonth == _clock.CurrentMonth)
+                if (character.BirthMonth == _clock.CurrentMonth && _clock.CurrentYear > character.BirthYear)
+                {
                     character.IncreaseAge();
+                    // DomainEvents.Raise(new BirthdayOccurred(c.Id)); // ToDo DomainEvents
+                }
+                    
 
                 HandlePregnancy(character);
 
@@ -50,7 +65,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             if (preg.IsDue(_clock.CurrentYear, _clock.CurrentMonth, _clock.MonthsPerYear))
             {
-                // Child creation (eventual consistency acceptable)
+                // ToDo: Twin chance? complications? (policy-driven)
                 var child = CreateNewborn(mother, preg.FatherId);
                 _characters.Save(child);
 
@@ -61,18 +76,22 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
                 mother.EndPregnancy(PregnancyStatus.Delivered);
                 mother.ClearPregnancy();
+
+                // DomainEvents.Raise(new ChildBorn(child.Id, mother.Id, preg.FatherId));
             }
         }
 
-        private Character CreateNewborn(Character mother, Guid fatherId)
+        private Character CreateNewborn(Character mother, Guid? fatherId)
         {
             // newborn birth month = current month; birth year = current year
             var babyId = Guid.NewGuid();
-            var name = $"Newborn-{babyId.ToString()[..6]}"; // ToDo
-            var sex = Random.Shared.Next(0, 2) == 0 ? Sex.Male : Sex.Female;
+            var sex = _rng.NextDouble() < 0.5 ? Sex.Male : Sex.Female;
+            var name = _names.GenerateFullName(sex); // ToDo: Mother name (surname), faction/culture
 
-            // Inherit personality faintly or randomize – simple placeholder
-            var p = mother.Personality with { }; // ToDo
+            var father = fatherId.HasValue ? _characters.GetById(fatherId.Value) : null;
+            var babyPersonality = father != null
+                ? _inherit.Inherit(mother.Personality, father.Personality)
+                : _inherit.Inherit(mother.Personality, mother.Personality);
 
             var baby = new Character(
                 babyId,
@@ -81,13 +100,13 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 birthYear: _clock.CurrentYear,
                 birthMonth: _clock.CurrentMonth,
                 sex,
-                personality: p,
+                personality: babyPersonality,
                 skills: new SkillSet(0,0,0,0) // ToDo: genetic seeding later
             );
 
             // link family (optional convenience)
             baby.LinkFamilyMember(mother.Id);
-            baby.LinkFamilyMember(fatherId);
+            if (fatherId.HasValue) baby.LinkFamilyMember(fatherId.Value);
             mother.LinkFamilyMember(baby.Id);
 
             return baby;
@@ -95,11 +114,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private void HandleMortality(Character character)
         {
-            // Placeholder: very simple age-based mortality trigger
-            if (character.Age > _elderlyAge)
+            var p = _mortality.GetMonthlyDeathProbability(character.Age, _clock.CurrentMonth);
+            if (_rng.NextDouble() < p)
             {
-                // 2% monthly chance after threshold
-                if (Random.Shared.NextDouble() < 0.02)
                     character.MarkDead();
             }
         }

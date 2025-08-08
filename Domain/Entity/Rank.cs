@@ -1,2 +1,2 @@
 namespace SkyHorizont.Domain.Entity;
-public enum Rank { Lieutenant, Captain, Major, Colonel, General, Leader }
+public enum Rank { Civilian, Lieutenant, Captain, Major, Colonel, General, Leader }
