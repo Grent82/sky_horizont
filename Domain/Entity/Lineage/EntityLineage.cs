@@ -4,6 +4,13 @@ namespace SkyHorizont.Domain.Entity.Lineage
 {
     public enum LineageType { Biological, Adoptive }
 
+    /// <summary>
+    /// Aggregate that stores the parent links for ONE child (CharacterId).
+    /// Invariants:
+    ///  - At most one biological father and one biological mother.
+    ///  - Parent IDs cannot be the child itself.
+    ///  - Father and mother cannot be the same person.
+    /// </summary>
     public class EntityLineage
     {
         public Guid CharacterId { get; }
@@ -25,27 +32,49 @@ namespace SkyHorizont.Domain.Entity.Lineage
 
         public void SetBiologicalParents(Guid? fatherId, Guid? motherId)
         {
+            SetBiologicalFather(fatherId);
+            SetBiologicalMother(motherId);
+        }
+
+        public void SetBiologicalFather(Guid? fatherId)
+        {
             ThrowIfSelf(fatherId);
-            ThrowIfSelf(motherId);
+            if (fatherId.HasValue && _bioMotherId.HasValue && fatherId.Value == _bioMotherId.Value)
+                throw new DomainException("Biological father and mother cannot be the same character.");
 
             _bioFatherId = fatherId;
+        }
+
+        public void SetBiologicalMother(Guid? motherId)
+        {
+            ThrowIfSelf(motherId);
+            if (motherId.HasValue && _bioFatherId.HasValue && motherId.Value == _bioFatherId.Value)
+                throw new DomainException("Biological father and mother cannot be the same character.");
+
             _bioMotherId = motherId;
+        }
+
+        public void ClearBiologicalParents()
+        {
+            _bioFatherId = null;
+            _bioMotherId = null;
         }
 
         public void AddAdoptiveParent(Guid parentId)
         {
             ThrowIfSelf(parentId);
-            if (_adoptiveParentIds.Contains(parentId)) return;
             _adoptiveParentIds.Add(parentId);
         }
 
         public void RemoveAdoptiveParent(Guid parentId) =>
             _adoptiveParentIds.Remove(parentId);
 
-        public IReadOnlyList<(Guid ParentId, LineageType Type)> GetParents(
-            bool includeAdoptive = false)
+        /// <summary>
+        /// Returns bio parents and, optionally, adoptive parents.
+        /// </summary>
+        public IReadOnlyList<(Guid ParentId, LineageType Type)> GetParents(bool includeAdoptive = false)
         {
-            var list = new List<(Guid, LineageType)>();
+            var list = new List<(Guid, LineageType)>(2 + (includeAdoptive ? _adoptiveParentIds.Count : 0));
             if (_bioFatherId.HasValue) list.Add((_bioFatherId.Value, LineageType.Biological));
             if (_bioMotherId.HasValue) list.Add((_bioMotherId.Value, LineageType.Biological));
             if (includeAdoptive)
@@ -61,6 +90,6 @@ namespace SkyHorizont.Domain.Entity.Lineage
         }
 
         public override string ToString()
-            => $"Lineage[{CharacterId}], BioFather = {_bioFatherId}, BioMother = {_bioMotherId}, Adopted({string.Join(',', _adoptiveParentIds)})";
+            => $"Lineage[{CharacterId}], BioFather={_bioFatherId}, BioMother={_bioMotherId}, Adopted({string.Join(',', _adoptiveParentIds)})";
     }
 }

@@ -18,12 +18,19 @@ namespace SkyHorizont.Domain.Entity
 
         public Guid Id { get; }
         public string Name { get; private set; }
-        public int Age { get; private set; }
+        public int BirthYear { get; }
+        public int BirthMonth { get; }
+        public int Age { get; private set; } = 0;
+        public bool IsAlive { get; private set; } = true;
         public Sex Sex { get; }
         public Personality Personality { get; }
         public SkillSet Skills { get; private set; }
         public Rank Rank { get; private set; }
         public int Merit { get; private set; }
+
+        public List<CharacterRelationship> Relationships { get; } = new();
+
+        public Pregnancy? ActivePregnancy { get; private set; }
 
         private readonly List<Guid> _familyLinkIds = new();
         public IReadOnlyList<Guid> FamilyLinkIds => _familyLinkIds.AsReadOnly();
@@ -35,7 +42,7 @@ namespace SkyHorizont.Domain.Entity
         public Character(
             Guid id,
             string name,
-            int age,
+            int age, int birthYear, int birthMonth,
             Sex sex,
             Personality personality,
             SkillSet skills,
@@ -104,10 +111,44 @@ namespace SkyHorizont.Domain.Entity
             };
         }
 
+        #region Pregnancy control
+
+        public void StartPregnancy(Guid fatherId, int conceptionYear, int conceptionMonth)
+        {
+            if (Sex != Sex.Female) throw new DomainException("Only female characters can be pregnant.");
+            if (ActivePregnancy is { Status: PregnancyStatus.Active })
+                throw new DomainException("Already pregnant.");
+            ActivePregnancy = Pregnancy.Start(fatherId, conceptionYear, conceptionMonth);
+        }
+
+        public void EndPregnancy(PregnancyStatus status)
+        {
+            if (ActivePregnancy is null) return;
+            ActivePregnancy = ActivePregnancy.WithStatus(status);
+        }
+
+        public void ClearPregnancy() => ActivePregnancy = null;
+
+        #endregion
+
+        public void IncreaseAge() => Age++;
+        public void MarkDead() => IsAlive = false;
+
         public void LinkFamilyMember(Guid otherId)
         {
             if (otherId != Id && !_familyLinkIds.Contains(otherId))
                 _familyLinkIds.Add(otherId);
+        }
+
+        public void AddRelationship(Guid otherCharacterId, RelationshipType type)
+        {
+            if (!Relationships.Any(r => r.TargetCharacterId == otherCharacterId))
+                Relationships.Add(new CharacterRelationship(otherCharacterId, type));
+        }
+
+        public void RemoveRelationship(Guid otherCharacterId)
+        {
+            Relationships.RemoveAll(r => r.TargetCharacterId == otherCharacterId);
         }
 
         internal void CompleteAssignedTask(bool success, int meritReward)

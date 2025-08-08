@@ -12,6 +12,11 @@ namespace SkyHorizont.Infrastructure.Persistence
             _context = context;
         }
 
+        public IEnumerable<Character> GetAll()
+        {
+            return _context.Characters.Values;
+        }
+
         public Character? GetById(Guid characterId) =>
             _context.Characters.TryGetValue(characterId, out var cmd) ? cmd : null;
 
