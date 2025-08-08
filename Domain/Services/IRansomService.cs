@@ -1,4 +1,4 @@
-namespace SkyHorizont.Domain.Entity
+namespace SkyHorizont.Domain.Services
 {
     public interface IRansomService
     {

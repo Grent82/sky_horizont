@@ -1,5 +1,4 @@
 
-using SkyHorizont.Domain.Entity.Task;
 using SkyHorizont.Domain.Shared;
 
 namespace SkyHorizont.Domain.Entity.Lineage

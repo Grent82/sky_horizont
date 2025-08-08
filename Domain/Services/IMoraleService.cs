@@ -1,7 +1,7 @@
 using SkyHorizont.Domain.Battle;
 using SkyHorizont.Domain.Galaxy.Planet;
 
-namespace SkyHorizont.Domain.Entity
+namespace SkyHorizont.Domain.Services
 {
     public interface IMoraleService
     {
