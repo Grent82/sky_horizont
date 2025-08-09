@@ -1,5 +1,4 @@
 using SkyHorizont.Domain.Entity.Lineage;
-using SkyHorizont.Domain.Galaxy.Planet;
 
 namespace SkyHorizont.Infrastructure.Persistence.Interfaces
 {

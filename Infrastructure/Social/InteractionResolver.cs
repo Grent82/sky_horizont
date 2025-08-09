@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Factions;
+using SkyHorizont.Domain.Intrigue;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Social;
 
@@ -461,5 +462,6 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         private static double Clamp01(double v) => v < 0 ? 0 : (v > 1 ? 1 : v);
+
     }
 }

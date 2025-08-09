@@ -45,4 +45,9 @@ namespace SkyHorizont.Domain.Social
         IReadOnlyList<Guid> SecretIds,
         string Notes
     ) : ISocialEvent;
+
+    public interface ISocialEventLog
+    {
+        void Append(ISocialEvent ev);
+    }
 }

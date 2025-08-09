@@ -6,11 +6,14 @@ using SkyHorizont.Domain.Entity.Lineage;
 using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Fleets;
 using SkyHorizont.Domain.Galaxy.Planet;
+using SkyHorizont.Domain.Intrigue;
 using SkyHorizont.Domain.Services;
+using SkyHorizont.Domain.Social;
 using SkyHorizont.Infrastructure.DomainServices;
 using SkyHorizont.Infrastructure.Persistence;
 using SkyHorizont.Infrastructure.Persistence.Interfaces;
 using SkyHorizont.Infrastructure.Repository;
+using SkyHorizont.Infrastructure.Social;
 
 namespace SkyHorizont.Infrastructure.Configuration
 {
@@ -27,6 +30,9 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<IFleetsDbContext, InMemoryFleetsDbContext>();
             services.AddScoped<IPlanetsDbContext, InMemoryPlanetsDbContext>();
             services.AddScoped<ILineageDbContext, InMemoryLinageDbContext>();
+            services.AddScoped<IOpinionsDbContext, InMemoryOpinionsDbContext>();
+            services.AddScoped<ISecretsDbContext, InMemorySecretsDbContext>();
+
 
             services.AddScoped<IAffectionRepository, AffectionRepository>();
             services.AddScoped<ICharacterFundsRepository, CharacterFundsRepository>();
@@ -35,6 +41,11 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<IFleetRepository, FleetsRepository>();
             services.AddScoped<IPlanetRepository, PlanetsRepository>();
             services.AddScoped<ILineageRepository, LineageRepository>();
+            services.AddScoped<IOpinionRepository, OpinionRepository>();
+            services.AddScoped<ISecretsRepository, SecretsRepository>();
+
+
+            services.AddScoped<ISocialEventLog, InMemorySocialEventLog>();
 
             // Domain Service Interfaces → Infrastructure Implementations
             services.AddScoped<IAffectionService, AffectionService>();
@@ -47,6 +58,10 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<ICharacterLifecycleService, CharacterLifecycleService>();
             services.AddSingleton<IPersonalityInheritanceService, SimplePersonalityInheritanceService>();
             services.AddSingleton<IMortalityModel, GompertzMortalityModel>();
+
+            services.AddScoped<IIntentPlanner, IntentPlanner>();
+            services.AddScoped<IInteractionResolver, InteractionResolver>();
+
 
             // Application Layer
             services.AddScoped<IGameClockService, GameClockService>();
