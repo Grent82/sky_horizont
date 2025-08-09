@@ -12,6 +12,7 @@ using SkyHorizont.Domain.Social;
 using SkyHorizont.Infrastructure.DomainServices;
 using SkyHorizont.Infrastructure.Persistence;
 using SkyHorizont.Infrastructure.Persistence.Interfaces;
+using SkyHorizont.Infrastructure.Persistence.Intrigue;
 using SkyHorizont.Infrastructure.Repository;
 using SkyHorizont.Infrastructure.Social;
 
@@ -33,6 +34,7 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<IOpinionsDbContext, InMemoryOpinionsDbContext>();
             services.AddScoped<ISecretsDbContext, InMemorySecretsDbContext>();
             services.AddScoped<IFactionsDbContext, InMemoryFactionsDbContext>();
+            services.AddScoped<IIntrigueDbContext, InMemoryIntrigueDbContext>();
 
 
             services.AddScoped<IAffectionRepository, AffectionRepository>();
@@ -45,6 +47,7 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<IOpinionRepository, OpinionRepository>();
             services.AddScoped<ISecretsRepository, SecretsRepository>();
             services.AddScoped<IFactionRepository, FactionRepository>();
+            services.AddScoped<IPlotRepository, PlotRepository>();
 
 
             services.AddScoped<ISocialEventLog, InMemorySocialEventLog>();

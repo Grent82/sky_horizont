@@ -9,6 +9,6 @@ namespace SkyHorizont.Domain.Intrigue
         TreasonousContact,
         AssassinationPlot
         // ToDo: Lovers
-        // ToDo: Children of Leader
+        // ToDo: Children of Leaders
     }
 }
