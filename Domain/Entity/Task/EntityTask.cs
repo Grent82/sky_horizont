@@ -82,8 +82,8 @@ namespace SkyHorizont.Domain.Entity.Task
 
             // succeed if research + loyalty × random factor beats threshold
             double threshold = 50.0;
-            double roll = _character.Skills.Research + (_character.Personality.Loyalty / 10.0)
-                          - new Random().NextDouble() * 20.0;
+            double roll = _character.Skills.Research/* + (_character.Personality.Loyalty / 10.0)
+                          - new Random().NextDouble() * 20.0*/;
             return roll >= threshold;
         }
 
@@ -111,9 +111,9 @@ namespace SkyHorizont.Domain.Entity.Task
         {
             if (_character == null)
                 throw new DomainException("Task not assigned.");
-            double roll = _character.Skills.Intelligence * 1.2
+            double roll = _character.Skills.Intelligence/* * 1.2
                           + (_character.Personality.Boldness * 1.1)
-                          - new Random().NextDouble() * 30.0;
+                          - new Random().NextDouble() * 30.0*/;
             return roll >= 60.0;
         }
 

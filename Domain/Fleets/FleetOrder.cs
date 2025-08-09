@@ -28,6 +28,7 @@ namespace SkyHorizont.Domain.Fleets
                 Complete();
                 return;
             }
+            /*
             var dist = fleet.GameNavService.Distance(fleet.CurrentSystemId, DestinationSystemId);
             fleet.TravelProgress += delta * fleet.AverageFleetSpeed;
             if (fleet.TravelProgress >= dist)
@@ -36,6 +37,7 @@ namespace SkyHorizont.Domain.Fleets
                 fleet.TravelProgress = 0;
                 Complete();
             }
+            */
         }
     }
 
@@ -49,6 +51,7 @@ namespace SkyHorizont.Domain.Fleets
 
         public override void Execute(Fleet fleet, double delta)
         {
+            /*
             if (fleet.GameCombatService.ResolveBattle(fleet.Id, TargetFleetId, out bool won, out List<Guid> lostShips))
             {
                 foreach (var shipId in lostShips) fleet.DestroyShip(shipId);
@@ -59,6 +62,7 @@ namespace SkyHorizont.Domain.Fleets
             {
                 Fail();
             }
+            */
         }
     }
 }
