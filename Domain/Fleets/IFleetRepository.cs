@@ -1,10 +1,10 @@
 namespace SkyHorizont.Domain.Fleets
 {
     public interface IFleetRepository
-        {
-            Fleet? GetById(Guid attackerFleetId);
-            IEnumerable<Fleet> GetAll();
+    {
+        Fleet? GetById(Guid attackerFleetId);
+        IEnumerable<Fleet> GetAll();
 
-            void Save(Fleet fleet);
-        }
+        void Save(Fleet fleet);
+    }
 }
