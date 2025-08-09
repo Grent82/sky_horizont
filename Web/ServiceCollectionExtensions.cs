@@ -32,6 +32,7 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<ILineageDbContext, InMemoryLinageDbContext>();
             services.AddScoped<IOpinionsDbContext, InMemoryOpinionsDbContext>();
             services.AddScoped<ISecretsDbContext, InMemorySecretsDbContext>();
+            services.AddScoped<IFactionsDbContext, InMemoryFactionsDbContext>();
 
 
             services.AddScoped<IAffectionRepository, AffectionRepository>();
@@ -43,6 +44,7 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<ILineageRepository, LineageRepository>();
             services.AddScoped<IOpinionRepository, OpinionRepository>();
             services.AddScoped<ISecretsRepository, SecretsRepository>();
+            services.AddScoped<IFactionRepository, FactionRepository>();
 
 
             services.AddScoped<ISocialEventLog, InMemorySocialEventLog>();
@@ -58,6 +60,7 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<ICharacterLifecycleService, CharacterLifecycleService>();
             services.AddSingleton<IPersonalityInheritanceService, SimplePersonalityInheritanceService>();
             services.AddSingleton<IMortalityModel, GompertzMortalityModel>();
+            services.AddSingleton<IFactionInfo, FactionInfoService>();
 
             services.AddScoped<IIntentPlanner, IntentPlanner>();
             services.AddScoped<IInteractionResolver, InteractionResolver>();
