@@ -1,5 +1,3 @@
-using SkyHorizont.Domain.Shared;
-
 namespace SkyHorizont.Domain.Entity.Lineage
 {
     public enum LineageType { Biological, Adoptive }
