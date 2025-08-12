@@ -19,6 +19,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public double BaseAttack { get; private set; }
         public double BaseDefense { get; private set; }
         public int StationedTroops { get; private set; }
+        public double BaseTaxRate { get; private set; }
         public IList<Guid> CapturedCharacterIds { get; } = new List<Guid>();
         private readonly List<Fleet> _stationedFleets = new();
 
@@ -30,6 +31,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             Resources initialResources,
             double initialStability = 1.0,
             int infrastructureLevel = 10,
+            double baseTaxRate = 1.0,
             double baseAtk = 0, double baseDef = 0, int troops = 0)
         {
             Id = id;
@@ -39,6 +41,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             Resources = initialResources;
             Stability = Math.Clamp(initialStability, 0.0, 1.0);
             InfrastructureLevel = Math.Clamp(infrastructureLevel, 0, 100);
+            BaseTaxRate = baseTaxRate;
             BaseAttack = baseAtk;
             BaseDefense = baseDef;
             StationedTroops = troops;
@@ -154,7 +157,9 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public void AddCaptured(Guid cmdrId) => CapturedCharacterIds.Add(cmdrId);
         public void ClearCapturedAfterResolution() => CapturedCharacterIds.Clear();
 
-        public void AdjustStability(double to) => Stability = Math.Clamp(to, 0, 1);
+        public void AdjustStability(double to) => Stability = Math.Clamp(to, 0.0, 1.0);
+
+        public void AdjustTaxRate(double to) => BaseTaxRate = to;
 
 
         public override string ToString() =>

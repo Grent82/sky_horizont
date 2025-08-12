@@ -16,8 +16,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IPlanetRepository _planets;
         private readonly IFleetRepository _fleets;
         private readonly ICharacterRepository _characters;
-        private readonly IFactionService _factionInfo;
         private readonly IFactionFundsRepository _factionFunds;
+        private readonly IFactionService _factionInfo;
+        private readonly IFactionTaxService _factionTaxService;
         private readonly IGameClockService _clock;
 
         
@@ -41,16 +42,18 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IPlanetRepository planets,
             IFleetRepository fleets,
             ICharacterRepository characters,
-            IFactionService factionInfo,
             IFactionFundsRepository factionFunds,
+            IFactionService factionInfo,
+            IFactionTaxService factionTaxService,
             IGameClockService clock)
         {
             _eco = eco;
             _planets = planets;
             _fleets = fleets;
             _characters = characters;
-            _factionInfo = factionInfo;
             _factionFunds = factionFunds;
+            _factionInfo = factionInfo;
+            _factionTaxService = factionTaxService;
             _clock = clock;
         }
 
@@ -58,15 +61,17 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         public void EndOfTurnUpkeep()
         {
-            // 1) Upkeep
+            ProcessTaxes();
+
+            // Upkeep
             DoFleetUpkeep();
             DoPlanetUpkeep();
             DoCharacterSalaries();
 
-            // 2) Trade & Tariffs (and Smuggling)
+            // Trade & Tariffs (and Smuggling)
             ProcessTradeRoutes();
 
-            // 3) Loans
+            // Loans
             ProcessLoans();
         }
 
@@ -161,11 +166,22 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         // -------------------- Internals --------------------
 
+        private void ProcessTaxes()
+        {
+            foreach (var planet in _planets.GetAll())
+            {
+                // ToDo: The % could be stored per planet or per faction policy
+                var baseTaxRate = planet.BaseTaxRate;
+                _factionTaxService.TaxPlanet(planet.Id, baseTaxRate);
+            }
+        }
+
         private void DoFleetUpkeep()
         {
             foreach (var fleet in _fleets.GetAll())
             {
                 // maintenance equals sum(ship.Cost * pct)
+                // ToDo: maintance, maybe half of the cost or dependend on commanders or leader
                 int upkeep = (int)Math.Ceiling(fleet.Ships.Sum(s => s.Cost * ShipMonthlyMaintenancePct));
                 if (upkeep <= 0) continue;
 

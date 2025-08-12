@@ -21,7 +21,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             if (planet is null) return;
 
             var stability = Math.Clamp(planet.Stability + delta, 0.0, 1.0);
-            planet.Stability = stability;
+            planet.AdjustStability(stability);
 
             _repository.Save(planet);
         }
