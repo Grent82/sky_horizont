@@ -1,4 +1,3 @@
-using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Intrigue;
 
 namespace SkyHorizont.Infrastructure.Persistence.Interfaces

@@ -20,8 +20,6 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public double BaseDefense { get; private set; }
         public int StationedTroops { get; private set; }
         public IList<Guid> CapturedCharacterIds { get; } = new List<Guid>();
-
-
         private readonly List<Fleet> _stationedFleets = new();
 
         public Planet(
@@ -155,6 +153,9 @@ namespace SkyHorizont.Domain.Galaxy.Planet
 
         public void AddCaptured(Guid cmdrId) => CapturedCharacterIds.Add(cmdrId);
         public void ClearCapturedAfterResolution() => CapturedCharacterIds.Clear();
+
+        public void AdjustStability(double to) => Stability = Math.Clamp(to, 0, 1);
+
 
         public override string ToString() =>
             $"{Name} (Faction: {ControllingFactionId}, Governor: {GovernorId})";

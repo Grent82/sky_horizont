@@ -3,6 +3,7 @@ using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Services;
 
+// ToDo: complete
 namespace SkyHorizont.Infrastructure.DomainServices
 {
     public class MoraleService : IMoraleService
@@ -16,17 +17,17 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         public void AdjustMoraleForConquest(Guid id, Planet planet)
         {
-            
+
         }
 
         public void AdjustMoraleForDefeat(Guid defenderCmdId, BattleResult result)
         {
-            
+
         }
 
         public void AdjustMoraleForVictory(Guid id, BattleResult result)
         {
-            
+
         }
 
         public void ApplyMoraleEffects()

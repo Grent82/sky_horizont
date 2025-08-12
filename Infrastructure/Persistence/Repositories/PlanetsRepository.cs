@@ -17,9 +17,9 @@ namespace SkyHorizont.Infrastructure.Persistence
         public Planet? GetById(Guid planetId) =>
             _context.Planets.TryGetValue(planetId, out var cmd) ? cmd : null;
 
-        public void Save(Planet fleet)
+        public void Save(Planet planet)
         {
-            _context.Planets[fleet.Id] = fleet;
+            _context.Planets[planet.Id] = planet;
         }
     }
 }
