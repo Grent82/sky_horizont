@@ -1,3 +1,8 @@
+using FluentAssertions;
+using SkyHorizont.Domain.Entity.Lineage;
+using SkyHorizont.Domain.Shared;
+using Xunit;
+
 namespace SkyHorizont.Tests.Entity
 {
     public class EntityLineageTests

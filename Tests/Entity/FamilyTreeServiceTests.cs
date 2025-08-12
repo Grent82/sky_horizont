@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using FluentAssertions;
 using Xunit;
 
@@ -277,5 +274,15 @@ namespace SkyHorizont.Tests.Entity
         }
 
         public IEnumerable<EntityLineage> FindAll() => _byChild.Values;
+
+        public IEnumerable<Guid> FindChildrenOfParent(Guid parentId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool IsAncestorOf(Guid candidateAncestorId, Guid childId)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
