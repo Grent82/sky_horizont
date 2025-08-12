@@ -58,8 +58,9 @@ namespace SkyHorizont.Domain.Fleets
         public IEnumerable<Guid> ComputeLostShips(double remainingPower, bool retreat)
         {
             var sorted = Ships.OrderBy(s => s.CurrentDefense).ToList();
+            // ToDo: beter calculation
             int toRemove = retreat
-                ? (int)(Ships.Count * 0.4)  // ~40% losses on retreat :contentReference[oaicite:3]{index=3}
+                ? (int)(Ships.Count * 0.4)  // ~40% losses on retreat
                 : Ships.Count;              // full destruction if no retreat
 
             return sorted.Take(toRemove).Select(s => s.Id);

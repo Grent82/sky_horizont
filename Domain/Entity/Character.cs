@@ -7,6 +7,7 @@ namespace SkyHorizont.Domain.Entity
     {
         private static readonly Dictionary<Rank, int> MeritThresholds = new()
         {
+            { Rank.Civilian,     0 },
             { Rank.Lieutenant, 100 },
             { Rank.Captain,    300 },
             { Rank.Major,      700 },

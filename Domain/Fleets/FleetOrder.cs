@@ -7,7 +7,7 @@ namespace SkyHorizont.Domain.Fleets
         public Guid Id { get; }
         public TaskStatus Status { get; private set; }
         public FleetOrder(Guid id) { Id = id; Status = TaskStatus.Pending; }
-        internal void Activate() { if (Status == TaskStatus.Pending) Status = TaskStatus.Active; }
+        public void Activate() { if (Status == TaskStatus.Pending) Status = TaskStatus.Active; }
         protected void Complete() => Status = TaskStatus.Success;
         protected void Fail() => Status = TaskStatus.Failed;
         public abstract void Execute(Fleet fleet, double delta);
