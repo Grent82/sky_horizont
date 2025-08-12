@@ -64,7 +64,7 @@ namespace SkyHorizont.Infrastructure.Social
             // Spy (enemy or rival)
             var spyTargetFaction = PickSpyFaction(actor, myFactionId);
             if (spyTargetFaction != Guid.Empty)
-                AddIfAboveZero(intents, ScoreSpy(actor, spyTargetFaction), IntentType.Spy, null, spyTargetFaction); // ToDo: null
+                AddIfAboveZero(intents, ScoreSpy(actor, spyTargetFaction), IntentType.Spy, null, spyTargetFaction); // ToDo: null? spy on enemy character as well (to get family members?)
 
             // Bribe (swing neutral or enemy asset)
             var bribeTarget = PickBribeTarget(actor, otherFaction);

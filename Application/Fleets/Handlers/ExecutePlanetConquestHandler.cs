@@ -56,7 +56,7 @@ namespace SkyHorizont.Application.Fleets.Handlers
                 var defenderFleet = cmd.BattleResult.DefenseRetreated
                     ? cmd.BattleResult.LoserFleet!
                     : cmd.BattleResult.WinnerFleet!;
-                _battleOutcomeService.ProcessFleetBattle(attackerFleet, defenderFleet, cmd.BattleResult); // ToDO
+                _battleOutcomeService.ProcessFleetBattle(attackerFleet, defenderFleet, cmd.BattleResult); // ToDo: order seems strange; thing about it
             }
 
             _planetRepo.Save(planet);

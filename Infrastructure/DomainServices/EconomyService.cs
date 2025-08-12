@@ -268,6 +268,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 var to   = _planets.GetById(route.ToPlanetId);
                 if (from is null || to is null) continue;
 
+                // ToDo: Planet distance may influence when Profit is optained
+
                 // Very simple value model: capacity * (avg infra / 50) * base unit
                 double infraFactor = Math.Max(1.0, (from.InfrastructureLevel + to.InfrastructureLevel) / 100.0 * 2.0);
                 int grossValue = (int)Math.Round(route.Capacity * TradeBaseUnitValue * infraFactor);
