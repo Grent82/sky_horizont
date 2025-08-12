@@ -54,7 +54,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         /// Collects a percentage of the planet's current local budget into the controlling faction's treasury.
         /// Effective rate and collection efficiency are modified by the governor's Economy skill and personality facets.
         /// </summary>
-        public void TaxPlanet(Guid planetId, int percentage)
+        public void TaxPlanet(Guid planetId, double percentage)
         {
             percentage = Math.Clamp(percentage, MinPercent, MaxPercent);
 

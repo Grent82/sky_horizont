@@ -21,22 +21,21 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IFactionTaxService _factionTaxService;
         private readonly IGameClockService _clock;
 
-        
-        // ---- Tuning knobs (easy to externalize later) ----
-        private const double ShipMonthlyMaintenancePct = 0.02;   // ToDo: make configurable (based on character skills and personality): 2% of ship Cost per month
-        private const int PlanetInfraUpkeepPerLevel    = 3;      // ToDo: make configurable (based on character skills and personality): credits per infra‑level
+        private readonly EconomyTuning _cfg;
+
+        // ---- Tuning knobs that remain local (value model & smuggling) ----
+        private const int TradeBaseUnitValue       = 5;    // value per route capacity unit
+        private const double SmugglingCutToPirates = 0.65; // pirates receive 65% of smuggled value
+        private const double SmugglingLossAtSource = 0.15; // source planet loses 15% to leakage/corruption
+        private const int MinimumTariffPercent     = 0;    // sanity guards
+        private const int MaximumTariffPercent     = 75;
+
         private static readonly Dictionary<Rank, int> SalaryByRank = new()
         {
             { Rank.Civilian, 0 }, { Rank.Lieutenant, 20 }, { Rank.Captain, 40 },
             { Rank.Major, 60 }, { Rank.Colonel, 90 }, { Rank.General, 140 }, { Rank.Leader, 0 }
         };
-        private const int TradeBaseUnitValue          = 5;       // value per route capacity unit
-        private const double SmugglingCutToPirates    = 0.65;    // pirates receive 65% of smuggled value
-        private const double SmugglingLossAtSource    = 0.15;    // source planet loses 15% to leakage/corruption
-        private const int MinimumTariffPercent        = 0;       // sanity guards
-        private const int MaximumTariffPercent        = 75;
 
-        // ToDo: Planet and faction budged
         public EconomyService(
             IPlanetEconomyRepository eco,
             IPlanetRepository planets,
@@ -45,7 +44,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IFactionFundsRepository factionFunds,
             IFactionService factionInfo,
             IFactionTaxService factionTaxService,
-            IGameClockService clock)
+            IGameClockService clock,
+            EconomyTuning? cfg = null) // NEW: optional tuning injected
         {
             _eco = eco;
             _planets = planets;
@@ -55,6 +55,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _factionInfo = factionInfo;
             _factionTaxService = factionTaxService;
             _clock = clock;
+            _cfg = cfg ?? new EconomyTuning(); // default matches old behavior
         }
 
         // -------------------- Public API --------------------
@@ -143,7 +144,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         public void MakeLoanPayment(Guid loanId, int amount)
         {
             var loan = _eco.GetLoan(loanId);
-            if ( loan == null || amount <= 0) return;
+            if (loan == null || amount <= 0) return;
 
             if (!DebitOwner(loan.AccountType, loan.OwnerId, amount)) return; // insufficient funds
             int paid = loan.MakePayment(amount);
@@ -163,14 +164,12 @@ namespace SkyHorizont.Infrastructure.DomainServices
             return _eco.GetPlanetBudget(planetId);
         }
 
-
         // -------------------- Internals --------------------
 
         private void ProcessTaxes()
         {
             foreach (var planet in _planets.GetAll())
             {
-                // ToDo: The % could be stored per planet or per faction policy
                 var baseTaxRate = planet.BaseTaxRate;
                 _factionTaxService.TaxPlanet(planet.Id, baseTaxRate);
             }
@@ -180,24 +179,25 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             foreach (var fleet in _fleets.GetAll())
             {
-                // maintenance equals sum(ship.Cost * pct)
-                // ToDo: maintance, maybe half of the cost or dependend on commanders or leader
-                int upkeep = (int)Math.Ceiling(fleet.Ships.Sum(s => s.Cost * ShipMonthlyMaintenancePct));
+                Character? commander = null;
+                if (fleet.AssignedCharacterId.HasValue && fleet.AssignedCharacterId.Value != Guid.Empty)
+                    commander = _characters.GetById(fleet.AssignedCharacterId.Value);
+
+                var maintPct = FleetMaintenancePctFor(fleet, commander); // NEW
+                int upkeep = (int)Math.Ceiling(fleet.Ships.Sum(s => s.Cost * maintPct));
                 if (upkeep <= 0) continue;
 
-                // Try charge faction treasury first; if none, try nearest owned planet?
                 var factionId = fleet.FactionId;
                 if (_factionFunds.GetBalance(factionId) >= upkeep)
                 {
                     _factionFunds.DeductBalance(factionId, upkeep);
                     _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
-                        "UpkeepFleet", factionId, -upkeep, $"Fleet {fleet.Id} upkeep from faction"));
+                        "UpkeepFleet", factionId, -upkeep, $"Fleet {fleet.Id} upkeep from faction (pct {maintPct:P1})"));
                 }
                 else
                 {
-                    // fallback: no money → technical debt (you could mark morale/supply penalties elsewhere)
                     _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
-                        "UpkeepFleetUnpaid", factionId, 0, $"Fleet {fleet.Id} unpaid upkeep {upkeep}"));
+                        "UpkeepFleetUnpaid", factionId, 0, $"Fleet {fleet.Id} unpaid upkeep {upkeep} (pct {maintPct:P1})"));
                 }
             }
         }
@@ -206,10 +206,13 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             foreach (var planet in _planets.GetAll())
             {
-                int infraUpkeep = planet.InfrastructureLevel * PlanetInfraUpkeepPerLevel;
+                Character? governor = null;
+                if (planet.GovernorId.HasValue && planet.GovernorId.Value != Guid.Empty)
+                    governor = _characters.GetById(planet.GovernorId.Value);
+
+                int infraUpkeep = InfraUpkeepFor(planet, governor); // NEW
                 if (infraUpkeep <= 0) continue;
 
-                // Pay from planet budget; if not enough, attempt faction cover
                 if (!_eco.TryDebitBudget(planet.Id, infraUpkeep))
                 {
                     var factionId = planet.ControllingFactionId;
@@ -217,19 +220,19 @@ namespace SkyHorizont.Infrastructure.DomainServices
                     {
                         _factionFunds.DeductBalance(factionId, infraUpkeep);
                         _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
-                            "UpkeepPlanetFactionCovered", factionId, -infraUpkeep, $"Covered infra upkeep for {planet.Id}"));
+                            "UpkeepPlanetFactionCovered", factionId, -infraUpkeep, $"Covered infra upkeep for {planet.Id} (adj)"));
                     }
                     else
                     {
                         _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
-                            "UpkeepPlanetUnpaid", planet.Id, 0, $"Unpaid infra upkeep {infraUpkeep}"));
+                            "UpkeepPlanetUnpaid", planet.Id, 0, $"Unpaid infra upkeep {infraUpkeep} (adj)"));
                     }
                 }
                 else
                 {
                     _planets.Save(planet);
                     _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
-                        "UpkeepPlanet", planet.Id, -infraUpkeep, $"Infra upkeep {infraUpkeep}"));
+                        "UpkeepPlanet", planet.Id, -infraUpkeep, $"Infra upkeep {infraUpkeep} (adj)"));
                 }
             }
         }
@@ -241,12 +244,11 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 if (!c.IsAlive) continue;
                 if (!SalaryByRank.TryGetValue(c.Rank, out var salary) || salary <= 0) continue;
 
-                // Pay from faction treasury; if not enough, skip
                 var factionId = _factionInfo.GetFactionIdForCharacter(c.Id);
                 if (_factionFunds.GetBalance(factionId) >= salary)
                 {
                     _factionFunds.DeductBalance(factionId, salary);
-                    c.Credit(salary); // character personal funds
+                    c.Credit(salary);
                     _characters.Save(c);
 
                     _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
@@ -268,15 +270,13 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 var to   = _planets.GetById(route.ToPlanetId);
                 if (from is null || to is null) continue;
 
-                // ToDo: Planet distance may influence when Profit is optained
-
-                // Very simple value model: capacity * (avg infra / 50) * base unit
+                // Very simple value model: capacity * (avg infra / 50) * base unit * distanceFactor
                 double infraFactor = Math.Max(1.0, (from.InfrastructureLevel + to.InfrastructureLevel) / 100.0 * 2.0);
-                int grossValue = (int)Math.Round(route.Capacity * TradeBaseUnitValue * infraFactor);
+                double distanceFactor = DistanceValueFactor(from.Id, to.Id); // NEW (currently 1.0)
+                int grossValue = (int)Math.Round(route.Capacity * TradeBaseUnitValue * infraFactor * distanceFactor);
 
                 if (route.IsSmuggling)
                 {
-                    // Smuggling: bleed the source planet; pirates get most of it
                     var pirateFaction = FindPirateFactionNear(from.ControllingFactionId) ?? from.ControllingFactionId;
                     int leakage = (int)Math.Round(grossValue * SmugglingLossAtSource);
                     int piratesTake = (int)Math.Round((grossValue - leakage) * SmugglingCutToPirates);
@@ -289,17 +289,15 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 }
                 else
                 {
-                    // Legal trade: split gross to planets, then apply tariff to controlling factions
                     int half = grossValue / 2;
                     _eco.AddBudget(from.Id, half);
                     _eco.AddBudget(to.Id, grossValue - half);
 
-                    // Apply tariffs by each controlling faction, if any
                     ApplyTariffOnPlanet(from, half, route.Id);
                     ApplyTariffOnPlanet(to, grossValue - half, route.Id);
 
                     _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
-                        "Trade", null, grossValue, $"Route {route.Id} value {grossValue}"));
+                        "Trade", null, grossValue, $"Route {route.Id} value {grossValue} (dist {distanceFactor:F2})"));
                 }
             }
         }
@@ -332,7 +330,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
                     "LoanInterest", loan.OwnerId, interest, $"{loan.AccountType} interest accrued"));
 
-                // Auto‑payment attempt: 10% of remaining (rounded up), min 1
                 int due = Math.Max(1, (int)Math.Ceiling(loan.RemainingPrincipal * 0.10));
                 if (DebitOwner(loan.AccountType, loan.OwnerId, due))
                 {
@@ -342,7 +339,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 }
                 else
                 {
-                    // No funds: mark default (you could add penalties elsewhere)
                     loan.MarkDefault();
                     _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
                         "LoanDefault", loan.OwnerId, 0, $"{loan.AccountType} defaulted with {loan.RemainingPrincipal} remaining"));
@@ -402,8 +398,47 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private Guid? FindPirateFactionNear(Guid fallbackFaction)
         {
-            // ToDo: pick pirate factions tracked, or now, return null to credit fallbackFaction if needed.
+            // TODO: integrate a pirate directory or starmap proximity.
+            // For now, return null to fall back to controlling faction when needed.
             return null;
+        }
+
+        // -------------------- NEW helpers (rates & distance) --------------------
+
+        private double FleetMaintenancePctFor(Fleet fleet, Character? commander)
+        {
+            // Start from configured base
+            double pct = _cfg.BaseShipMaintPct;
+            if (commander is null) return pct;
+
+            // Military skill reduces maintenance up to configured cap
+            double skillFactor = 1.0 - (commander.Skills.Military / 100.0) * _cfg.FleetMaintSkillReductionPer100;
+            // Conscientiousness reduces waste/leakage a bit
+            double conscFactor = 1.0 - (commander.Personality.Conscientiousness / 100.0) * _cfg.FleetMaintConscReductionPer100;
+
+            var result = pct * skillFactor * conscFactor;
+            return Math.Clamp(result, 0.005, 0.10);
+        }
+
+        private int InfraUpkeepFor(Planet planet, Character? governor)
+        {
+            var baseUpkeep = planet.InfrastructureLevel * _cfg.BaseInfraUpkeepPerLvl;
+            if (baseUpkeep <= 0) return 0;
+            if (governor is null) return baseUpkeep;
+
+            double skillFactor = 1.0 - (governor.Skills.Economy / 100.0) * _cfg.GovInfraSkillReductionPer100;
+            double conscFactor = 1.0 - (governor.Personality.Conscientiousness / 100.0) * _cfg.GovConscReductionPer100;
+
+            var adjusted = baseUpkeep * Math.Max(0.5, skillFactor * conscFactor);
+            return (int)Math.Ceiling(adjusted);
+        }
+
+        private double DistanceValueFactor(Guid fromPlanetId, Guid toPlanetId)
+        {
+            // Stub for now (no extra dependency). 
+            // ToDo: Integrate starmap later.
+            // Return 1.0 → your current behavior.
+            return 1.0;
         }
     }
 }
