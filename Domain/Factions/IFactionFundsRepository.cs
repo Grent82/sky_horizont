@@ -4,5 +4,6 @@ namespace SkyHorizont.Domain.Factions
     {
         int GetBalance(Guid factionId);
         void AddBalance(Guid factionId, int delta);
+        void DeductBalance(Guid factionId, int upkeep);
     }
 }

@@ -20,6 +20,12 @@ namespace SkyHorizont.Infrastructure.Persistence
             _context.FactionFunds[factionId] = GetBalance(factionId) + delta;
             _context.SaveChanges();
         }
+
+        public void DeductBalance(Guid factionId, int delta)
+        {
+            _context.FactionFunds[factionId] = GetBalance(factionId) - delta;
+            _context.SaveChanges();
+        }
     }
 
 }
