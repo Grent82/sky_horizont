@@ -16,7 +16,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IPlanetRepository _planets;
         private readonly IFleetRepository _fleets;
         private readonly ICharacterRepository _characters;
-        private readonly IFactionInfo _factionInfo;
+        private readonly IFactionService _factionInfo;
         private readonly IFactionFundsRepository _factionFunds;
         private readonly IGameClockService _clock;
 
@@ -40,7 +40,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IPlanetRepository planets,
             IFleetRepository fleets,
             ICharacterRepository characters,
-            IFactionInfo factionInfo,
+            IFactionService factionInfo,
             IFactionFundsRepository factionFunds,
             IGameClockService clock)
         {

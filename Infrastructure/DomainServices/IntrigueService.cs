@@ -18,8 +18,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IPlotRepository _plots;
         private readonly ISecretsRepository _secrets;
         private readonly IOpinionRepository _opinions;
-        private readonly IFactionInfo _factionInfo;
-        private readonly IFactionMembershipService _factionMembership;
+        private readonly IFactionService _factionInfo;
         private readonly ICharacterRepository _characters;
         private readonly IRandomService _rng;
 
@@ -37,8 +36,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IPlotRepository plots,
             ISecretsRepository secrets,
             IOpinionRepository opinions,
-            IFactionInfo factionInfo,
-            IFactionMembershipService factionMembership,
+            IFactionService factionInfo,
             ICharacterRepository characters,
             IRandomService rng)
         {
@@ -46,7 +44,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _secrets = secrets;
             _opinions = opinions;
             _factionInfo = factionInfo;
-            _factionMembership = factionMembership;
             _characters = characters;
             _rng = rng;
         }
@@ -161,7 +158,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             if (_rng.NextDouble() <= chance)
             {
-                _factionMembership.MoveCharacterToFaction(actorId, newFactionId);
+                _factionInfo.MoveCharacterToFaction(actorId, newFactionId);
 
                 // Opinion effects: old faction leader hates you, new one likes you
                 var oldLeader = _factionInfo.GetLeaderId(oldFaction);
@@ -249,7 +246,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 {
                     var targetFaction = _factionInfo.GetFactionIdForCharacter(targetChar.Id);
                     // Move leader into that faction as "leader" via membership/service in your command layer (not shown here)
-                    _factionMembership.MoveCharacterToFaction(leader.Id, targetFaction);
+                    _factionInfo.MoveCharacterToFaction(leader.Id, targetFaction);
                     // Opinions: target hates conspirators (already handled on exposure, but give extra sting)
                     _opinions.AdjustOpinion(targetChar.Id, leader.Id, -40, "Coup executed");
                 }

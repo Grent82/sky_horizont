@@ -14,7 +14,7 @@ namespace SkyHorizont.Infrastructure.Social
     {
         private readonly ICharacterRepository _chars;
         private readonly IOpinionRepository _opinions;
-        private readonly IFactionInfo _factions;
+        private readonly IFactionService _factions;
         private readonly IRandomService _rng;
 
         // Tuning knobs (0..100 style target values; scores roughly 0..100 range)
@@ -23,7 +23,7 @@ namespace SkyHorizont.Infrastructure.Social
         public IntentPlanner(
             ICharacterRepository characters,
             IOpinionRepository opinions,
-            IFactionInfo factions,
+            IFactionService factions,
             IRandomService rng,
             PlannerConfig? config = null)
         {

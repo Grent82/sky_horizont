@@ -1,3 +1,4 @@
+using Infrastructure.Persistence.Repositories;
 using SkyHorizont.Application;
 using SkyHorizont.Application.Turns;
 using SkyHorizont.Domain.Battle;
@@ -7,6 +8,7 @@ using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Fleets;
 using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Intrigue;
+using SkyHorizont.Domain.Research;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Social;
 using SkyHorizont.Infrastructure.DomainServices;
@@ -35,6 +37,9 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<ISecretsDbContext, InMemorySecretsDbContext>();
             services.AddScoped<IFactionsDbContext, InMemoryFactionsDbContext>();
             services.AddScoped<IIntrigueDbContext, InMemoryIntrigueDbContext>();
+            services.AddScoped<IIntelDbContext, InMemoryIntelDbContext>();
+            services.AddScoped<IPlanetEconomyDbContext, InMemoryPlanetEconomyDbContext>();
+            services.AddScoped<IResearchDbContext, InMemoryResearchDbContext>();
 
 
             services.AddScoped<IAffectionRepository, AffectionRepository>();
@@ -48,6 +53,9 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<ISecretsRepository, SecretsRepository>();
             services.AddScoped<IFactionRepository, FactionRepository>();
             services.AddScoped<IPlotRepository, PlotRepository>();
+            services.AddScoped<IIntelRepository, IntelRepository>();
+            services.AddScoped<IPlanetEconomyRepository, PlanetEconomyRepository>();
+            services.AddScoped<IResearchRepository, ResearchRepository>();
 
 
             services.AddScoped<ISocialEventLog, InMemorySocialEventLog>();
@@ -56,22 +64,27 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<IAffectionService, AffectionService>();
             services.AddScoped<IBattleOutcomeService, BattleOutcomeService>();
             services.AddScoped<ICharacterFundsService, CharacterFundsService>();
-            services.AddScoped<IFactionTaxService, FactionTaxService>();
-            services.AddScoped<IFundsService, FundsService>();
-            services.AddScoped<IMoraleService, MoraleService>();
-            services.AddScoped<IRansomService, RansomService>();
             services.AddScoped<ICharacterLifecycleService, CharacterLifecycleService>();
-            services.AddSingleton<IPersonalityInheritanceService, SimplePersonalityInheritanceService>();
-            services.AddSingleton<IMortalityModel, GompertzMortalityModel>();
-            services.AddSingleton<IFactionInfo, FactionInfoService>();
-
+            services.AddScoped<IFactionService, FactionService>();
+            services.AddScoped<IFactionTaxService, FactionTaxService>();
+            services.AddScoped<IFactionService, FactionService>();
+            services.AddScoped<IMortalityModel, GompertzMortalityModel>();
+            services.AddScoped<IFundsService, FundsService>();
+            services.AddScoped<IIntelService, IntelService>();
+            services.AddScoped<IIntrigueService, IntrigueService>();
+            services.AddScoped<IMoraleService, MoraleService>();
+            services.AddScoped<IPlanetService, PlanetService>();
+            services.AddScoped<IRansomService, RansomService>();
+            services.AddScoped<IEconomyService, EconomyService>();
+            services.AddScoped<IResearchService, ResearchService>();
             services.AddScoped<IIntentPlanner, IntentPlanner>();
             services.AddScoped<IInteractionResolver, InteractionResolver>();
+            services.AddSingleton<IPersonalityInheritanceService, SimplePersonalityInheritanceService>();
 
 
             // Application Layer
-            services.AddScoped<IGameClockService, GameClockService>();
-            services.AddScoped<ITurnProcessor, TurnProcessor>();
+            services.AddSingleton<IGameClockService, GameClockService>();
+            services.AddSingleton<ITurnProcessor, TurnProcessor>();
             services.AddSingleton<IRandomService>(_ => new RandomService(rngSeed));
             services.AddSingleton<INameGenerator, NameGenerator>();
             

@@ -29,6 +29,11 @@ namespace SkyHorizont.Infrastructure.Repository
             return _context.WarPairs;
         }
 
+        public void MoveCharacterToFaction(Guid characterId, Guid newFactionId)
+        {
+            _context.CharacterFaction[characterId] = newFactionId;
+        }
+
         public void Save(Faction faction)
         {
             throw new NotImplementedException();

@@ -17,14 +17,14 @@ namespace SkyHorizont.Infrastructure.Social
     {
         private readonly ICharacterRepository _chars;
         private readonly IOpinionRepository _opinions;
-        private readonly IFactionInfo _factions;
+        private readonly IFactionService _factions;
         private readonly ISecretsRepository _secrets;
         private readonly IRandomService _rng;
 
         public InteractionResolver(
             ICharacterRepository characters,
             IOpinionRepository opinions,
-            IFactionInfo factions,
+            IFactionService factions,
             ISecretsRepository secrets,
             IRandomService rng)
         {

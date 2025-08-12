@@ -7,11 +7,11 @@ namespace SkyHorizont.Infrastructure.DomainServices
     /// Read-only service that implements IFactionInfo from an IFactionsDbContext.
     /// Stores war/rival relations as undirected pairs of faction IDs.
     /// </summary>
-    public sealed class FactionInfoService : IFactionInfo
+    public sealed class FactionService : IFactionService
     {
         private readonly IFactionRepository _factionRepository;
 
-        public FactionInfoService(IFactionRepository factionRepository) =>_factionRepository = factionRepository;
+        public FactionService(IFactionRepository factionRepository) =>_factionRepository = factionRepository;
 
         public Guid GetFactionIdForCharacter(Guid characterId)
         {
@@ -56,6 +56,11 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             // Store undirected relations canonically: (min, max)
             return x.CompareTo(y) <= 0 ? (x, y) : (y, x);
+        }
+
+        public void MoveCharacterToFaction(Guid characterId, Guid newFactionId)
+        {
+            _factionRepository.MoveCharacterToFaction(characterId, newFactionId);
         }
 
         #endregion

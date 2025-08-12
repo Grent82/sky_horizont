@@ -8,6 +8,7 @@ namespace SkyHorizont.Domain.Factions
         HashSet<(Guid a, Guid b)> GetWarPairs();
         HashSet<(Guid a, Guid b)> GetRivalPairs();
 
+        void MoveCharacterToFaction(Guid characterId, Guid newFactionId);
 
         void Save(Faction faction);
     }

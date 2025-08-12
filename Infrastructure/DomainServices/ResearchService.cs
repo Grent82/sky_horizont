@@ -12,9 +12,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
     public class ResearchService : IResearchService
     {
         private readonly IResearchRepository _repository;
-        private readonly IFactionInfo _factionInfo;
+        private readonly IFactionService _factionInfo;
 
-        public ResearchService(IResearchRepository repository, IFactionInfo factionInfo)
+        public ResearchService(IResearchRepository repository, IFactionService factionInfo)
         {
             _repository = repository;
             _factionInfo = factionInfo;
