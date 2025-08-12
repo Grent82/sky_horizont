@@ -2,6 +2,7 @@ using Infrastructure.Persistence.Repositories;
 using SkyHorizont.Application;
 using SkyHorizont.Application.Turns;
 using SkyHorizont.Domain.Battle;
+using SkyHorizont.Domain.Economy;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Entity.Lineage;
 using SkyHorizont.Domain.Factions;

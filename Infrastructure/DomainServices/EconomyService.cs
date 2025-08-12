@@ -75,6 +75,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _eco.SetTariffPolicy(factionId, new TariffPolicy(factionId, percent));
         }
 
+        public int GetTariff(Guid factionId)
+            => _eco.GetTariffPolicy(factionId)?.Percent ?? 0;
+
         public TariffPolicy? GetTariffPolicy(Guid factionId)
             => _eco.GetTariffPolicy(factionId);
 
@@ -134,13 +137,13 @@ namespace SkyHorizont.Infrastructure.DomainServices
         public void MakeLoanPayment(Guid loanId, int amount)
         {
             var loan = _eco.GetLoan(loanId);
-            if ( loan != null || amount <= 0) return;
+            if ( loan == null || amount <= 0) return;
 
-            if (!DebitOwner(loan!.AccountType, loan!.OwnerId, amount)) return; // insufficient funds
-            int paid = loan!.MakePayment(amount);
+            if (!DebitOwner(loan.AccountType, loan.OwnerId, amount)) return; // insufficient funds
+            int paid = loan.MakePayment(amount);
 
             _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
-                "LoanPayment", loan!.OwnerId, -paid, $"{loan!.AccountType} paid {paid}"));
+                "LoanPayment", loan.OwnerId, -paid, $"{loan.AccountType} paid {paid}"));
         }
 
         public void CreditPlanetBudget(Guid planetId, int credits)
@@ -284,11 +287,12 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private void ApplyTariffOnPlanet(Planet planet, int credited, Guid routeId)
         {
-            var policy = _eco.GetTariffPolicy(planet.Id);
+            var policy = _eco.GetTariffPolicy(planet.ControllingFactionId);
+            if (policy is null || policy.Percent <= 0) return;
+
             int tax = (int)Math.Floor(credited * (policy.Percent / 100.0));
             if (tax <= 0) return;
 
-            // Pull tax from planet up to faction
             if (_eco.TryDebitBudget(planet.Id, tax))
             {
                 _planets.Save(planet);
@@ -381,11 +385,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             // ToDo: pick pirate factions tracked, or now, return null to credit fallbackFaction if needed.
             return null;
-        }
-
-        public int GetTariff(Guid factionId)
-        {
-            throw new NotImplementedException();
         }
     }
 }

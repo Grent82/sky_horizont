@@ -11,20 +11,21 @@ namespace Infrastructure.Persistence.Repositories
 
         public PlanetEconomyRepository(IPlanetEconomyDbContext ctx) => _eco = ctx;
 
-        public void AddBudget(Guid planetId, int credits)
+        public void AddBudget(Guid planetId, int amount)
         {
-
+            if (amount <= 0) return;
             var current = GetPlanetBudget(planetId);
-            _eco.PlanetBudgets[planetId] = current + credits;
+            _eco.PlanetBudgets[planetId] = current + amount;
             _eco.SaveChanges();
         }
 
 
 
-        public bool TryDebitBudget(Guid planetId, int credits)
+        public bool TryDebitBudget(Guid planetId, int amount)
         {
+            if (amount <= 0) return true;
             var current = GetPlanetBudget(planetId);
-            var newBalance = current - credits;
+            var newBalance = current - amount;
             if (newBalance < 0)
             {
                 return false;
@@ -65,6 +66,9 @@ namespace Infrastructure.Persistence.Repositories
         {
             _eco.EventLog.Add(economyEvent);
         }
+
+
+        public IEnumerable<EconomyEvent> GetEventLog() => _eco.EventLog.AsReadOnly();
 
         public void SetLoan(Loan loan)
         {
