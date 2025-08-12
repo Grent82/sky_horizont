@@ -6,6 +6,7 @@ using SkyHorizont.Domain.Services;
 // ToDo: complete
 namespace SkyHorizont.Infrastructure.DomainServices
 {
+    // ToDo: Moral system
     public class MoraleService : IMoraleService
     {
         private readonly ICharacterRepository _characterRepository;

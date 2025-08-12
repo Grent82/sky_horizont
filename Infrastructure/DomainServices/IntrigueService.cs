@@ -192,7 +192,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             if (_secrets.GetById(secret.Id) is null)
                 _secrets.Add(secret);
 
-            // Resolve: severity drives compliance chance; target’s Conscientiousness lowers compliance (principled),
+            // TODO: Resolve: severity drives compliance chance; target’s Conscientiousness lowers compliance (principled),
             // Neuroticism raises compliance (fearful).
             double sev = Math.Clamp(secret.Severity, 1, 100) / 100.0;
             double bias = (target.Personality.Neuroticism - target.Personality.Conscientiousness) * 0.003; // -0.3..+0.3
@@ -212,7 +212,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             {
                 // Target is angry and may counter-expose; for now: big opinion hit
                 _opinions.AdjustOpinion(targetId, holderId, OpinionPenaltyBlackmailed, $"Resisted blackmail ({secret.Type})");
-                // Optional: create a counter-plot or attempt exposure
+                // TODO: create a counter-plot or attempt exposure
                 MaybeCreateExposurePlot(targetId, holderId, secret);
             }
         }

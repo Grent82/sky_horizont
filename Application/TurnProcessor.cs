@@ -3,6 +3,8 @@ using System.Linq;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Social;
+using SkyHorizont.Domain.Intrigue;
+using SkyHorizont.Domain.Economy;
 
 namespace SkyHorizont.Application
 {
@@ -12,7 +14,8 @@ namespace SkyHorizont.Application
     }
 
     /// <summary>
-    /// Orchestrates the monthly turn: clock → lifecycle → social interactions → affection → ransom → morale.
+    /// Orchestrates the monthly turn:
+    /// Clock → Lifecycle → Social (plan/resolve) → Affection → Ransom → Morale → Intrigue → Economy.
     /// </summary>
     public sealed class TurnProcessor : ITurnProcessor
     {
@@ -28,6 +31,10 @@ namespace SkyHorizont.Application
         private readonly IMoraleService _morale;
         private readonly ICharacterLifecycleService _lifecycle;
 
+        // New systems
+        private readonly IIntrigueService _intrigue;
+        private readonly IEconomyService _economy;
+
         public TurnProcessor(
             IGameClockService clock,
             ICharacterRepository characters,
@@ -37,64 +44,79 @@ namespace SkyHorizont.Application
             IAffectionService affectionService,
             IRansomService ransom,
             IMoraleService morale,
-            ICharacterLifecycleService lifecycle)
+            ICharacterLifecycleService lifecycle,
+            IIntrigueService intrigue,
+            IEconomyService economy)
         {
             _clock      = clock;
             _characters = characters;
 
-            _planner  = planner;
-            _resolver = resolver;
+            _planner   = planner;
+            _resolver  = resolver;
             _socialLog = socialLog;
 
             _affection = affectionService;
             _ransom    = ransom;
             _morale    = morale;
             _lifecycle = lifecycle;
+
+            _intrigue  = intrigue;
+            _economy   = economy;
         }
 
         public void ProcessAllTurnEvents(int turnNumber)
         {
-            // 1) Advance game time (month → possibly year rollover)
-            _clock.AdvanceTurn();
+            // 1) Advance game time (month → year rollover if needed)
+            SafeRun("Clock.AdvanceTurn", () => _clock.AdvanceTurn());
 
             // 2) Lifecycle first (age up, pregnancies, births, deaths)
-            _lifecycle.ProcessLifecycleTurn();
+            SafeRun("Lifecycle.Process", () => _lifecycle.ProcessLifecycleTurn());
 
             // 3) Social layer: plan intents per living character and resolve them
-            foreach (var actor in _characters.GetAll().Where(c => c.IsAlive))
+            SafeRun("Social.Intents", () =>
             {
-                // Plan
-                var intents = _planner.PlanMonthlyIntents(actor);
-
-                // Resolve
-                foreach (var intent in intents)
+                foreach (var actor in _characters.GetAll().Where(c => c.IsAlive))
                 {
-                    try
+                    var intents = _planner.PlanMonthlyIntents(actor);
+                    foreach (var intent in intents)
                     {
-                        var events = _resolver.Resolve(intent, turnNumber);
-                        foreach (var ev in events)
+                        try
                         {
-                            _socialLog.Append(ev);
+                            var events = _resolver.Resolve(intent, turnNumber);
+                            foreach (var ev in events)
+                                _socialLog.Append(ev);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[TurnProcessor] Error resolving intent {intent.Type} for {actor.Id}: {ex}");
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        // Non-fatal: log and continue. Swap to your logger if you have one.
-                        Console.WriteLine($"[TurnProcessor] Error resolving intent {intent.Type} for {actor.Id}: {ex}");
-                    }
                 }
-            }
+            });
 
             // 4) Affection drift / captive affection adjustments (monthly)
-            _affection.UpdateAffection();
+            SafeRun("Affection.Update", () => _affection.UpdateAffection());
 
             // 5) Ransom attempts / hostage negotiations this month
-            _ransom.TryRequestRansoms();
+            SafeRun("Ransom.TryRequestRansoms", () => _ransom.TryRequestRansoms());
 
             // 6) Morale (apply per-fleet / per-garrison modifiers)
-            _morale.ApplyMoraleEffects();
+            SafeRun("Morale.Apply", () => _morale.ApplyMoraleEffects());
 
-            // 7) (Optional) Economy, taxes, upkeep, research ticks, etc. would go here.
+            // 7) Intrigue (plots progress, exposure, recruitment, defections, blackmail)
+            SafeRun("Intrigue.TickPlots", () => _intrigue.TickPlots());
+
+            // 8) Economy (upkeep, trade/tariffs/smuggling, loans)
+            SafeRun("Economy.EndOfTurnUpkeep", () => _economy.EndOfTurnUpkeep());
+        }
+
+        private static void SafeRun(string label, Action action)
+        {
+            try { action(); }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[TurnProcessor] {label} failed: {ex.Message}");
+            }
         }
     }
 }

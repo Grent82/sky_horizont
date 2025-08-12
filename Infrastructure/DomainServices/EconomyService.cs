@@ -35,6 +35,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private const int MinimumTariffPercent        = 0;       // sanity guards
         private const int MaximumTariffPercent        = 75;
 
+        // ToDo: Planet and faction budged
         public EconomyService(
             IPlanetEconomyRepository eco,
             IPlanetRepository planets,

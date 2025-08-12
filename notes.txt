@@ -22,6 +22,5 @@ Make exposure interact with your Morale or Battle layers (e.g., exposed coup red
 
 
 Tasks:
-A TaskEffect payload returned on success (e.g., ResearchUnlock, IntelReport, StabilityDelta).
 A cooldown or fatigue system integrated with characters.
 Task chains (dependencies) so a success auto‑spawns a follow‑up task.

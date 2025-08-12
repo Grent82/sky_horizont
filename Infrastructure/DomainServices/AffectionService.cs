@@ -45,6 +45,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             }
         }
 
+        // ToDo: any updates for affection based on actions
         private void ApplyAffectionChange(Guid captiveId, Guid captorId, bool isFleet)
         {
             var captor = _cmdRepo.GetById(captorId);
