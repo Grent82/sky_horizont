@@ -52,6 +52,8 @@ namespace SkyHorizont.Domain.Entity
             Id = id;
             Name = name ?? throw new ArgumentNullException(nameof(name));
             Age = age;
+            BirthYear = birthYear;
+            BirthMonth = birthMonth;
             Sex = sex;
             Personality = personality;
             Skills = skills;
@@ -96,7 +98,9 @@ namespace SkyHorizont.Domain.Entity
         {
             if (Rank == Rank.Leader) return;
             Rank = Rank + 1;
-            // Optional side-effects
+            // Todo: side-effects
+            // ToDo: events? is this thrigth place for promote
+
         }
 
         public bool CanPerform(TaskType type)

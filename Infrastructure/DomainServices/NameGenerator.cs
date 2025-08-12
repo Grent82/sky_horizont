@@ -20,8 +20,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         public NameGenerator(IRandomService rng) => _rng = rng;
 
-        public string GenerateGivenName(Sex? sex = null, string? culture = null)
+        public string GenerateFirstName(Sex? sex = null, string? faction = null)
         {
+            // ToDo: use faction
             var parts = new List<string>
             {
                 Pick(Prefixes),
@@ -33,15 +34,17 @@ namespace SkyHorizont.Infrastructure.DomainServices
             return Capitalize(name);
         }
 
-        public string GenerateSurname(string? culture = null)
+        public string GenerateSurname(string? faction = null)
         {
             var usePrefix = _rng.NextDouble() < 0.5;
             var core = Pick(ClanCores);
             return usePrefix ? $"{Pick(ClanPrefixes)} {core}" : core;
         }
 
-        public string GenerateFullName(Sex? sex = null, string? culture = null)
-            => $"{GenerateGivenName(sex, culture)} {GenerateSurname(culture)}";
+        public string GenerateFullName(Sex? sex = null, string? faction = null)
+            => $"{GenerateFirstName(sex, faction)} {GenerateSurname(faction)}";
+
+    
 
         private string Pick(string[] arr) => arr[_rng.NextInt(0, arr.Length)];
         private static string Capitalize(string s) => string.IsNullOrWhiteSpace(s) ? s : char.ToUpperInvariant(s[0]) + s[1..];

@@ -1,6 +1,7 @@
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Entity.Lineage;
 using SkyHorizont.Domain.Services;
+using SkyHorizont.Domain.Shared;
 
 namespace SkyHorizont.Infrastructure.DomainServices
 {
@@ -13,6 +14,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IMortalityModel _mortality;
         private readonly INameGenerator _names;
         private readonly IPersonalityInheritanceService _inherit;
+        private readonly IPregnancyPolicy _pregPolicy;
+        private readonly ISkillInheritanceService _skillInherit;
+        private readonly IEventBus _events;
 
         public CharacterLifecycleService(
             ICharacterRepository characters,
@@ -21,7 +25,10 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IRandomService rng,
             IMortalityModel mortality,
             INameGenerator names,
-            IPersonalityInheritanceService inherit)
+            IPersonalityInheritanceService inherit,
+            IPregnancyPolicy pregPolicy,
+            ISkillInheritanceService skillInherit,
+            IEventBus events)
         {
             _characters = characters;
             _lineage = lineage;
@@ -30,6 +37,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _mortality = mortality;
             _names = names;
             _inherit = inherit;
+            _pregPolicy = pregPolicy;
+            _skillInherit = skillInherit;
+            _events = events;
         }
 
         public void ProcessLifecycleTurn()
@@ -44,9 +54,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 if (character.BirthMonth == _clock.CurrentMonth && _clock.CurrentYear > character.BirthYear)
                 {
                     character.IncreaseAge();
-                    // DomainEvents.Raise(new BirthdayOccurred(c.Id)); // ToDo DomainEvents
+                    _events.Publish(new BirthdayOccurred(character.Id, _clock.CurrentYear, _clock.CurrentMonth));
                 }
-                    
+
 
                 HandlePregnancy(character);
 
@@ -65,51 +75,75 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             if (preg.IsDue(_clock.CurrentYear, _clock.CurrentMonth, _clock.MonthsPerYear))
             {
-                // ToDo: Twin chance? complications? (policy-driven)
-                var child = CreateNewborn(mother, preg.FatherId);
-                _characters.Save(child);
+                if (_pregPolicy.ShouldHaveComplications(mother, _clock.CurrentYear, _clock.CurrentMonth, out var note))
+                {
+                    _events.Publish(new DomainEventLog("BirthComplication", mother.Id, note));
+                }
 
-                // Wire lineage
-                var childLine = _lineage.FindByChildId(child.Id) ?? new EntityLineage(child.Id);
-                childLine.SetBiologicalParents(preg.FatherId, mother.Id);
-                _lineage.Upsert(childLine);
+                bool twins = _pregPolicy.ShouldHaveTwins(mother, _clock.CurrentYear, _clock.CurrentMonth);
+                
+                var child1 = CreateNewborn(mother, preg.FatherId);
+                _characters.Save(child1);
+                WireLineage(child1, mother, preg.FatherId);
+
+                if (twins)
+                {
+                    var child2 = CreateNewborn(mother, preg.FatherId);
+                    _characters.Save(child2);
+                    WireLineage(child2, mother, preg.FatherId);
+                }
 
                 mother.EndPregnancy(PregnancyStatus.Delivered);
                 mother.ClearPregnancy();
 
-                // ToDo: DomainEvents.Raise(new ChildBorn(child.Id, mother.Id, preg.FatherId));
+                _events.Publish(new ChildBorn(child1.Id, mother.Id, preg.FatherId, _clock.CurrentYear, _clock.CurrentMonth));
+                if (twins)
+                    _events.Publish(new ChildBorn(child1.Id, mother.Id, preg.FatherId, _clock.CurrentYear, _clock.CurrentMonth));
             }
         }
 
         private Character CreateNewborn(Character mother, Guid? fatherId)
         {
-            // newborn birth month = current month; birth year = current year
             var babyId = Guid.NewGuid();
             var sex = _rng.NextDouble() < 0.5 ? Sex.Male : Sex.Female;
-            var name = _names.GenerateFullName(sex); // ToDo: Mother name (surname), faction/culture
-
             var father = fatherId.HasValue ? _characters.GetById(fatherId.Value) : null;
+            string childSurname = father != null ? ExtractSurname(father.Name) : ExtractSurname(mother.Name);
+            string given = _names.GenerateFirstName(sex); // ToDo: By Faction/Clan/House
+            string full = $"{given} {childSurname}";
+
+            
             var babyPersonality = father != null
                 ? _inherit.Inherit(mother.Personality, father.Personality)
                 : _inherit.Inherit(mother.Personality, mother.Personality);
 
+            var babySkills = _skillInherit.Inherit(mother.Skills, father?.Skills, _rng);
+
             var baby = new Character(
                 babyId,
-                name,
+                full,
                 0,
                 birthYear: _clock.CurrentYear,
                 birthMonth: _clock.CurrentMonth,
                 sex,
                 personality: babyPersonality,
-                skills: new SkillSet(0,0,0,0) // ToDo: genetic seeding later
+                skills: babySkills
             );
 
-            // link family (optional convenience)
             baby.LinkFamilyMember(mother.Id);
-            if (fatherId.HasValue) baby.LinkFamilyMember(fatherId.Value);
             mother.LinkFamilyMember(baby.Id);
-
+            if (father != null)
+            {
+                baby.LinkFamilyMember(father.Id);
+                father.LinkFamilyMember(baby.Id);
+            }
             return baby;
+        }
+
+        private void WireLineage(Character child, Character mother, Guid? fatherId)
+        {
+            var childLine = _lineage.FindByChildId(child.Id) ?? new EntityLineage(child.Id);
+            childLine.SetBiologicalParents(fatherId, mother.Id);
+            _lineage.Upsert(childLine);
         }
 
         private void HandleMortality(Character character)
@@ -117,8 +151,14 @@ namespace SkyHorizont.Infrastructure.DomainServices
             var p = _mortality.GetMonthlyDeathProbability(character.Age, _clock.CurrentMonth);
             if (_rng.NextDouble() < p)
             {
-                    character.MarkDead();
+                character.MarkDead();
             }
+        }
+        
+        private string ExtractSurname(string fullName)
+        {
+            var parts = fullName?.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return (parts is { Length: > 1 }) ? parts[^1] : fullName ?? "Doe";
         }
     }
 }
