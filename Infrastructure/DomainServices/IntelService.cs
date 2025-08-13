@@ -20,7 +20,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             intelValue = Math.Max(0, intelValue);
             var report = new IntelReport(
-                ReportId: Guid.NewGuid(),
+                Id: Guid.NewGuid(),
                 SourceCharacterId: characterId,
                 TargetFactionId: targetFactionId,
                 Summary: summary ?? string.Empty,

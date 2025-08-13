@@ -1,7 +1,7 @@
 namespace SkyHorizont.Domain.Services
 {
     public sealed record IntelReport(
-        Guid ReportId,
+        Guid Id,
         Guid SourceCharacterId,
         Guid TargetFactionId,
         string Summary,

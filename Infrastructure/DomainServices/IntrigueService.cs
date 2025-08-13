@@ -20,7 +20,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IOpinionRepository _opinions;
         private readonly IFactionService _factionInfo;
         private readonly ICharacterRepository _characters;
+        private readonly IIntelService _intel;
         private readonly IRandomService _rng;
+        private readonly IGameClockService _clock;
 
         // Tuning knobs (quick defaults; externalize later if you want)
         private const int ProgressTarget = 100;
@@ -38,14 +40,18 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IOpinionRepository opinions,
             IFactionService factionInfo,
             ICharacterRepository characters,
-            IRandomService rng)
+            IIntelService intel,
+            IRandomService rng,
+            IGameClockService clock)
         {
             _plots = plots;
             _secrets = secrets;
             _opinions = opinions;
             _factionInfo = factionInfo;
             _characters = characters;
+            _intel = intel;
             _rng = rng;
+            _clock = clock;
         }
 
         public void TickPlots()
@@ -212,7 +218,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
             {
                 // Target is angry and may counter-expose; for now: big opinion hit
                 _opinions.AdjustOpinion(targetId, holderId, OpinionPenaltyBlackmailed, $"Resisted blackmail ({secret.Type})");
-                // TODO: create a counter-plot or attempt exposure
                 MaybeCreateExposurePlot(targetId, holderId, secret);
             }
         }
@@ -237,33 +242,53 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 // Pick a target and… remove.
                 var victim = plot.Targets.Select(_characters.GetById).FirstOrDefault(c => c != null && c.IsAlive);
                 victim?.MarkDead();
+
+                // Blowback: victim's leader (if any) hates leader
+                var vf = victim != null ? _factionInfo.GetFactionIdForCharacter(victim.Id) : Guid.Empty;
+                var vLeader = vf != Guid.Empty ? _factionInfo.GetLeaderId(vf) : null;
+                if (vLeader.HasValue)
+                    _opinions.AdjustOpinion(vLeader.Value, leader.Id, -35, "Assassination blowback");
             }
             else if (goalKey.Contains("coup"))
             {
-                // Attempt to replace target's faction leader with plot leader (drastic, simplified)
                 var targetChar = plot.Targets.Select(_characters.GetById).FirstOrDefault(c => c != null && c.IsAlive);
                 if (targetChar != null)
                 {
                     var targetFaction = _factionInfo.GetFactionIdForCharacter(targetChar.Id);
-                    // Move leader into that faction as "leader" via membership/service in your command layer (not shown here)
                     _factionInfo.MoveCharacterToFaction(leader.Id, targetFaction);
-                    // Opinions: target hates conspirators (already handled on exposure, but give extra sting)
+
                     _opinions.AdjustOpinion(targetChar.Id, leader.Id, -40, "Coup executed");
+
+                    // Paper trail secret about conspirators
+                    foreach (var cId in plot.Conspirators.Prepend(plot.LeaderId).Distinct())
+                    {
+                        _secrets.Add(new Secret(
+                            Id: Guid.NewGuid(),
+                            Type: SecretType.TreasonousContact,
+                            Summary: $"Evidence of conspiracy by {cId} against {targetFaction}",
+                            AboutCharacterId: cId,
+                            AboutFactionId: targetFaction,
+                            Severity: 65,
+                            _clock.CurrentYear, _clock.CurrentMonth));
+                    }
                 }
             }
             else if (goalKey.Contains("steal") || goalKey.Contains("tech"))
             {
-                // Create a juicy secret representing stolen knowledge
+                var f = _factionInfo.GetFactionIdForCharacter(leader.Id);
                 var secret = new Secret(
                     Id: Guid.NewGuid(),
                     Type: SecretType.TechBreakthrough,
                     Summary: $"Illicit tech advantage gained by {leader.Name}",
                     AboutCharacterId: leader.Id,
-                    AboutFactionId: _factionInfo.GetFactionIdForCharacter(leader.Id),
+                    AboutFactionId: f,
                     Severity: 70,
-                    TurnDiscovered: 0
+                    _clock.CurrentYear, _clock.CurrentMonth
                 );
                 _secrets.Add(secret);
+
+                // actionable intel for own faction
+                _intel.RecordReport(leader.Id, f, "Reverse-engineered tech insights gained", 60, _clock.CurrentYear, _clock.CurrentMonth);
             }
 
             // After resolution, mark plot as exposed (spent) to stop further progression

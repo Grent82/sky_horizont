@@ -18,7 +18,7 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly IRandomService _rng;
 
         // Tuning knobs (0..100 style target values; scores roughly 0..100 range)
-        private readonly PlannerConfig _cfg;
+        private readonly PlannerConfig _cfg; // ToDo: from config file
 
         public IntentPlanner(
             ICharacterRepository characters,
@@ -38,11 +38,11 @@ namespace SkyHorizont.Infrastructure.Social
         {
             var intents = new List<ScoredIntent>();
             if (!actor.IsAlive) return Enumerable.Empty<CharacterIntent>();
-            if (actor.IsAssigned) return Enumerable.Empty<CharacterIntent>(); // busy on a mission this month
+            if (actor.IsAssigned) return Enumerable.Empty<CharacterIntent>();
 
             // Basic context
             var myFactionId = _factions.GetFactionIdForCharacter(actor.Id);
-            var myLeaderId  = myFactionId != Guid.Empty ? _factions.GetLeaderId(myFactionId) : null;
+            var myLeaderId = myFactionId != Guid.Empty ? _factions.GetLeaderId(myFactionId) : null;
 
             // Gather potential social targets:
             var knownPeople = _chars.GetAll().Where(c => c.IsAlive && c.Id != actor.Id).ToList();
@@ -64,7 +64,12 @@ namespace SkyHorizont.Infrastructure.Social
             // Spy (enemy or rival)
             var spyTargetFaction = PickSpyFaction(actor, myFactionId);
             if (spyTargetFaction != Guid.Empty)
-                AddIfAboveZero(intents, ScoreSpy(actor, spyTargetFaction), IntentType.Spy, null, spyTargetFaction); // ToDo: null? spy on enemy character as well (to get family members?)
+                AddIfAboveZero(intents, ScoreSpy(actor, spyTargetFaction), IntentType.Spy, null, spyTargetFaction);
+
+            var spyTargetChar = PickSpyCharacter(actor, myFactionId, knownPeople);
+            if (spyTargetChar != null)
+                AddIfAboveZero(intents, ScoreSpy(actor, _factions.GetFactionIdForCharacter(spyTargetChar.Id)),
+                            IntentType.Spy, spyTargetChar.Id, null);
 
             // Bribe (swing neutral or enemy asset)
             var bribeTarget = PickBribeTarget(actor, otherFaction);
@@ -120,7 +125,11 @@ namespace SkyHorizont.Infrastructure.Social
                 .Select(i => new CharacterIntent(actor.Id, i.Type, i.TargetCharacterId, i.TargetFactionId))
                 .ToList();
 
-            // ToDo: Optional: filter out conflicts (e.g., Court and Assassinate same month)
+            var scoreMap = intents.ToDictionary(i => (i.Type, i.TargetCharacterId, i.TargetFactionId), i => i.Score);
+            double scoreOf(CharacterIntent ci) => scoreMap.TryGetValue((ci.Type, ci.TargetCharacterId, ci.TargetFactionId), out var s) ? s : 0.0;
+
+            chosen = FilterConflicts(chosen, scoreOf).ToList();
+            
             return chosen;
         }
 
@@ -129,7 +138,7 @@ namespace SkyHorizont.Infrastructure.Social
         private double ScoreCourtship(Character actor, Character target)
         {
             var opinion = _opinions.GetOpinion(actor.Id, target.Id);   // -100..+100
-            var compat  = actor.Personality.CheckCompatibility(target.Personality); // 0..100
+            var compat = actor.Personality.CheckCompatibility(target.Personality); // 0..100
             var baseScore = 0.0;
 
             baseScore += Map01(compat);                  // compatibility matters a lot
@@ -259,7 +268,7 @@ namespace SkyHorizont.Infrastructure.Social
 
             // Diplomacy loves high agreeableness and extraversion
             baseScore += (actor.Personality.Agreeableness - 50) * 0.3;
-            baseScore += (actor.Personality.Extraversion  - 50) * 0.2;
+            baseScore += (actor.Personality.Extraversion - 50) * 0.2;
 
             // If at war → push higher (seek ceasefire), except very angry/anxious persons
             if (_factions.IsAtWar(myFactionId, targetFactionId))
@@ -458,6 +467,21 @@ namespace SkyHorizont.Infrastructure.Social
             return pool.First().C;
         }
 
+        private Character? PickSpyCharacter(Character actor, Guid myFactionId, List<Character> candidates)
+        {
+            var pool = candidates
+                .Where(c => _factions.GetFactionIdForCharacter(c.Id) != myFactionId)
+                .Select(c => new
+                {
+                    C = c,
+                    Score = (int)c.Rank * 10 - _opinions.GetOpinion(actor.Id, c.Id) + _rng.NextInt(0, 10)
+                })
+                .OrderByDescending(x => x.Score)
+                .ToList();
+
+            return pool.Count == 0 ? null : pool.First().C;
+        }
+
         // ───────────────────── Helpers ──────────────────────────────
 
         private static void AddIfAboveZero(List<ScoredIntent> list, double score, IntentType type,
@@ -467,10 +491,32 @@ namespace SkyHorizont.Infrastructure.Social
             list.Add(new ScoredIntent(type, score, targetCharacterId, targetFactionId));
         }
 
-        private static double Map01(double v)   => Math.Clamp(v, 0, 100) / 1.0;
+        private static double Map01(double v) => Math.Clamp(v, 0, 100) / 1.0;
         private static double Clamp0to100(double v) => v < 0 ? 0 : (v > 100 ? 100 : v);
 
         private sealed record ScoredIntent(IntentType Type, double Score, Guid? TargetCharacterId, Guid? TargetFactionId);
+        
+        private static IEnumerable<CharacterIntent> FilterConflicts(IEnumerable<CharacterIntent> intents, Func<CharacterIntent,double> scoreOf)
+        {
+            // simple mutually exclusive sets; tune as needed
+            var conflictSets = new[]
+            {
+                new HashSet<IntentType>{ IntentType.Court, IntentType.Assassinate },
+                new HashSet<IntentType>{ IntentType.Negotiate, IntentType.Quarrel },
+                new HashSet<IntentType>{ IntentType.Bribe, IntentType.Recruit }, // “push/pull” in same month
+            };
+
+            var chosen = intents.ToList();
+            foreach (var set in conflictSets)
+            {
+                var inSet = chosen.Where(i => set.Contains(i.Type)).ToList();
+                if (inSet.Count <= 1) continue;
+                var best = inSet.OrderByDescending(scoreOf).First();
+                chosen = chosen.Except(inSet).ToList();
+                chosen.Add(best);
+            }
+            return chosen;
+        }
     }
 
     // ───────────────────────── Config ──────────────────────────────
