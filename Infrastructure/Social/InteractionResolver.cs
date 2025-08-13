@@ -168,19 +168,38 @@ namespace SkyHorizont.Infrastructure.Social
 
             if (success)
             {
-                // mint a secret
                 var severity = 50 + _rng.NextInt(0, 40); // 50..89
-                var secret = new Secret(
-                    Guid.NewGuid(),
-                    SecretType.MilitaryDisposition,
-                    "Enemy fleet movement intel",
-                    null,
-                    intent.TargetFactionId,
-                    severity,
-                    currentYear, currentMonth);
+                Secret secret;
+
+                if (intent.TargetCharacterId.HasValue)
+                {
+                    var about = _chars.GetById(intent.TargetCharacterId.Value);
+                    secret = new Secret(
+                        Guid.NewGuid(),
+                        SecretType.PersonalInformation,
+                        about != null ? $"Informations observed for {about.Name}" : "Target informations observed",
+                        intent.TargetCharacterId.Value,
+                        null,
+                        severity,
+                        currentYear, currentMonth);
+                }
+                else
+                {
+                    secret = new Secret(
+                        Guid.NewGuid(),
+                        SecretType.MilitaryDisposition,
+                        "Enemy fleet movement intel",
+                        null,
+                        intent.TargetFactionId,
+                        severity,
+                        currentYear, currentMonth);
+                }
+
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
-                notes = "Acquired fleet disposition report.";
+                notes = intent.TargetCharacterId.HasValue
+                    ? "Acquired sensitive personal informations."
+                    : "Acquired fleet disposition report.";
             }
             else
             {

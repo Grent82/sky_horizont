@@ -7,8 +7,7 @@ namespace SkyHorizont.Domain.Intrigue
         Corruption,
         Infidelity,
         TreasonousContact,
-        AssassinationPlot
-        // ToDo: Lovers
-        // ToDo: Children of Leaders
+        AssassinationPlot,
+        PersonalInformation
     }
 }
