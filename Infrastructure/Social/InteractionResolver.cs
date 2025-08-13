@@ -1,3 +1,4 @@
+using SkyHorizont.Domain.Diplomacy;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Intrigue;
@@ -17,19 +18,22 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly IFactionService _factions;
         private readonly ISecretsRepository _secrets;
         private readonly IRandomService _rng;
+        private readonly IDiplomacyService _diplomacy;
 
         public InteractionResolver(
             ICharacterRepository characters,
             IOpinionRepository opinions,
             IFactionService factions,
             ISecretsRepository secrets,
-            IRandomService rng)
+            IRandomService rng,
+            IDiplomacyService diplomacy)
         {
             _chars = characters;
             _opinions = opinions;
             _factions = factions;
             _secrets = secrets;
             _rng = rng;
+            _diplomacy = diplomacy;
         }
 
         public IEnumerable<ISocialEvent> Resolve(CharacterIntent intent, int currentYear, int currentMonth)
@@ -85,8 +89,8 @@ namespace SkyHorizont.Infrastructure.Social
             var success = _rng.NextDouble() < Clamp01(baseChance);
 
             // Opinion deltas
-            var deltaActorToTarget  = success ? +4 : -2;
-            var deltaTargetToActor  = success ? +6 : -3;
+            var deltaActorToTarget = success ? +4 : -2;
+            var deltaTargetToActor = success ? +6 : -3;
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, success ? "Romance success" : "Awkward attempt");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Charmed" : "Turned down");
@@ -365,14 +369,20 @@ namespace SkyHorizont.Infrastructure.Social
 
             var baseChance = 0.2
                 + (actor.Personality.Agreeableness - 50) * 0.003
-                + (actor.Personality.Extraversion  - 50) * 0.002
+                + (actor.Personality.Extraversion - 50) * 0.002
                 + (int)actor.Rank * 0.02;
 
-            // At war? harder, but also more urgent → neutral net change
-            if (_factions.IsAtWar(myFaction, intent.TargetFactionId.Value))
-                baseChance += 0.0; // tune later
+            bool atWar = _factions.IsAtWar(myFaction, intent.TargetFactionId.Value);
+
+            if (atWar) baseChance += 0.0;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
+
+            if (success)
+            {
+                var treatyType = ChooseTreatyType(actor, myFaction, intent.TargetFactionId.Value, atWar);
+                _diplomacy.ProposeTreaty(myFaction, intent.TargetFactionId.Value, treatyType);
+            }
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
@@ -486,7 +496,53 @@ namespace SkyHorizont.Infrastructure.Social
         }
         #endregion
 
+
         private static double Clamp01(double v) => v < 0 ? 0 : (v > 1 ? 1 : v);
+        
+        private TreatyType ChooseTreatyType(Character actor, Guid myFactionId, Guid targetFactionId, bool atWar)
+        {
+            if (atWar) return TreatyType.Ceasefire;
+
+            var p = actor.Personality;
+
+            double allianceScore =
+                20
+                + actor.Skills.Military * 0.20
+                + (PersonalityTraits.Assertive(p) ? 10 : 0)
+                + (PersonalityTraits.ThrillSeeker(p) ? 5 : 0)
+                - (p.Agreeableness - 50) * 0.10;  // less agreeable → more force‑bloc leaning
+
+            double tradeScore =
+                20
+                + actor.Skills.Economy * 0.30
+                + (PersonalityTraits.Cooperative(p) ? 10 : 0)
+                + (PersonalityTraits.Cheerful(p) ? 5 : 0);
+
+            double researchScore =
+                15
+                + actor.Skills.Research * 0.35
+                + (PersonalityTraits.IntellectuallyCurious(p) ? 12 : 0)
+                + (PersonalityTraits.SelfEfficient(p) ? 3 : 0);
+
+            double napScore =
+                10
+                + p.Agreeableness * 0.20
+                + (PersonalityTraits.Trusting(p) ? 8 : 0)
+                - (PersonalityTraits.EasilyAngered(p) ? 8 : 0);
+
+            allianceScore += (int)actor.Rank * 1.5;
+
+            var best = new[]
+            {
+                (TreatyType.Alliance,      allianceScore),
+                (TreatyType.Trade,         tradeScore),
+                (TreatyType.ResearchPact,  researchScore),
+                (TreatyType.NonAggression, napScore)
+            }.OrderByDescending(t => t.Item2).First().Item1;
+
+            return best;
+        }
+
 
     }
 }
