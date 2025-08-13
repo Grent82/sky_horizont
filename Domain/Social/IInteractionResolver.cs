@@ -1,3 +1,5 @@
+using SkyHorizont.Domain.Services;
+
 namespace SkyHorizont.Domain.Social
 {
     /// <summary>
@@ -6,6 +8,6 @@ namespace SkyHorizont.Domain.Social
     /// </summary>
     public interface IInteractionResolver
     {
-        IEnumerable<ISocialEvent> Resolve(CharacterIntent intent, int currentTurn);
+        IEnumerable<ISocialEvent> Resolve(CharacterIntent intent, int currentYear, int currentMonth);
     }
 }

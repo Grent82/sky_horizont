@@ -6,7 +6,8 @@ namespace SkyHorizont.Domain.Intrigue
         string Summary,
         Guid? AboutCharacterId,
         Guid? AboutFactionId,
-        int Severity,         // 1..100
-        int TurnDiscovered
+        int Severity,
+        int Year,
+        int Month
     );
 }

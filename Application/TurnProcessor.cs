@@ -82,7 +82,7 @@ namespace SkyHorizont.Application
                     {
                         try
                         {
-                            var events = _resolver.Resolve(intent, turnNumber);
+                            var events = _resolver.Resolve(intent, _clock.CurrentYear, _clock.CurrentMonth);
                             foreach (var ev in events)
                                 _socialLog.Append(ev);
                         }

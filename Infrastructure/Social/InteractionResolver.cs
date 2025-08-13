@@ -32,7 +32,7 @@ namespace SkyHorizont.Infrastructure.Social
             _rng = rng;
         }
 
-        public IEnumerable<ISocialEvent> Resolve(CharacterIntent intent, int turn)
+        public IEnumerable<ISocialEvent> Resolve(CharacterIntent intent, int currentYear, int currentMonth)
         {
             var actor = _chars.GetById(intent.ActorId);
             if (actor is null || !actor.IsAlive) return Array.Empty<ISocialEvent>();
@@ -40,31 +40,31 @@ namespace SkyHorizont.Infrastructure.Social
             switch (intent.Type)
             {
                 case IntentType.Court:
-                    return ResolveCourt(actor, intent, turn);
+                    return ResolveCourt(actor, intent, currentYear, currentMonth);
 
                 case IntentType.VisitFamily:
-                    return ResolveVisitFamily(actor, intent, turn);
+                    return ResolveVisitFamily(actor, intent, currentYear, currentMonth);
 
                 case IntentType.Spy:
-                    return ResolveSpy(actor, intent, turn);
+                    return ResolveSpy(actor, intent, currentYear, currentMonth);
 
                 case IntentType.Bribe:
-                    return ResolveBribe(actor, intent, turn);
+                    return ResolveBribe(actor, intent, currentYear, currentMonth);
 
                 case IntentType.Recruit:
-                    return ResolveRecruit(actor, intent, turn);
+                    return ResolveRecruit(actor, intent, currentYear, currentMonth);
 
                 case IntentType.Defect:
-                    return ResolveDefect(actor, intent, turn);
+                    return ResolveDefect(actor, intent, currentYear, currentMonth);
 
                 case IntentType.Negotiate:
-                    return ResolveNegotiate(actor, intent, turn);
+                    return ResolveNegotiate(actor, intent, currentYear, currentMonth);
 
                 case IntentType.Quarrel:
-                    return ResolveQuarrel(actor, intent, turn);
+                    return ResolveQuarrel(actor, intent, currentYear, currentMonth);
 
                 case IntentType.Assassinate:
-                    return ResolveAssassinate(actor, intent, turn);
+                    return ResolveAssassinate(actor, intent, currentYear, currentMonth);
 
                 default:
                     return Array.Empty<ISocialEvent>();
@@ -72,7 +72,7 @@ namespace SkyHorizont.Infrastructure.Social
         }
 
         #region Courtship
-        private IEnumerable<ISocialEvent> ResolveCourt(Character actor, CharacterIntent intent, int turn)
+        private IEnumerable<ISocialEvent> ResolveCourt(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
             if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
@@ -93,7 +93,8 @@ namespace SkyHorizont.Infrastructure.Social
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
-                turn,
+                currentYear,
+                currentMonth,
                 SocialEventType.CourtshipAttempt,
                 actor.Id,
                 target.Id,
@@ -117,7 +118,7 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         #region VisitFamily
-        private IEnumerable<ISocialEvent> ResolveVisitFamily(Character actor, CharacterIntent intent, int turn)
+        private IEnumerable<ISocialEvent> ResolveVisitFamily(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
             if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
             var relative = _chars.GetById(intent.TargetCharacterId.Value);
@@ -134,7 +135,8 @@ namespace SkyHorizont.Infrastructure.Social
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
-                turn,
+                currentYear,
+                currentMonth,
                 SocialEventType.FamilyVisit,
                 actor.Id,
                 relative.Id,
@@ -150,7 +152,7 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         #region Spy
-        private IEnumerable<ISocialEvent> ResolveSpy(Character actor, CharacterIntent intent, int turn)
+        private IEnumerable<ISocialEvent> ResolveSpy(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
             if (intent.TargetFactionId is null) return Array.Empty<ISocialEvent>();
 
@@ -175,7 +177,7 @@ namespace SkyHorizont.Infrastructure.Social
                     null,
                     intent.TargetFactionId,
                     severity,
-                    turn);
+                    currentYear, currentMonth);
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
                 notes = "Acquired fleet disposition report.";
@@ -188,7 +190,8 @@ namespace SkyHorizont.Infrastructure.Social
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
-                turn,
+                currentYear,
+                currentMonth,
                 SocialEventType.EspionageOperation,
                 actor.Id,
                 null,
@@ -205,7 +208,7 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         #region Bribe
-        private IEnumerable<ISocialEvent> ResolveBribe(Character actor, CharacterIntent intent, int turn)
+        private IEnumerable<ISocialEvent> ResolveBribe(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
             if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
@@ -234,14 +237,15 @@ namespace SkyHorizont.Infrastructure.Social
                     target.Id,
                     null,
                     60 + _rng.NextInt(0, 25),
-                    turn);
+                    currentYear, currentMonth);
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
             }
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
-                turn,
+                currentYear,
+                currentMonth,
                 SocialEventType.BriberyAttempt,
                 actor.Id,
                 target.Id,
@@ -258,7 +262,7 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         #region Recruit
-        private IEnumerable<ISocialEvent> ResolveRecruit(Character actor, CharacterIntent intent, int turn)
+        private IEnumerable<ISocialEvent> ResolveRecruit(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
             if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
@@ -279,7 +283,8 @@ namespace SkyHorizont.Infrastructure.Social
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
-                turn,
+                currentYear,
+                currentMonth,
                 SocialEventType.RecruitmentAttempt,
                 actor.Id,
                 target.Id,
@@ -296,7 +301,7 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         #region Defect
-        private IEnumerable<ISocialEvent> ResolveDefect(Character actor, CharacterIntent intent, int turn)
+        private IEnumerable<ISocialEvent> ResolveDefect(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
             if (intent.TargetFactionId is null) return Array.Empty<ISocialEvent>();
 
@@ -316,7 +321,8 @@ namespace SkyHorizont.Infrastructure.Social
             // Deltas: actor vs leader/faction could be handled elsewhere; here we just log event
             var ev = new SocialEvent(
                 Guid.NewGuid(),
-                turn,
+                currentYear,
+                currentMonth,
                 SocialEventType.DefectionAttempt,
                 actor.Id,
                 null,
@@ -333,7 +339,7 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         #region Negotiate
-        private IEnumerable<ISocialEvent> ResolveNegotiate(Character actor, CharacterIntent intent, int turn)
+        private IEnumerable<ISocialEvent> ResolveNegotiate(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
             if (intent.TargetFactionId is null) return Array.Empty<ISocialEvent>();
             var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
@@ -351,7 +357,8 @@ namespace SkyHorizont.Infrastructure.Social
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
-                turn,
+                currentYear,
+                currentMonth,
                 SocialEventType.Negotiation,
                 actor.Id,
                 null,
@@ -367,7 +374,7 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         #region Quarrel
-        private IEnumerable<ISocialEvent> ResolveQuarrel(Character actor, CharacterIntent intent, int turn)
+        private IEnumerable<ISocialEvent> ResolveQuarrel(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
             if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
@@ -388,7 +395,8 @@ namespace SkyHorizont.Infrastructure.Social
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
-                turn,
+                currentYear,
+                currentMonth,
                 SocialEventType.Quarrel,
                 actor.Id,
                 target.Id,
@@ -405,7 +413,7 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         #region Assassinate
-        private IEnumerable<ISocialEvent> ResolveAssassinate(Character actor, CharacterIntent intent, int turn)
+        private IEnumerable<ISocialEvent> ResolveAssassinate(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
             if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
@@ -430,7 +438,7 @@ namespace SkyHorizont.Infrastructure.Social
                     actor.Id,
                     null,
                     70 + _rng.NextInt(0, 20),
-                    turn);
+                    currentYear, currentMonth);
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
             }
@@ -443,7 +451,8 @@ namespace SkyHorizont.Infrastructure.Social
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
-                turn,
+                currentYear,
+                currentMonth,
                 SocialEventType.AssassinationAttempt,
                 actor.Id,
                 target.Id,

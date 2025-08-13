@@ -16,7 +16,8 @@ namespace SkyHorizont.Domain.Social
     public interface ISocialEvent
     {
         Guid EventId { get; }
-        int Turn { get; }
+        int Year { get; }
+        int Month { get; }
         SocialEventType Type { get; }
         Guid ActorId { get; }
         Guid? TargetCharacterId { get; }
@@ -34,7 +35,8 @@ namespace SkyHorizont.Domain.Social
 
     public sealed record SocialEvent(
         Guid EventId,
-        int Turn,
+        int Year,
+        int Month,
         SocialEventType Type,
         Guid ActorId,
         Guid? TargetCharacterId,
