@@ -11,4 +11,4 @@
 ## ToDos
 * Domain events broadcasting conquest progress to UI or simulation loop.
 * refine combat-to-economy mapping further
-* Impregnation
+* have your planner inject a travel/assignment intent first (mission chain). That requires a movement/assignment system
