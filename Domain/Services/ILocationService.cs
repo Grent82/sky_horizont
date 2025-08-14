@@ -20,5 +20,7 @@ namespace SkyHorizont.Domain.Services
 
         IEnumerable<Guid> GetCaptivesOnPlanet(Guid planetId);
         IEnumerable<Guid> GetCaptivesOnFleet(Guid fleetId);
+
+        void AddCitizenToPlanet(Guid character, CharacterLocation location);
     }
 }

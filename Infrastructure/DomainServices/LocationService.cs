@@ -24,7 +24,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             // Planet governor / planet captives / fleet commanders / fleet captives
             foreach (var p in _planets.GetAll())
             {
-                if (p.GovernorId == characterId)
+                if (p.Citizens.Contains(characterId))
                     return new CharacterLocation(LocationKind.Planet, p.Id, p.SystemId);
                 if (p.CapturedCharacterIds.Contains(characterId))
                     return new CharacterLocation(LocationKind.Planet, p.Id, p.SystemId);
@@ -45,7 +45,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             var a = GetCharacterLocation(characterA);
             var b = GetCharacterLocation(characterB);
-            if (a is null || b is null) return false;
+            if (a is null || b is null)
+                return false;
             return a.Kind == b.Kind && a.HostId == b.HostId;
         }
 
@@ -92,6 +93,15 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             var f = _fleets.GetById(fleetId);
             return f is null ? Enumerable.Empty<Guid>() : f.CapturedCharacterIds;
+        }
+
+        public void AddCitizenToPlanet(Guid character, CharacterLocation location)
+        {
+            if (location.Kind == LocationKind.Planet)
+            {
+                var planet = _planets.GetById(location.HostId);
+                planet.AddCitizen(character);
+            }
         }
     }
 }

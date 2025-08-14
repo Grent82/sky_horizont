@@ -41,7 +41,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _inherit = inherit;
             _pregPolicy = pregPolicy;
             _skillInherit = skillInherit;
-            -loc = loc;
+            _loc = loc;
             _events = events;
         }
 
@@ -73,9 +73,12 @@ namespace SkyHorizont.Infrastructure.DomainServices
         // TODO (later): gate on co-location (same planet/fleet) once a location service is available.
         private void HandleConception(Character potentialMother, List<Character> allChars)
         {
-            if (potentialMother.Sex != Sex.Female) return;
-            if (!potentialMother.IsAlive) return;
-            if (potentialMother.ActivePregnancy is { Status: PregnancyStatus.Active }) return;
+            if (potentialMother.Sex != Sex.Female)
+                return;
+            if (!potentialMother.IsAlive)
+                return;
+            if (potentialMother.ActivePregnancy is { Status: PregnancyStatus.Active })
+                return;
 
             // Find consensual partners: Lovers/Spouse links
             var partnerIds = potentialMother.Relationships
@@ -84,17 +87,21 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 .Distinct()
                 .ToList();
 
-            if (partnerIds.Count == 0) return;
+            if (partnerIds.Count == 0)
+                return;
 
             
 
             foreach (var pid in partnerIds)
             {
                 var partner = _characters.GetById(pid);
-                if (partner is null || !partner.IsAlive) continue;
-                if (partner.Id == potentialMother.Id) continue;
+                if (partner is null || !partner.IsAlive)
+                    continue;
+                if (partner.Id == potentialMother.Id)
+                    continue;
 
-                if (partner.Sex != Sex.Male) continue;
+                if (partner.Sex != Sex.Male)
+                    continue;
 
                 if (!_loc.AreCoLocated(potentialMother.Id, partner.Id))
                     continue;
@@ -116,7 +123,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
             double chance = 0.10; // 10% baseline per month for active couples
 
             // Age band effects (rough, gamey)
-            if (mother.Age < 14) return 0.0;
+            if (mother.Age < 14)
+                return 0.0;
             if (mother.Age <= 16) chance += 0.04;
             if (mother.Age <= 20) chance += 0.02;
             if (mother.Age <= 28) chance += 0.01;
@@ -143,10 +151,12 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private void HandlePregnancy(Character mother)
         {
-            if (mother.Sex != Sex.Female || mother.ActivePregnancy is null) return;
+            if (mother.Sex != Sex.Female || mother.ActivePregnancy is null)
+                return;
 
             var preg = mother.ActivePregnancy;
-            if (preg.Status != PregnancyStatus.Active) return;
+            if (preg.Status != PregnancyStatus.Active)
+                return;
 
             if (preg.IsDue(_clock.CurrentYear, _clock.CurrentMonth, _clock.MonthsPerYear))
             {
@@ -161,7 +171,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 _characters.Save(child1);
                 WireLineage(child1, mother, preg.FatherId);
 
-                Character child2 =  null;
+                Character child2 = null;
                 if (twins)
                 {
                     child2 = CreateNewborn(mother, preg.FatherId);
@@ -183,7 +193,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             var babyId = Guid.NewGuid();
             var sex = _rng.NextDouble() < 0.5 ? Sex.Male : Sex.Female;
             var father = fatherId.HasValue ? _characters.GetById(fatherId.Value) : null;
-            string childSurname = father != null ? ExtractSurname(father.Name) : ExtractSurname(mother.Name);
+            string childSurname = father != null ? ExtractSurname(father.Name) : ExtractSurname(mother.Name); // ToDo: if mother singel then get mother name
             string given = _names.GenerateFirstName(sex); // ToDo: By Faction/Clan/House
             string full = $"{given} {childSurname}";
 
@@ -212,6 +222,10 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 baby.LinkFamilyMember(father.Id);
                 father.LinkFamilyMember(baby.Id);
             }
+
+            var loc = _loc.GetCharacterLocation(mother.Id);
+            _loc.AddCitizenToPlanet(baby.Id, loc);
+
             return baby;
         }
 
