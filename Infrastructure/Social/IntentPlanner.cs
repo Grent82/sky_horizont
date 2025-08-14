@@ -37,11 +37,16 @@ namespace SkyHorizont.Infrastructure.Social
         public IEnumerable<CharacterIntent> PlanMonthlyIntents(Character actor)
         {
             var intents = new List<ScoredIntent>();
-            if (!actor.IsAlive) return Enumerable.Empty<CharacterIntent>();
-            if (actor.IsAssigned) return Enumerable.Empty<CharacterIntent>();
+            if (!actor.IsAlive)
+                return Enumerable.Empty<CharacterIntent>();
+            if (actor.IsAssigned)
+                return Enumerable.Empty<CharacterIntent>();
+
+            if (actor.Age < 13)
+                return Enumerable.Empty<CharacterIntent>(); 
 
             // Basic context
-            var myFactionId = _factions.GetFactionIdForCharacter(actor.Id);
+                var myFactionId = _factions.GetFactionIdForCharacter(actor.Id);
             var myLeaderId = myFactionId != Guid.Empty ? _factions.GetLeaderId(myFactionId) : null;
 
             // Gather potential social targets:

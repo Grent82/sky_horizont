@@ -1,10 +1,7 @@
-using System;
-using System.Linq;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Social;
 using SkyHorizont.Domain.Intrigue;
-using SkyHorizont.Domain.Economy;
 
 namespace SkyHorizont.Application
 {
@@ -21,17 +18,13 @@ namespace SkyHorizont.Application
     {
         private readonly IGameClockService _clock;
         private readonly ICharacterRepository _characters;
-
         private readonly IIntentPlanner _planner;
         private readonly IInteractionResolver _resolver;
         private readonly ISocialEventLog _socialLog;
-
         private readonly IAffectionService _affection;
         private readonly IRansomService _ransom;
         private readonly IMoraleService _morale;
         private readonly ICharacterLifecycleService _lifecycle;
-
-        // New systems
         private readonly IIntrigueService _intrigue;
         private readonly IEconomyService _economy;
 

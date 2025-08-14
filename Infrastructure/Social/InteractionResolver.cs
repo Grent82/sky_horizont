@@ -39,7 +39,8 @@ namespace SkyHorizont.Infrastructure.Social
         public IEnumerable<ISocialEvent> Resolve(CharacterIntent intent, int currentYear, int currentMonth)
         {
             var actor = _chars.GetById(intent.ActorId);
-            if (actor is null || !actor.IsAlive) return Array.Empty<ISocialEvent>();
+            if (actor is null || !actor.IsAlive)
+                return Array.Empty<ISocialEvent>();
 
             switch (intent.Type)
             {
@@ -64,8 +65,8 @@ namespace SkyHorizont.Infrastructure.Social
                 case IntentType.Negotiate:
                     return ResolveNegotiate(actor, intent, currentYear, currentMonth);
 
-                case IntentType.Quarrel:
-                    return ResolveQuarrel(actor, intent, currentYear, currentMonth);
+                //case IntentType.Quarrel:
+                //    return ResolveQuarrel(actor, intent, currentYear, currentMonth);
 
                 case IntentType.Assassinate:
                     return ResolveAssassinate(actor, intent, currentYear, currentMonth);
@@ -78,9 +79,11 @@ namespace SkyHorizont.Infrastructure.Social
         #region Courtship
         private IEnumerable<ISocialEvent> ResolveCourt(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
-            if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
+            if (intent.TargetCharacterId is null)
+                return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
-            if (target is null || !target.IsAlive) return Array.Empty<ISocialEvent>();
+            if (target is null || !target.IsAlive)
+                return Array.Empty<ISocialEvent>();
 
             var compat = actor.Personality.CheckCompatibility(target.Personality); // 0..100
             var baseChance = 0.25 + compat / 300.0; // ~0.25..0.58
@@ -414,7 +417,7 @@ namespace SkyHorizont.Infrastructure.Social
                 + (target.Personality.Neuroticism - 50) * 0.002
                 - (actor.Personality.Agreeableness - 50) * 0.003;
 
-            var success = _rng.NextDouble() < Clamp01(heat); // success here means “the quarrel happened / escalated”
+            var success = _rng.NextDouble() < Clamp01(heat);
 
             var deltaActorToTarget = success ? -6 : -2;
             var deltaTargetToActor = success ? -6 : -2;

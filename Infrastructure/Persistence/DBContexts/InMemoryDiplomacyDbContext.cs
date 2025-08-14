@@ -3,7 +3,7 @@ using SkyHorizont.Infrastructure.Persistence.Interfaces;
 
 namespace SkyHorizont.Infrastructure.Persistence.Diplomacy
 {
-    public sealed class InMemoryTreatiesDbContext : ITreatiesDbContext
+    public sealed class InMemoryDiplomacyDbContext : IDiplomacyDbContext
     {
         public Dictionary<Guid, Treaty> Treaties { get; } = new();
 

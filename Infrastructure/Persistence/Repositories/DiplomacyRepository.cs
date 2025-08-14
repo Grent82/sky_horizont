@@ -3,11 +3,11 @@ using SkyHorizont.Infrastructure.Persistence.Interfaces;
 
 namespace SkyHorizont.Infrastructure.Persistence.Diplomacy
 {
-    public sealed class TreatiesRepository : IDiplomacyRepository
+    public sealed class DiplomacyRepository : IDiplomacyRepository
     {
-        private readonly ITreatiesDbContext _ctx;
+        private readonly IDiplomacyDbContext _ctx;
 
-        public TreatiesRepository(ITreatiesDbContext ctx) => _ctx = ctx;
+        public DiplomacyRepository(IDiplomacyDbContext ctx) => _ctx = ctx;
 
         public IEnumerable<Treaty> GetAll() => _ctx.Treaties.Values;
 

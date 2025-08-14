@@ -51,7 +51,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             foreach (var character in _characters.GetAll().ToList())
             {
-                if (!character.IsAlive) continue;
+                if (!character.IsAlive)
+                    continue;
 
                 // Birthday month → increment age
                 if (character.BirthMonth == _clock.CurrentMonth && _clock.CurrentYear > character.BirthYear)
@@ -70,7 +71,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
             }
         }
         
-        // TODO (later): gate on co-location (same planet/fleet) once a location service is available.
         private void HandleConception(Character potentialMother, List<Character> allChars)
         {
             if (potentialMother.Sex != Sex.Female)
@@ -89,8 +89,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             if (partnerIds.Count == 0)
                 return;
-
-            
 
             foreach (var pid in partnerIds)
             {
@@ -116,8 +114,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
             }
         }
 
-        // Very light heuristic: baseline + age + personality.
-        // Tuned to be conservative; adjust numbers as you like.
         private double ComputeMonthlyConceptionChance(Character mother, Character partner)
         {
             double chance = 0.10; // 10% baseline per month for active couples
@@ -125,26 +121,30 @@ namespace SkyHorizont.Infrastructure.DomainServices
             // Age band effects (rough, gamey)
             if (mother.Age < 14)
                 return 0.0;
-            if (mother.Age <= 16) chance += 0.04;
-            if (mother.Age <= 20) chance += 0.02;
-            if (mother.Age <= 28) chance += 0.01;
-            else if (mother.Age <= 34) chance += 0.00;   // baseline
-            else if (mother.Age <= 40) chance -= 0.03;
-            else if (mother.Age <= 45) chance -= 0.06;
+            if (mother.Age <= 16)
+                chance += 0.04;
+            if (mother.Age <= 20)
+                chance += 0.02;
+            if (mother.Age <= 28)
+                chance += 0.01;
+            else if (mother.Age <= 34)
+                chance += 0.00;   // baseline
+            else if (mother.Age <= 40)
+                chance -= 0.03;
+            else if (mother.Age <= 45)
+                chance -= 0.06;
             else chance -= 0.10;
 
-            // Personality proxies for frequency/likelihood of intimate time
-            // (agreeable/extraverted → more time together; conscientious → busy/scheduled)
             chance += (mother.Personality.Agreeableness - 50) * 0.0008;
             chance += (mother.Personality.Extraversion  - 50) * 0.0008;
             chance -= (mother.Personality.Conscientiousness - 50) * 0.0006;
 
-            // Small random nudge, bounded
             chance += (_rng.NextDouble() - 0.5) * 0.02;
 
-            // Clamp 0..30% monthly
-            if (chance < 0.0) chance = 0.0;
-            if (chance > 0.30) chance = 0.30;
+            if (chance < 0.0)
+                chance = 0.0;
+            if (chance > 0.30)
+                chance = 0.30;
             return chance;
         }
 
@@ -171,7 +171,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 _characters.Save(child1);
                 WireLineage(child1, mother, preg.FatherId);
 
-                Character child2 = null;
+                Character? child2 = null;
                 if (twins)
                 {
                     child2 = CreateNewborn(mother, preg.FatherId);
