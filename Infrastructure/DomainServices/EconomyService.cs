@@ -270,9 +270,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 var to   = _planets.GetById(route.ToPlanetId);
                 if (from is null || to is null) continue;
 
-                // Very simple value model: capacity * (avg infra / 50) * base unit * distanceFactor
                 double infraFactor = Math.Max(1.0, (from.InfrastructureLevel + to.InfrastructureLevel) / 100.0 * 2.0);
-                double distanceFactor = DistanceValueFactor(from.Id, to.Id); // NEW (currently 1.0)
+                double distanceFactor = DistanceValueFactor(from.Id, to.Id);
                 int grossValue = (int)Math.Round(route.Capacity * TradeBaseUnitValue * infraFactor * distanceFactor);
 
                 if (route.IsSmuggling)

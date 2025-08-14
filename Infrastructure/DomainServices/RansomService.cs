@@ -6,6 +6,7 @@ using SkyHorizont.Domain.Services;
 
 namespace SkyHorizont.Infrastructure.DomainServices
 {
+    // ToDo: ransom service
     public class RansomService : IRansomService
     {
         private readonly ICharacterRepository _cmdRepo;

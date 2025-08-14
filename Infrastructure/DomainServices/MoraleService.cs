@@ -3,7 +3,6 @@ using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Services;
 
-// ToDo: complete
 namespace SkyHorizont.Infrastructure.DomainServices
 {
     // ToDo: Moral system

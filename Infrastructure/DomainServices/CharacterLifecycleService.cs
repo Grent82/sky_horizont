@@ -16,6 +16,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IPersonalityInheritanceService _inherit;
         private readonly IPregnancyPolicy _pregPolicy;
         private readonly ISkillInheritanceService _skillInherit;
+        private readonly ILocationService _loc;
         private readonly IEventBus _events;
 
         public CharacterLifecycleService(
@@ -28,6 +29,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IPersonalityInheritanceService inherit,
             IPregnancyPolicy pregPolicy,
             ISkillInheritanceService skillInherit,
+            ILocationService loc,
             IEventBus events)
         {
             _characters = characters;
@@ -39,6 +41,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _inherit = inherit;
             _pregPolicy = pregPolicy;
             _skillInherit = skillInherit;
+            -loc = loc;
             _events = events;
         }
 
@@ -57,6 +60,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
                     _events.Publish(new BirthdayOccurred(character.Id, _clock.CurrentYear, _clock.CurrentMonth));
                 }
 
+                HandleConception(character, all);
 
                 HandlePregnancy(character);
 
@@ -65,6 +69,77 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 _characters.Save(character);
             }
         }
+        
+        // TODO (later): gate on co-location (same planet/fleet) once a location service is available.
+        private void HandleConception(Character potentialMother, List<Character> allChars)
+        {
+            if (potentialMother.Sex != Sex.Female) return;
+            if (!potentialMother.IsAlive) return;
+            if (potentialMother.ActivePregnancy is { Status: PregnancyStatus.Active }) return;
+
+            // Find consensual partners: Lovers/Spouse links
+            var partnerIds = potentialMother.Relationships
+                .Where(r => r.Type == RelationshipType.Lover || r.Type == RelationshipType.Spouse)
+                .Select(r => r.TargetCharacterId)
+                .Distinct()
+                .ToList();
+
+            if (partnerIds.Count == 0) return;
+
+            
+
+            foreach (var pid in partnerIds)
+            {
+                var partner = _characters.GetById(pid);
+                if (partner is null || !partner.IsAlive) continue;
+                if (partner.Id == potentialMother.Id) continue;
+
+                if (partner.Sex != Sex.Male) continue;
+
+                if (!_loc.AreCoLocated(potentialMother.Id, partner.Id))
+                    continue;
+
+                var chance = ComputeMonthlyConceptionChance(potentialMother, partner);
+                if (_rng.NextDouble() < chance)
+                {
+                    potentialMother.StartPregnancy(partner.Id, _clock.CurrentYear, _clock.CurrentMonth);
+                    _events.Publish(new DomainEventLog("Conception", potentialMother.Id, $"Partner={partner.Id}"));
+                    break;
+                }
+            }
+        }
+
+        // Very light heuristic: baseline + age + personality.
+        // Tuned to be conservative; adjust numbers as you like.
+        private double ComputeMonthlyConceptionChance(Character mother, Character partner)
+        {
+            double chance = 0.10; // 10% baseline per month for active couples
+
+            // Age band effects (rough, gamey)
+            if (mother.Age < 14) return 0.0;
+            if (mother.Age <= 16) chance += 0.04;
+            if (mother.Age <= 20) chance += 0.02;
+            if (mother.Age <= 28) chance += 0.01;
+            else if (mother.Age <= 34) chance += 0.00;   // baseline
+            else if (mother.Age <= 40) chance -= 0.03;
+            else if (mother.Age <= 45) chance -= 0.06;
+            else chance -= 0.10;
+
+            // Personality proxies for frequency/likelihood of intimate time
+            // (agreeable/extraverted → more time together; conscientious → busy/scheduled)
+            chance += (mother.Personality.Agreeableness - 50) * 0.0008;
+            chance += (mother.Personality.Extraversion  - 50) * 0.0008;
+            chance -= (mother.Personality.Conscientiousness - 50) * 0.0006;
+
+            // Small random nudge, bounded
+            chance += (_rng.NextDouble() - 0.5) * 0.02;
+
+            // Clamp 0..30% monthly
+            if (chance < 0.0) chance = 0.0;
+            if (chance > 0.30) chance = 0.30;
+            return chance;
+        }
+
 
         private void HandlePregnancy(Character mother)
         {
@@ -81,14 +156,15 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 }
 
                 bool twins = _pregPolicy.ShouldHaveTwins(mother, _clock.CurrentYear, _clock.CurrentMonth);
-                
+
                 var child1 = CreateNewborn(mother, preg.FatherId);
                 _characters.Save(child1);
                 WireLineage(child1, mother, preg.FatherId);
 
+                Character child2 =  null;
                 if (twins)
                 {
-                    var child2 = CreateNewborn(mother, preg.FatherId);
+                    child2 = CreateNewborn(mother, preg.FatherId);
                     _characters.Save(child2);
                     WireLineage(child2, mother, preg.FatherId);
                 }
@@ -98,7 +174,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
                 _events.Publish(new ChildBorn(child1.Id, mother.Id, preg.FatherId, _clock.CurrentYear, _clock.CurrentMonth));
                 if (twins)
-                    _events.Publish(new ChildBorn(child1.Id, mother.Id, preg.FatherId, _clock.CurrentYear, _clock.CurrentMonth));
+                    _events.Publish(new ChildBorn(child2!.Id, mother.Id, preg.FatherId, _clock.CurrentYear, _clock.CurrentMonth));
             }
         }
 

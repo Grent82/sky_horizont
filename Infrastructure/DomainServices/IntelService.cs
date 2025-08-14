@@ -33,6 +33,5 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         public IEnumerable<IntelReport> GetReportsForFaction(Guid targetFactionId) =>
             _repository.GetReportsByFactionId(targetFactionId);
-
     }
 }
