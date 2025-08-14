@@ -32,7 +32,7 @@
     <ProjectReference Include="..\Domain\Domain.csproj" />
     <ProjectReference Include="..\Application\Application.csproj" />
     <!-- Add Infrastructure/Web only if you really test them -->
-    <!-- <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" /> -->
+    <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
     <!-- <ProjectReference Include="..\Web\Web.csproj" /> -->
   </ItemGroup>
 
