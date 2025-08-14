@@ -3,6 +3,7 @@ using SkyHorizont.Domain.Entity.Lineage;
 using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Infrastructure.DomainServices;
+using SkyHorizont.Infrastructure.Social;
 
 namespace SkyHorizont.Infrastructure.Testing
 {
@@ -15,6 +16,9 @@ namespace SkyHorizont.Infrastructure.Testing
         private readonly ILineageRepository _lineage;
         private readonly IPlanetRepository _planets;
         private readonly CharacterLifecycleService _lifecycle;
+        private readonly IntentPlanner _planner;
+        private readonly InteractionResolver _resolver;
+        private readonly InMemorySocialEventLog _socialLog;
         private readonly IGameClockService _clock;
 
         public LifecycleSimulationRunner(
@@ -22,12 +26,18 @@ namespace SkyHorizont.Infrastructure.Testing
             ILineageRepository lineage,
             IPlanetRepository planets,
             CharacterLifecycleService lifecycle,
+            IntentPlanner planner,
+            InteractionResolver resolver,
+            InMemorySocialEventLog socialLog,
             IGameClockService clock)
         {
             _characters = characters;
             _lineage = lineage;
             _planets = planets;
             _lifecycle = lifecycle;
+            _planner = planner;
+            _resolver = resolver;
+             _socialLog = socialLog;
             _clock = clock;
         }
 
@@ -74,8 +84,50 @@ namespace SkyHorizont.Infrastructure.Testing
             int turns = years * _clock.MonthsPerYear;
             for (int i = 0; i < turns; i++)
             {
-                _lifecycle.ProcessLifecycleTurn();
-                _clock.AdvanceTurn();
+                ProcessAllTurnEvents(turns);
+            }
+        }
+
+        public void ProcessAllTurnEvents(int turnNumber)
+        {
+            // 1) Advance game time (month → year rollover if needed)
+            SafeRun("Clock.AdvanceTurn", () => _clock.AdvanceTurn());
+
+            // 2) Lifecycle first (age up, pregnancies, births, deaths)
+            SafeRun("Lifecycle.Process", () => _lifecycle.ProcessLifecycleTurn());
+
+            // 3) Social layer: plan intents per living character and resolve them
+            SafeRun("Social.Intents", () =>
+            {
+                foreach (var actor in _characters.GetAll().Where(c => c.IsAlive))
+                {
+                    var intents = _planner.PlanMonthlyIntents(actor);
+                    foreach (var intent in intents)
+                    {
+                        try
+                        {
+                            var events = _resolver.Resolve(intent, _clock.CurrentYear, _clock.CurrentMonth);
+                            foreach (var ev in events)
+                                _socialLog.Append(ev);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[TurnProcessor] Error resolving intent {intent.Type} for {actor.Id}: {ex}");
+                        }
+                    }
+                }
+            });
+
+            // 4) Affection drift / captive affection adjustments (monthly)
+            //SafeRun("Affection.Update", () => _affection.UpdateAffection());
+        }
+
+        private static void SafeRun(string label, Action action)
+        {
+            try { action(); }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[TurnProcessor] {label} failed: {ex.Message}");
             }
         }
     }
