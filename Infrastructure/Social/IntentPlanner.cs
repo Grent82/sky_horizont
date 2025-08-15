@@ -146,12 +146,14 @@ namespace SkyHorizont.Infrastructure.Social
             var compat = actor.Personality.CheckCompatibility(target.Personality); // 0..100
             var baseScore = 0.0;
 
-            baseScore += Map01(compat);                  // compatibility matters a lot
-            baseScore += Map01(Math.Max(0, opinion + 50)); // tilt positive opinions
+            baseScore += Map0to100(compat);
+            baseScore += Map0to100(Math.Max(0, opinion + 50));
 
             // Cheerful & Warm people push up
-            if (PersonalityTraits.Cheerful(actor.Personality)) baseScore += 10;
-            if (PersonalityTraits.WarmAndFriendly(actor.Personality)) baseScore += 10;
+            if (PersonalityTraits.Cheerful(actor.Personality))
+                baseScore += 10;
+            if (PersonalityTraits.WarmAndFriendly(actor.Personality))
+                baseScore += 10;
 
             // Already close relationship? small boost
             if (actor.Relationships.Any(r => r.TargetCharacterId == target.Id &&
@@ -168,7 +170,7 @@ namespace SkyHorizont.Infrastructure.Social
         {
             var opinion = _opinions.GetOpinion(actor.Id, familyId);
             var s = 30.0
-                    + Map01(opinion + 50)
+                    + Map0to100(opinion + 50)
                     + (actor.Personality.Agreeableness - 50) * 0.3
                     + (actor.Personality.Conscientiousness - 50) * 0.2;
 
@@ -247,7 +249,7 @@ namespace SkyHorizont.Infrastructure.Social
             var baseScore = 0.0;
 
             // Hate your leader? go up
-            baseScore += Map01(-(opinionLeader)) * 0.8;
+            baseScore += Map0to100(-opinionLeader) * 0.8;
 
             // Personality: low conscientiousness & low agreeableness → more likely
             baseScore += (50 - actor.Personality.Conscientiousness) * 0.2;
@@ -294,9 +296,12 @@ namespace SkyHorizont.Infrastructure.Social
             var opinion = _opinions.GetOpinion(actor.Id, target.Id);
             var baseScore = 0.0;
 
-            if (opinion < -25) baseScore += Map01(-(opinion)); // the more hate, the higher
-            if (PersonalityTraits.EasilyAngered(actor.Personality)) baseScore += 15;
-            if (PersonalityTraits.Cheerful(actor.Personality)) baseScore -= 5;
+            if (opinion < -25)
+                baseScore += Map0to100(-opinion);
+            if (PersonalityTraits.EasilyAngered(actor.Personality))
+                baseScore += 15;
+            if (PersonalityTraits.Cheerful(actor.Personality))
+                baseScore -= 5;
 
             // Hierarchy discourages picking on superiors
             if ((int)target.Rank > (int)actor.Rank) baseScore -= 10;
@@ -306,27 +311,26 @@ namespace SkyHorizont.Infrastructure.Social
 
         private double ScoreAssassinate(Character actor, Character target, Guid myFactionId)
         {
-            // Very rare: needs high military skill + strong negative opinion + wartime/plot
             var opinion = _opinions.GetOpinion(actor.Id, target.Id);
             var baseScore = 0.0;
 
             baseScore += actor.Skills.Military * 0.4;
             baseScore += Math.Max(0, -(opinion)) * 0.2;
 
-            // Traits: impulsive/angry raise; conscientious/agreeable lower
-            if (PersonalityTraits.Impulsive(actor.Personality)) baseScore += 10;
-            if (PersonalityTraits.EasilyAngered(actor.Personality)) baseScore += 10;
+            if (PersonalityTraits.Impulsive(actor.Personality))
+                baseScore += 10;
+            if (PersonalityTraits.EasilyAngered(actor.Personality))
+                baseScore += 10;
             baseScore -= (actor.Personality.Conscientiousness - 50) * 0.2;
             baseScore -= (actor.Personality.Agreeableness - 50) * 0.2;
 
-            // Prefer at war
             var targetFaction = _factions.GetFactionIdForCharacter(target.Id);
-            if (_factions.IsAtWar(myFactionId, targetFaction)) baseScore += 10;
+            if (_factions.IsAtWar(myFactionId, targetFaction))
+                baseScore += 10;
 
-            // Don’t let civilians constantly try this
-            if (actor.Rank <= Rank.Captain && actor.Skills.Military < 70) baseScore -= 20;
+            if (actor.Rank <= Rank.Captain && actor.Skills.Military < 70)
+                baseScore -= 20;
 
-            // Make it rare
             baseScore -= 15;
 
             return Clamp0to100(baseScore * _cfg.AssassinateWeight);
@@ -496,7 +500,7 @@ namespace SkyHorizont.Infrastructure.Social
             list.Add(new ScoredIntent(type, score, targetCharacterId, targetFactionId));
         }
 
-        private static double Map01(double v) => Math.Clamp(v, 0, 100) / 1.0;
+        private static double Map0to100(double v) => Math.Clamp(v, 0, 100) / 1.0;
         private static double Clamp0to100(double v) => v < 0 ? 0 : (v > 100 ? 100 : v);
 
         private sealed record ScoredIntent(IntentType Type, double Score, Guid? TargetCharacterId, Guid? TargetFactionId);
