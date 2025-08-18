@@ -10,7 +10,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public Guid Id { get; }
         public string Name { get; private set; }
         public Guid SystemId { get; }
-        public Guid ControllingFactionId { get; private set; }
+        public Guid FactionId { get; private set; }
         public double Stability { get; private set; }  // 0.0–1.0
         public Resources Resources { get; private set; }
         public int InfrastructureLevel { get; private set; }  // 0..100
@@ -28,7 +28,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             Guid id,
             string name,
             Guid systemId,
-            Guid controllingFactionId,
+            Guid factionId,
             Resources initialResources,
             double initialStability = 1.0,
             int infrastructureLevel = 10,
@@ -38,7 +38,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             Id = id;
             Name = name ?? throw new ArgumentNullException(nameof(name));
             SystemId = systemId;
-            ControllingFactionId = controllingFactionId;
+            FactionId = factionId;
             Resources = initialResources;
             Stability = Math.Clamp(initialStability, 0.0, 1.0);
             InfrastructureLevel = Math.Clamp(infrastructureLevel, 0, 100);
@@ -91,7 +91,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
 
         public void StationFleet(Fleet fleet)
         {
-            if (fleet.FactionId != ControllingFactionId)
+            if (fleet.FactionId != FactionId)
                 throw new DomainException("Fleet must belong to owning faction.");
             if (!_stationedFleets.Any(f => f.Id == fleet.Id))
                 _stationedFleets.Add(fleet);
@@ -128,7 +128,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
 
         public void ChangeControl(Guid newFaction)
         {
-            ControllingFactionId = newFaction;
+            FactionId = newFaction;
             // ToDo: optional: reset governor, stability drop
             Stability = 0.5;
             GovernorId = null;
@@ -168,6 +168,6 @@ namespace SkyHorizont.Domain.Galaxy.Planet
 
 
         public override string ToString() =>
-            $"{Name} (Faction: {ControllingFactionId}, Governor: {GovernorId})";
+            $"{Name} (Faction: {FactionId}, Governor: {GovernorId})";
     }
 }

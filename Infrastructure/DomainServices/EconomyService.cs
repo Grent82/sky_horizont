@@ -215,7 +215,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
                 if (!_eco.TryDebitBudget(planet.Id, infraUpkeep))
                 {
-                    var factionId = planet.ControllingFactionId;
+                    var factionId = planet.FactionId;
                     if (_factionFunds.GetBalance(factionId) >= infraUpkeep)
                     {
                         _factionFunds.DeductBalance(factionId, infraUpkeep);
@@ -276,7 +276,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
                 if (route.IsSmuggling)
                 {
-                    var pirateFaction = FindPirateFactionNear(from.ControllingFactionId) ?? from.ControllingFactionId;
+                    var pirateFaction = FindPirateFactionNear(from.FactionId) ?? from.FactionId;
                     int leakage = (int)Math.Round(grossValue * SmugglingLossAtSource);
                     int piratesTake = (int)Math.Round((grossValue - leakage) * SmugglingCutToPirates);
 
@@ -303,7 +303,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private void ApplyTariffOnPlanet(Planet planet, int credited, Guid routeId)
         {
-            var policy = _eco.GetTariffPolicy(planet.ControllingFactionId);
+            var policy = _eco.GetTariffPolicy(planet.FactionId);
             if (policy is null || policy.Percent <= 0) return;
 
             int tax = (int)Math.Floor(credited * (policy.Percent / 100.0));
@@ -312,10 +312,10 @@ namespace SkyHorizont.Infrastructure.DomainServices
             if (_eco.TryDebitBudget(planet.Id, tax))
             {
                 _planets.Save(planet);
-                _factionFunds.AddBalance(planet.ControllingFactionId, tax);
+                _factionFunds.AddBalance(planet.FactionId, tax);
 
                 _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
-                    "Tariff", planet.ControllingFactionId, tax, $"Route {routeId} tariff {policy.Percent}% from {planet.Id} = {tax}"));
+                    "Tariff", planet.FactionId, tax, $"Route {routeId} tariff {policy.Percent}% from {planet.Id} = {tax}"));
             }
         }
 

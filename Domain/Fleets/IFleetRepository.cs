@@ -4,7 +4,7 @@ namespace SkyHorizont.Domain.Fleets
     {
         Fleet? GetById(Guid attackerFleetId);
         IEnumerable<Fleet> GetAll();
-
         void Save(Fleet fleet);
+        IEnumerable<Fleet> GetFleetsForFaction(Guid factionId);
     }
 }

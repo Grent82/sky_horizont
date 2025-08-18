@@ -87,8 +87,8 @@ namespace SkyHorizont.Domain.Battle
 
             var result = new BattleResult(
                 Guid.NewGuid(),
-                attackerWins || defenderRetreated ? attacker.FactionId : planet.ControllingFactionId,
-                attackerWins || defenderRetreated ? planet.ControllingFactionId : attacker.FactionId,
+                attackerWins || defenderRetreated ? attacker.FactionId : planet.FactionId,
+                attackerWins || defenderRetreated ? planet.FactionId : attacker.FactionId,
                 attackerWins ? attacker : (defenderRetreated ? attacker : null),
                 defenderRetreated ? defenderFleets.FirstOrDefault() : (attackerWins ? null : attacker),
                 attackerWins ? 24 : 0,

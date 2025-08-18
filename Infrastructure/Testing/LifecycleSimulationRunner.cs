@@ -48,7 +48,7 @@ namespace SkyHorizont.Infrastructure.Testing
                 id: Guid.NewGuid(),
                 name: "Testia Prime",
                 systemId: systemId,
-                controllingFactionId: Guid.NewGuid(),
+                factionId: Guid.NewGuid(),
                 initialResources: new Resources(10_000, 10_000, 10_000),
                 initialStability: 1.0,
                 infrastructureLevel: 50,

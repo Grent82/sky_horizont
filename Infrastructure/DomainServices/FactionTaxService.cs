@@ -61,7 +61,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             var planet = _planets.GetById(planetId);
             if (planet is null) return;
 
-            var factionId = planet.ControllingFactionId;
+            var factionId = planet.FactionId;
             if (factionId == Guid.Empty) return;
 
             int budget = _eco.GetPlanetBudget(planet.Id);
