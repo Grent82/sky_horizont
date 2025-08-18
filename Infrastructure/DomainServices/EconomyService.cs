@@ -32,8 +32,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private static readonly Dictionary<Rank, int> SalaryByRank = new()
         {
-            { Rank.Civilian, 0 }, { Rank.Lieutenant, 20 }, { Rank.Captain, 40 },
-            { Rank.Major, 60 }, { Rank.Colonel, 90 }, { Rank.General, 140 }, { Rank.Leader, 0 }
+            { Rank.Civilian, 0 },{ Rank.Courtesan, 10 }, { Rank.Lieutenant, 20 }, { Rank.Captain, 40 },
+            { Rank.Major, 60 }, { Rank.Colonel, 90 }, { Rank.General, 140 }, { Rank.Leader, 250 }
         };
 
         public EconomyService(

@@ -95,13 +95,57 @@ namespace SkyHorizont.Infrastructure.DomainServices
             return f is null ? Enumerable.Empty<Guid>() : f.CapturedCharacterIds;
         }
 
-        public void AddCitizenToPlanet(Guid character, CharacterLocation location)
+        public void AddCitizenToPlanet(Guid character, Guid locationId)
         {
-            if (location.Kind == LocationKind.Planet)
+            var planet = _planets.GetById(locationId);
+            if (planet is null)
+                return;
+            planet.AddCitizen(character);
+        }
+
+        public void AddPassengerToFleet(Guid character, Guid fleetId)
+        {
+            var fleet = _fleets.GetById(fleetId);
+            if (fleet is null)
+                return;
+            fleet.AddPassenger(character);
+        }
+
+        public void StageAtHolding(Guid character, Guid fleetId)
+        {
+            // Default: place in fleet holding (brig) as captive.
+            // If your design differentiates "staged" vs "captive", add a separate list on Fleet and store there.
+            var fleet = _fleets.GetById(fleetId);
+            if (fleet is null)
+                return;
+            fleet.AddCaptured(character);
+        }
+
+        /// <summary>
+        /// Returns true if 'prisonerId' is captured on a host controlled by 'captorId'.
+        /// On a planet: governor is captor. On a fleet: assigned commander is captor.
+        /// </summary>
+        public bool IsPrisonerOf(Guid prisonerId, Guid captorId)
+        {
+            // Planet case
+            foreach (var p in _planets.GetAll())
             {
-                var planet = _planets.GetById(location.HostId);
-                planet.AddCitizen(character);
+                if (!p.CapturedCharacterIds.Contains(prisonerId)) continue;
+                if (p.GovernorId.HasValue && p.GovernorId.Value == captorId) return true;
+
+                // Also count stationed fleet commanders of the same planet as valid captors
+                foreach (var f in p.GetStationedFleets())
+                    if (f.AssignedCharacterId == captorId) return true;
             }
+
+            // Fleet case
+            foreach (var f in _fleets.GetAll())
+            {
+                if (!f.CapturedCharacterIds.Contains(prisonerId)) continue;
+                if (f.AssignedCharacterId == captorId) return true;
+            }
+
+            return false;
         }
     }
 }

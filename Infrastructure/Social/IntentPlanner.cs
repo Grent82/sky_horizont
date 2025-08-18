@@ -43,74 +43,117 @@ namespace SkyHorizont.Infrastructure.Social
                 return Enumerable.Empty<CharacterIntent>();
 
             if (actor.Age < 13)
-                return Enumerable.Empty<CharacterIntent>(); 
+                return Enumerable.Empty<CharacterIntent>();
 
             // Basic context
-                var myFactionId = _factions.GetFactionIdForCharacter(actor.Id);
-            var myLeaderId = myFactionId != Guid.Empty ? _factions.GetLeaderId(myFactionId) : null;
+            var actorFactionId = _factions.GetFactionIdForCharacter(actor.Id);
+            var actorLeaderId = actorFactionId != Guid.Empty ? _factions.GetLeaderId(actorFactionId) : null;
+            var opinionCache = new Dictionary<Guid, int>(128);
+            int Opin(Guid otherId)
+                => opinionCache.TryGetValue(otherId, out var v)
+                ? v
+                : (opinionCache[otherId] = _opinions.GetOpinion(actor.Id, otherId));
 
-            // Gather potential social targets:
-            var knownPeople = _chars.GetAll().Where(c => c.IsAlive && c.Id != actor.Id).ToList();
-            var sameFaction = knownPeople.Where(c => _factions.GetFactionIdForCharacter(c.Id) == myFactionId).ToList();
-            var otherFaction = knownPeople.Where(c => _factions.GetFactionIdForCharacter(c.Id) != myFactionId).ToList();
+            var factionCache = new Dictionary<Guid, Guid>(128);
+            Guid Fac(Guid charId)
+                => factionCache.TryGetValue(charId, out var f)
+                ? f
+                : (factionCache[charId] = _factions.GetFactionIdForCharacter(charId));
+    
+
+            var knownPeopleRaw = _chars.GetAll().Where(c => c.IsAlive && c.Id != actor.Id);
+            var scored = knownPeopleRaw.Select(c =>
+            {
+                var relSet = actor.Relationships.Count == 0
+                    ? (HashSet<Guid>?)null
+                    : actor.Relationships.Select(r => r.TargetCharacterId).ToHashSet();
+
+                var familySet = actor.FamilyLinkIds.Count == 0
+                    ? (HashSet<Guid>?)null
+                    : actor.FamilyLinkIds.ToHashSet();
+
+                int op = Opin(c.Id);
+                bool related = relSet != null && relSet.Contains(c.Id);
+                bool family  = familySet != null && familySet.Contains(c.Id);
+                bool sameFac = Fac(c.Id) == actorFactionId;
+
+                double w =
+                    Math.Abs(op)
+                    + (related ? 25 : 0)
+                    + (family ? 20 : 0)
+                    + (sameFac ? 15 : 0);
+
+                return new { C = c, W = w };
+            })
+            .OrderByDescending(x => x.W)
+            .Take(_cfg.MaxCandidatePool)
+            .Select(x => x.C)
+            .ToList();
+
+            var sameFaction = scored.Where(c => Fac(c.Id) == actorFactionId)
+                                    .ToList();
+
+            var otherFaction = scored.Where(c => Fac(c.Id) != actorFactionId)
+                                    .Take(_cfg.MaxCrossFactionPool)
+                                    .ToList();
 
             // ── Score core intents ─────────────────────────────────────────────
 
             // Courtship / Maintain romance
-            var romanticTarget = PickRomanticTarget(actor, knownPeople);
+            var romanticTarget = PickRomanticTarget(actor, scored, Fac, Opin);
             if (romanticTarget != null)
-                AddIfAboveZero(intents, ScoreCourtship(actor, romanticTarget), IntentType.Court, romanticTarget.Id);
+                AddIfAboveZero(intents, ScoreCourtship(actor, romanticTarget, Opin), IntentType.Court, romanticTarget.Id);
 
             // Visit family (keeps ties warm)
-            var familyTarget = PickFamilyTarget(actor);
+            var familyTarget = PickFamilyTarget(actor, Opin);
             if (familyTarget.HasValue)
-                AddIfAboveZero(intents, ScoreVisitFamily(actor, familyTarget.Value), IntentType.VisitFamily, familyTarget.Value);
+                AddIfAboveZero(intents, ScoreVisitFamily(actor, familyTarget.Value, Opin), IntentType.VisitFamily, familyTarget.Value);
 
             // Spy (enemy or rival)
-            var spyTargetFaction = PickSpyFaction(actor, myFactionId);
+            var spyTargetFaction = PickSpyFaction(actorFactionId);
             if (spyTargetFaction != Guid.Empty)
-                AddIfAboveZero(intents, ScoreSpy(actor, spyTargetFaction), IntentType.Spy, null, spyTargetFaction);
+                AddIfAboveZero(intents, ScoreSpy(actor), IntentType.Spy, null, spyTargetFaction);
 
-            var spyTargetChar = PickSpyCharacter(actor, myFactionId, knownPeople);
+            var spyTargetChar = PickSpyCharacter(actorFactionId, scored, Fac, Opin);
             if (spyTargetChar != null)
-                AddIfAboveZero(intents, ScoreSpy(actor, _factions.GetFactionIdForCharacter(spyTargetChar.Id)),
+                AddIfAboveZero(intents, ScoreSpy(actor),
                             IntentType.Spy, spyTargetChar.Id, null);
 
             // Bribe (swing neutral or enemy asset)
-            var bribeTarget = PickBribeTarget(actor, otherFaction);
+            var bribeTarget = PickBribeTarget(otherFaction, Opin);
             if (bribeTarget != null)
-                AddIfAboveZero(intents, ScoreBribe(actor, bribeTarget), IntentType.Bribe, bribeTarget.Id);
+                AddIfAboveZero(intents, ScoreBribe(actor, bribeTarget, actorFactionId, Fac), IntentType.Bribe, bribeTarget.Id);
 
             // Recruit (leaders/commanders recruiting sub-commanders)
             if (IsRecruiter(actor))
             {
-                var recruitTarget = PickRecruitTarget(actor, knownPeople);
+                var recruitTarget = PickRecruitTarget(actorFactionId, scored, Fac);
                 if (recruitTarget != null)
-                    AddIfAboveZero(intents, ScoreRecruit(actor, recruitTarget), IntentType.Recruit, recruitTarget.Id);
+                    AddIfAboveZero(intents, ScoreRecruit(actor, recruitTarget, actorFactionId, Fac), IntentType.Recruit, recruitTarget.Id);
             }
 
             // Defect (if hates leader / wooed by enemy)
-            if (myLeaderId.HasValue)
+            if (actorLeaderId.HasValue)
             {
-                var defectTargetFaction = PickDefectionFaction(actor, myFactionId);
+                var defectTargetFaction = PickDefectionFaction(actorFactionId);
                 if (defectTargetFaction != Guid.Empty)
-                    AddIfAboveZero(intents, ScoreDefect(actor, myLeaderId.Value, defectTargetFaction), IntentType.Defect, null, defectTargetFaction);
+                    AddIfAboveZero(intents, ScoreDefect(actor, actorLeaderId.Value, actorFactionId, defectTargetFaction, Opin), IntentType.Defect, null, defectTargetFaction);
             }
 
             // Negotiate (diplomatic outreach)
-            var negotiateTargetFaction = PickNegotiateFaction(actor, myFactionId);
+            var negotiateTargetFaction = PickNegotiateFaction(actor, actorFactionId);
             if (negotiateTargetFaction != Guid.Empty)
-                AddIfAboveZero(intents, ScoreNegotiate(actor, myFactionId, negotiateTargetFaction), IntentType.Negotiate, null, negotiateTargetFaction);
+                AddIfAboveZero(intents, ScoreNegotiate(actor, actorFactionId, negotiateTargetFaction), IntentType.Negotiate, null, negotiateTargetFaction);
 
             // Quarrel (pick fight with rival/enemy)
-            var quarrelTarget = PickQuarrelTarget(actor, knownPeople);
+            var quarrelTarget = PickQuarrelTarget(actor, scored, Opin);
             if (quarrelTarget != null)
-                AddIfAboveZero(intents, ScoreQuarrel(actor, quarrelTarget), IntentType.Quarrel, quarrelTarget.Id);
+                AddIfAboveZero(intents, ScoreQuarrel(actor, quarrelTarget, Opin), IntentType.Quarrel, quarrelTarget.Id);
 
             // (Optional) Assassinate (very rare, high stakes)
-            var assassinateTarget = PickAssassinationTarget(actor, otherFaction);
+            var assassinateTarget = PickAssassinationTarget(otherFaction, Opin);
             if (assassinateTarget != null)
-                AddIfAboveZero(intents, ScoreAssassinate(actor, assassinateTarget, myFactionId), IntentType.Assassinate, assassinateTarget.Id);
+                AddIfAboveZero(intents, ScoreAssassinate(actor, assassinateTarget, actorFactionId, Fac, Opin), IntentType.Assassinate, assassinateTarget.Id);
 
             // ── Pick top N with a little exploration randomness ────────────────
             if (intents.Count == 0) return Enumerable.Empty<CharacterIntent>();
@@ -124,30 +167,26 @@ namespace SkyHorizont.Infrastructure.Social
                             si.TargetFactionId))
                         .ToList();
 
-            var chosen = intents
+            var prelim = intents
                 .OrderByDescending(i => i.Score)
-                .Take(_cfg.MaxIntentsPerMonth)
-                .Select(i => new CharacterIntent(actor.Id, i.Type, i.TargetCharacterId, i.TargetFactionId))
+                .Take(Math.Min(_cfg.ConflictBuffer, Math.Max(_cfg.MaxIntentsPerMonth * 3, 6)))
                 .ToList();
 
-            var scoreMap = intents.ToDictionary(i => (i.Type, i.TargetCharacterId, i.TargetFactionId), i => i.Score);
-            double scoreOf(CharacterIntent ci) => scoreMap.TryGetValue((ci.Type, ci.TargetCharacterId, ci.TargetFactionId), out var s) ? s : 0.0;
-
-            chosen = FilterConflicts(chosen, scoreOf).ToList();
-            
-            return chosen;
+            var filtered = ResolveConflictsTargetAware(actor, prelim, _cfg.MaxIntentsPerMonth, Fac);
+            return filtered.Select(i => new CharacterIntent(actor.Id, i.Type, i.TargetCharacterId, i.TargetFactionId))
+                        .ToList();
         }
 
         // ────────────────────────── Scoring ──────────────────────────
 
-        private double ScoreCourtship(Character actor, Character target)
+        private double ScoreCourtship(Character actor, Character target, Func<Guid, int> opin)
         {
-            var opinion = _opinions.GetOpinion(actor.Id, target.Id);   // -100..+100
+            var opinion = opin(target.Id);   // -100..+100
             var compat = actor.Personality.CheckCompatibility(target.Personality); // 0..100
             var baseScore = 0.0;
 
-            baseScore += Map0to100(compat);
-            baseScore += Map0to100(Math.Max(0, opinion + 50));
+            baseScore += Clamp0to100Map(compat);
+            baseScore += Clamp0to100Map(Math.Max(0, opinion + 50));
 
             // Cheerful & Warm people push up
             if (PersonalityTraits.Cheerful(actor.Personality))
@@ -166,39 +205,42 @@ namespace SkyHorizont.Infrastructure.Social
             return Clamp0to100(baseScore * _cfg.RomanceWeight);
         }
 
-        private double ScoreVisitFamily(Character actor, Guid familyId)
+        private double ScoreVisitFamily(Character actor, Guid familyId, Func<Guid, int> opin)
         {
-            var opinion = _opinions.GetOpinion(actor.Id, familyId);
+            var opinion = opin(familyId);
             var s = 30.0
-                    + Map0to100(opinion + 50)
+                    + Clamp0to100Map(opinion + 50)
                     + (actor.Personality.Agreeableness - 50) * 0.3
                     + (actor.Personality.Conscientiousness - 50) * 0.2;
 
             return Clamp0to100(s * _cfg.FamilyWeight);
         }
 
-        private double ScoreSpy(Character actor, Guid targetFactionId)
+        private double ScoreSpy(Character actor)
         {
             var intel = actor.Skills.Intelligence; // 0..100
             var s = intel * 0.6;
 
             // Bold & curious personalities bias up
-            if (PersonalityTraits.Adventurous(actor.Personality)) s += 10;
-            if (PersonalityTraits.IntellectuallyCurious(actor.Personality)) s += 10;
+            if (PersonalityTraits.Adventurous(actor.Personality))
+                s += 10;
+            if (PersonalityTraits.IntellectuallyCurious(actor.Personality))
+                s += 10;
 
             // Very anxious actors bias down
-            if (PersonalityTraits.Anxious(actor.Personality)) s -= 10;
+            if (PersonalityTraits.Anxious(actor.Personality))
+                s -= 10;
 
             // Rank helps coordination
             s += (int)actor.Rank * 2;
 
-            // Don’t send civilians on spy ops unless talented
-            if (actor.Rank == Rank.Civilian && intel < 65) s -= 15;
+            if (actor.Rank == Rank.Civilian && intel < 65)
+                s -= 15;
 
             return Clamp0to100(s * _cfg.SpyWeight);
         }
 
-        private double ScoreBribe(Character actor, Character target)
+        private double ScoreBribe(Character actor, Character target, Guid actorFactionId, Func<Guid, Guid> fac)
         {
             var baseScore = 20.0;
 
@@ -211,17 +253,18 @@ namespace SkyHorizont.Infrastructure.Social
             baseScore -= (actor.Personality.Agreeableness - 50) * 0.2;
 
             // If at war with target’s faction, urgency up
-            var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
-            var targetFaction = _factions.GetFactionIdForCharacter(target.Id);
-            if (_factions.IsAtWar(myFaction, targetFaction)) baseScore += 10;
+            var targetFaction = fac(target.Id);
+            if (_factions.IsAtWar(actorFactionId, targetFaction))
+                baseScore += 10;
 
             // Money check – if broke, bribe unlikely
-            if (actor.Balance < _cfg.MinBribeBudget) baseScore -= 25;
+            if (actor.Balance < _cfg.MinBribeBudget)
+                baseScore -= 25;
 
             return Clamp0to100(baseScore * _cfg.BribeWeight);
         }
 
-        private double ScoreRecruit(Character actor, Character target)
+        private double ScoreRecruit(Character actor, Character target, Guid actorFactionId, Func<Guid, Guid> fac)
         {
             var baseScore = 30.0;
 
@@ -237,19 +280,19 @@ namespace SkyHorizont.Infrastructure.Social
             baseScore += (actor.Personality.Extraversion - 50) * 0.2;
 
             // Already in same faction? smaller score (already recruitable by order chain)
-            var sameFaction = _factions.GetFactionIdForCharacter(actor.Id) == _factions.GetFactionIdForCharacter(target.Id);
+            var sameFaction = actorFactionId == fac(target.Id);
             if (sameFaction) baseScore -= 10;
 
             return Clamp0to100(baseScore * _cfg.RecruitWeight);
         }
 
-        private double ScoreDefect(Character actor, Guid leaderId, Guid targetFactionId)
+        private double ScoreDefect(Character actor, Guid leaderId, Guid actorFactionId, Guid targetFactionId, Func<Guid, int> opin)
         {
-            var opinionLeader = _opinions.GetOpinion(actor.Id, leaderId); // -100..+100
+            var opinionLeader = opin(leaderId); // -100..+100
             var baseScore = 0.0;
 
             // Hate your leader? go up
-            baseScore += Map0to100(-opinionLeader) * 0.8;
+            baseScore += Clamp0to100Map(-opinionLeader) * 0.8;
 
             // Personality: low conscientiousness & low agreeableness → more likely
             baseScore += (50 - actor.Personality.Conscientiousness) * 0.2;
@@ -260,8 +303,7 @@ namespace SkyHorizont.Infrastructure.Social
             baseScore -= (actor.Personality.Neuroticism - 50) * 0.15;
 
             // If target faction is enemy of your enemy, small bump
-            var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
-            if (_factions.IsAtWar(myFaction, targetFactionId)) baseScore += 10;
+            if (_factions.IsAtWar(actorFactionId, targetFactionId)) baseScore += 10;
 
             // High rank less likely to defect (have more to lose)
             baseScore -= (int)actor.Rank * 2;
@@ -291,27 +333,26 @@ namespace SkyHorizont.Infrastructure.Social
             return Clamp0to100(baseScore * _cfg.NegotiateWeight);
         }
 
-        private double ScoreQuarrel(Character actor, Character target)
+        private double ScoreQuarrel(Character actor, Character target, Func<Guid, int> opin)
         {
-            var opinion = _opinions.GetOpinion(actor.Id, target.Id);
+            var opinion = opin(target.Id);
             var baseScore = 0.0;
 
-            if (opinion < -25)
-                baseScore += Map0to100(-opinion);
-            if (PersonalityTraits.EasilyAngered(actor.Personality))
-                baseScore += 15;
-            if (PersonalityTraits.Cheerful(actor.Personality))
-                baseScore -= 5;
+            if (opinion < _cfg.QuarrelOpinionThreshold)
+                baseScore += Clamp0to100Map(_cfg.QuarrelOpinionThreshold - opinion);
 
-            // Hierarchy discourages picking on superiors
+            if (PersonalityTraits.EasilyAngered(actor.Personality)) baseScore += 15;
+            if (PersonalityTraits.Cheerful(actor.Personality)) baseScore -= 5;
+
             if ((int)target.Rank > (int)actor.Rank) baseScore -= 10;
 
             return Clamp0to100(baseScore * _cfg.QuarrelWeight);
         }
 
-        private double ScoreAssassinate(Character actor, Character target, Guid myFactionId)
+
+        private double ScoreAssassinate(Character actor, Character target, Guid actorFactionId, Func<Guid, Guid> fac, Func<Guid, int> opin)
         {
-            var opinion = _opinions.GetOpinion(actor.Id, target.Id);
+            var opinion = opin(target.Id);
             var baseScore = 0.0;
 
             baseScore += actor.Skills.Military * 0.4;
@@ -324,8 +365,8 @@ namespace SkyHorizont.Infrastructure.Social
             baseScore -= (actor.Personality.Conscientiousness - 50) * 0.2;
             baseScore -= (actor.Personality.Agreeableness - 50) * 0.2;
 
-            var targetFaction = _factions.GetFactionIdForCharacter(target.Id);
-            if (_factions.IsAtWar(myFactionId, targetFaction))
+            var targetFaction = fac(target.Id);
+            if (_factions.IsAtWar(actorFactionId, targetFaction))
                 baseScore += 10;
 
             if (actor.Rank <= Rank.Captain && actor.Skills.Military < 70)
@@ -338,7 +379,7 @@ namespace SkyHorizont.Infrastructure.Social
 
         // ───────────────────── Target pickers ───────────────────────
 
-        private Character? PickRomanticTarget(Character actor, List<Character> candidates)
+        private Character? PickRomanticTarget(Character actor, List<Character> candidates, Func<Guid, Guid> fac, Func<Guid, int> opin)
         {
             // Prefer existing lovers/spouses; otherwise, someone compatible in same faction
             var lovers = actor.Relationships.Where(r => r.Type == RelationshipType.Lover || r.Type == RelationshipType.Spouse)
@@ -348,49 +389,50 @@ namespace SkyHorizont.Infrastructure.Social
             var known = candidates.Where(c => lovers.Contains(c.Id)).ToList();
             if (known.Count > 0) return known[_rng.NextInt(0, known.Count)];
 
-            var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
-            var pool = candidates.Where(c => _factions.GetFactionIdForCharacter(c.Id) == myFaction).ToList();
+            var myFaction = fac(actor.Id);
+            var pool = candidates.Where(c => fac(c.Id) == myFaction).ToList();
             if (pool.Count == 0) return null;
 
             // Pick someone actor likes / high compatibility
             return pool.Select(c => new
             {
                 C = c,
-                Score = 0.6 * _opinions.GetOpinion(actor.Id, c.Id) + 0.4 * actor.Personality.CheckCompatibility(c.Personality)
+                Score = 0.6 * opin(c.Id) + 0.4 * actor.Personality.CheckCompatibility(c.Personality)
             })
             .OrderByDescending(x => x.Score)
             .FirstOrDefault()?.C;
         }
 
-        private Guid? PickFamilyTarget(Character actor)
+        private Guid? PickFamilyTarget(Character actor, Func<Guid, int> opin)
         {
             if (actor.FamilyLinkIds.Count == 0) return null;
             // Random family member with slightly positive opinion bias
             var weighted = actor.FamilyLinkIds
-                .Select(fid => new { Id = fid, W = _opinions.GetOpinion(actor.Id, fid) + 60 + _rng.NextInt(0, 20) })
+                .Select(fid => new { Id = fid, W = opin(fid) + 60 + _rng.NextInt(0, 20) })
                 .OrderByDescending(x => x.W)
                 .FirstOrDefault();
             return weighted?.Id;
         }
 
-        private Guid PickSpyFaction(Character actor, Guid myFactionId)
+        private Guid PickSpyFaction(Guid actorFactionId)
         {
-            var rivals = _factions.GetAllRivalFactions(myFactionId).ToList();
+            var rivals = _factions.GetAllRivalFactions(actorFactionId).ToList();
             if (rivals.Count == 0) return Guid.Empty;
 
             // Prefer factions at war
-            var war = rivals.Where(f => _factions.IsAtWar(myFactionId, f)).ToList();
+            var war = rivals.Where(f => _factions.IsAtWar(actorFactionId, f)).ToList();
             if (war.Count > 0) return war[_rng.NextInt(0, war.Count)];
 
             return rivals[_rng.NextInt(0, rivals.Count)];
         }
 
-        private Character? PickBribeTarget(Character actor, List<Character> otherFaction)
+        private Character? PickBribeTarget(List<Character> otherFaction, Func<Guid, int> opin)
         {
             var pool = otherFaction
-                .Where(c => _opinions.GetOpinion(actor.Id, c.Id) > -50) // not sworn enemies
+                .Where(c => opin(c.Id) > -50) // not sworn enemies
                 .ToList();
-            if (pool.Count == 0) return null;
+            if (pool.Count == 0)
+                return null;
 
             // Prefer people with lower C/A (more corruptible)
             return pool.Select(c => new
@@ -404,12 +446,12 @@ namespace SkyHorizont.Infrastructure.Social
 
         private bool IsRecruiter(Character actor) => actor.Rank >= Rank.Captain || actor.Skills.Military >= 70;
 
-        private Character? PickRecruitTarget(Character actor, List<Character> candidates)
+        private Character? PickRecruitTarget(Guid actorFactionId, List<Character> candidates, Func<Guid, Guid> fac)
         {
-            var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
             // Prefer neutral or other factions; avoid already in chain (same faction)
-            var pool = candidates.Where(c => _factions.GetFactionIdForCharacter(c.Id) != myFaction).ToList();
-            if (pool.Count == 0) return null;
+            var pool = candidates.Where(c => fac(c.Id) != actorFactionId).ToList();
+            if (pool.Count == 0)
+                return null;
 
             return pool.Select(c => new
             {
@@ -420,55 +462,61 @@ namespace SkyHorizont.Infrastructure.Social
             .First().C;
         }
 
-        private Guid PickDefectionFaction(Character actor, Guid myFactionId)
+        private Guid PickDefectionFaction(Guid actorFactionId)
         {
             // If actor dislikes the leader heavily, consider defection to a rival
-            var rivals = _factions.GetAllRivalFactions(myFactionId).ToList();
-            if (rivals.Count == 0) return Guid.Empty;
+            var rivals = _factions.GetAllRivalFactions(actorFactionId).ToList();
+            if (rivals.Count == 0)
+                return Guid.Empty;
 
             // Prefer factions at war with your current faction (enemy of enemy dynamic)
-            var war = rivals.Where(f => _factions.IsAtWar(myFactionId, f)).ToList();
-            if (war.Count > 0) return war[_rng.NextInt(0, war.Count)];
+            var war = rivals.Where(f => _factions.IsAtWar(actorFactionId, f)).ToList();
+            if (war.Count > 0)
+                return war[_rng.NextInt(0, war.Count)];
 
             return rivals[_rng.NextInt(0, rivals.Count)];
         }
 
-        private Guid PickNegotiateFaction(Character actor, Guid myFactionId)
+        private Guid PickNegotiateFaction(Character actor, Guid actorFactionId)
         {
             // Diplomatic actors try de-escalation with a rival
-            var rivals = _factions.GetAllRivalFactions(myFactionId).ToList();
-            if (rivals.Count == 0) return Guid.Empty;
+            var rivals = _factions.GetAllRivalFactions(actorFactionId).ToList();
+            if (rivals.Count == 0)
+                return Guid.Empty;
 
             // If cheerful/trusting → prefer ceasefire with current war opponent
             if (PersonalityTraits.Cheerful(actor.Personality) || PersonalityTraits.Trusting(actor.Personality))
             {
-                var war = rivals.Where(f => _factions.IsAtWar(myFactionId, f)).ToList();
-                if (war.Count > 0) return war[_rng.NextInt(0, war.Count)];
+                var war = rivals.Where(f => _factions.IsAtWar(actorFactionId, f)).ToList();
+                if (war.Count > 0)
+                    return war[_rng.NextInt(0, war.Count)];
             }
 
             return rivals[_rng.NextInt(0, rivals.Count)];
         }
 
-        private Character? PickQuarrelTarget(Character actor, List<Character> candidates)
+        private Character? PickQuarrelTarget(Character actor, List<Character> candidates, Func<Guid, int> opin)
         {
             var negatives = candidates
-                .Select(c => new { C = c, O = _opinions.GetOpinion(actor.Id, c.Id) })
-                .Where(x => x.O < -25)
+                .Select(c => new { C = c, O = opin(c.Id) })
+                .Where(x => x.O < _cfg.QuarrelOpinionThreshold)
                 .OrderBy(x => x.O)
                 .ToList();
-            if (negatives.Count == 0) return null;
+            if (negatives.Count == 0)
+                return null;
 
-            return negatives[_rng.NextInt(0, Math.Min(3, negatives.Count))].C; // pick one of the worst few
+            return negatives[_rng.NextInt(0, Math.Min(3, negatives.Count))].C;
         }
 
-        private Character? PickAssassinationTarget(Character actor, List<Character> otherFaction)
+        private Character? PickAssassinationTarget(List<Character> otherFaction, Func<Guid, int> opin)
         {
             // Very rare: aim at high-rank enemies with whom the actor has bad blood
-            if (_rng.NextDouble() > _cfg.AssassinateFrequency) return null;
+            if (_rng.NextDouble() > _cfg.AssassinateFrequency)
+                return null;
 
             var pool = otherFaction
-                .Select(c => new { C = c, O = _opinions.GetOpinion(actor.Id, c.Id) })
-                .Where(x => x.O < -50 && x.C.Rank >= Rank.Major)
+                .Select(c => new { C = c, O = opin(c.Id) })
+                .Where(x => x.O < _cfg.AssassinationOpinionThreshold && x.C.Rank >= Rank.Major)
                 .OrderBy(x => x.O)
                 .ToList();
 
@@ -476,14 +524,14 @@ namespace SkyHorizont.Infrastructure.Social
             return pool.First().C;
         }
 
-        private Character? PickSpyCharacter(Character actor, Guid myFactionId, List<Character> candidates)
+        private Character? PickSpyCharacter(Guid actorFactionId, List<Character> candidates, Func<Guid, Guid> fac, Func<Guid, int> opin)
         {
             var pool = candidates
-                .Where(c => _factions.GetFactionIdForCharacter(c.Id) != myFactionId)
+                .Where(c => fac(c.Id) != actorFactionId)
                 .Select(c => new
                 {
                     C = c,
-                    Score = (int)c.Rank * 10 - _opinions.GetOpinion(actor.Id, c.Id) + _rng.NextInt(0, 10)
+                    Score = (int)c.Rank * 10 - opin(c.Id) + _rng.NextInt(0, 10)
                 })
                 .OrderByDescending(x => x.Score)
                 .ToList();
@@ -496,23 +544,24 @@ namespace SkyHorizont.Infrastructure.Social
         private static void AddIfAboveZero(List<ScoredIntent> list, double score, IntentType type,
                                            Guid? targetCharacterId = null, Guid? targetFactionId = null)
         {
-            if (score <= 0) return;
+            if (score <= 0)
+                return;
             list.Add(new ScoredIntent(type, score, targetCharacterId, targetFactionId));
         }
 
-        private static double Map0to100(double v) => Math.Clamp(v, 0, 100) / 1.0;
+        private static double Clamp0to100Map(double v) => Math.Clamp(v, 0, 100);
         private static double Clamp0to100(double v) => v < 0 ? 0 : (v > 100 ? 100 : v);
 
         private sealed record ScoredIntent(IntentType Type, double Score, Guid? TargetCharacterId, Guid? TargetFactionId);
-        
-        private static IEnumerable<CharacterIntent> FilterConflicts(IEnumerable<CharacterIntent> intents, Func<CharacterIntent,double> scoreOf)
+
+        private static IEnumerable<CharacterIntent> FilterConflicts(IEnumerable<CharacterIntent> intents, Func<CharacterIntent, double> scoreOf)
         {
             // simple mutually exclusive sets; tune as needed
             var conflictSets = new[]
             {
                 new HashSet<IntentType>{ IntentType.Court, IntentType.Assassinate },
                 new HashSet<IntentType>{ IntentType.Negotiate, IntentType.Quarrel },
-                new HashSet<IntentType>{ IntentType.Bribe, IntentType.Recruit }, // “push/pull” in same month
+                new HashSet<IntentType>{ IntentType.Bribe, IntentType.Recruit },
             };
 
             var chosen = intents.ToList();
@@ -526,6 +575,68 @@ namespace SkyHorizont.Infrastructure.Social
             }
             return chosen;
         }
+        
+        private List<ScoredIntent> ResolveConflictsTargetAware(Character actor, List<ScoredIntent> candidates, int take, Func<Guid, Guid> fac)
+        {
+            var kept = new List<ScoredIntent>(take);
+            var chosenCharTargets = new HashSet<Guid>();
+            var chosenFactionTargets = new HashSet<Guid>();
+
+            foreach (var si in candidates)
+            {
+                if (kept.Count >= take) break;
+
+                bool conflict = false;
+
+                var tc = si.TargetCharacterId;
+                var tf = si.TargetFactionId;
+
+                if (!conflict && (si.Type == IntentType.Bribe || si.Type == IntentType.Recruit))
+                {
+                    if (tc.HasValue && chosenCharTargets.Contains(tc.Value))
+                        conflict = true;
+                }
+
+                if (!conflict && (si.Type == IntentType.Negotiate || si.Type == IntentType.Quarrel))
+                {
+                    Guid? quarrelFaction = null;
+                    if (si.Type == IntentType.Quarrel && tc.HasValue)
+                        quarrelFaction = fac(tc.Value);
+
+                    var factionTarget = tf ?? quarrelFaction;
+
+                    if (factionTarget.HasValue && chosenFactionTargets.Contains(factionTarget.Value))
+                        conflict = true;
+                }
+
+                if (!conflict &&
+                    (si.Type == IntentType.Assassinate || si.Type == IntentType.Court) &&
+                    tc.HasValue &&
+                    chosenCharTargets.Contains(tc.Value))
+                {
+                    conflict = true;
+                }
+
+                if (!conflict && si.Type == IntentType.Defect && tf.HasValue && chosenFactionTargets.Contains(tf.Value))
+                {
+                    conflict = true;
+                }
+
+                if (!conflict)
+                {
+                    kept.Add(si);
+                    if (tc.HasValue) chosenCharTargets.Add(tc.Value);
+                    if (tf.HasValue) chosenFactionTargets.Add(tf.Value);
+                    if (si.Type == IntentType.Quarrel && si.TargetCharacterId.HasValue)
+                    {
+                        var f = fac(si.TargetCharacterId.Value);
+                        if (f != Guid.Empty) chosenFactionTargets.Add(f);
+                    }
+                }
+            }
+
+            return kept;
+        }
     }
 
     // ───────────────────────── Config ──────────────────────────────
@@ -533,7 +644,6 @@ namespace SkyHorizont.Infrastructure.Social
     {
         public int MaxIntentsPerMonth { get; init; } = 2;
         public double ScoreNoiseMax { get; init; } = 5.0;
-
         public double RomanceWeight { get; init; } = 0.9;
         public double FamilyWeight { get; init; } = 0.7;
         public double SpyWeight { get; init; } = 1.0;
@@ -543,9 +653,13 @@ namespace SkyHorizont.Infrastructure.Social
         public double NegotiateWeight { get; init; } = 0.7;
         public double QuarrelWeight { get; init; } = 0.6;
         public double AssassinateWeight { get; init; } = 0.65;
-
         public int MinBribeBudget { get; init; } = 200;
-        public double AssassinateFrequency { get; init; } = 0.05; // 5% chance to even consider
+        public double AssassinateFrequency { get; init; } = 0.05;
+        public int MaxCandidatePool { get; init; } = 60;
+        public int MaxCrossFactionPool { get; init; } = 40;
+        public int QuarrelOpinionThreshold { get; init; } = -25;
+        public int AssassinationOpinionThreshold { get; init; } = -50;
+        public int ConflictBuffer { get; init; } = 8;
 
         public static PlannerConfig Default => new();
     }

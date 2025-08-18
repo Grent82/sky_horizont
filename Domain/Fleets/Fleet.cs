@@ -20,6 +20,8 @@ namespace SkyHorizont.Domain.Fleets
 
         public IList<Guid> CapturedCharacterIds { get; } = new List<Guid>();
 
+        public IList<Guid> PassengerCharacterIds { get; } = new List<Guid>();
+
         public double AverageFleetSpeed => _ships.Values.Any()
             ? _ships.Values.Average(s => s.Speed)
             : 0;
@@ -99,6 +101,12 @@ namespace SkyHorizont.Domain.Fleets
         }
 
         public void AddCaptured(Guid cmdrId) => CapturedCharacterIds.Add(cmdrId);
+
+        public void RemoveCaptured(Guid cmdrId) => CapturedCharacterIds.Remove(cmdrId);
         public void ClearCapturedAfterResolution() => CapturedCharacterIds.Clear();
+
+        public void AddPassenger(Guid cmdrId) => PassengerCharacterIds.Add(cmdrId);
+        public void RemovePassenger(Guid cmdrId) => PassengerCharacterIds.Remove(cmdrId);
+        public void ClearPassengers() => PassengerCharacterIds.Clear();
     }
 }

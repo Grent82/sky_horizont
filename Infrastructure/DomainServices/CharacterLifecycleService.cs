@@ -48,8 +48,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
         public void ProcessLifecycleTurn()
         {
             var all = _characters.GetAll().ToList();
+            var byId = all.ToDictionary(c => c.Id);
 
-            foreach (var character in _characters.GetAll().ToList())
+            foreach (var character in all)
             {
                 if (!character.IsAlive)
                     continue;
@@ -61,7 +62,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
                     _events.Publish(new BirthdayOccurred(character.Id, _clock.CurrentYear, _clock.CurrentMonth));
                 }
 
-                HandleConception(character, all);
+                HandleConception(character, byId);
 
                 HandlePregnancy(character);
 
@@ -71,13 +72,13 @@ namespace SkyHorizont.Infrastructure.DomainServices
             }
         }
         
-        private void HandleConception(Character potentialMother, List<Character> allChars)
+        private void HandleConception(Character potentialMother, IReadOnlyDictionary<Guid, Character> byId)
         {
             if (potentialMother.Sex != Sex.Female)
                 return;
             if (!potentialMother.IsAlive)
                 return;
-            if (potentialMother.ActivePregnancy is { Status: PregnancyStatus.Active })
+            if (_pregPolicy.IsPostpartumProtected(potentialMother, _clock.CurrentYear, _clock.CurrentMonth))
                 return;
 
             // Find consensual partners: Lovers/Spouse links
@@ -92,23 +93,18 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             foreach (var pid in partnerIds)
             {
-                var partner = _characters.GetById(pid);
-                if (partner is null || !partner.IsAlive)
-                    continue;
-                if (partner.Id == potentialMother.Id)
+                byId.TryGetValue(pid, out var partner);
+                if (partner is null)
                     continue;
 
-                if (partner.Sex != Sex.Male)
-                    continue;
-
-                if (!_loc.AreCoLocated(potentialMother.Id, partner.Id))
+                if (!_pregPolicy.CanConceiveWith(potentialMother, partner, _clock.CurrentYear, _clock.CurrentMonth))
                     continue;
 
                 var chance = ComputeMonthlyConceptionChance(potentialMother, partner);
                 if (_rng.NextDouble() < chance)
                 {
                     potentialMother.StartPregnancy(partner.Id, _clock.CurrentYear, _clock.CurrentMonth);
-                    _events.Publish(new DomainEventLog("Conception", potentialMother.Id, $"Partner={partner.Id}"));
+                    _events.Publish(new DomainEventLog("Conception", potentialMother.Id, $"partner={partner.Id}; year={_clock.CurrentYear}; month={_clock.CurrentMonth}"));
                     break;
                 }
             }
@@ -118,21 +114,14 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             double chance = 0.10; // 10% baseline per month for active couples
 
-            // Age band effects (rough, gamey)
             if (mother.Age < 14)
                 return 0.0;
-            if (mother.Age <= 16)
-                chance += 0.04;
-            if (mother.Age <= 20)
-                chance += 0.02;
-            if (mother.Age <= 28)
-                chance += 0.01;
-            else if (mother.Age <= 34)
-                chance += 0.00;   // baseline
-            else if (mother.Age <= 40)
-                chance -= 0.03;
-            else if (mother.Age <= 45)
-                chance -= 0.06;
+            else if (mother.Age <= 16) chance += 0.04;
+            else if (mother.Age <= 20) chance += 0.02;
+            else if (mother.Age <= 28) chance += 0.01;
+            else if (mother.Age <= 34) chance += 0.00;   // baseline
+            else if (mother.Age <= 40) chance -= 0.03;
+            else if (mother.Age <= 45) chance -= 0.06;
             else chance -= 0.10;
 
             chance += (mother.Personality.Agreeableness - 50) * 0.0008;
@@ -185,6 +174,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 _events.Publish(new ChildBorn(child1.Id, mother.Id, preg.FatherId, _clock.CurrentYear, _clock.CurrentMonth));
                 if (twins)
                     _events.Publish(new ChildBorn(child2!.Id, mother.Id, preg.FatherId, _clock.CurrentYear, _clock.CurrentMonth));
+
+                _pregPolicy.RecordDelivery(mother.Id, _clock.CurrentYear, _clock.CurrentMonth);
             }
         }
 
@@ -221,10 +212,23 @@ namespace SkyHorizont.Infrastructure.DomainServices
             {
                 baby.LinkFamilyMember(father.Id);
                 father.LinkFamilyMember(baby.Id);
+                _characters.Save(father);
             }
+            _characters.Save(mother);
 
             var loc = _loc.GetCharacterLocation(mother.Id);
-            _loc.AddCitizenToPlanet(baby.Id, loc);
+            switch (loc.Kind)
+            {
+                case LocationKind.Planet:
+                    _loc.AddCitizenToPlanet(baby.Id, loc.HostId);
+                    break;
+                case LocationKind.Fleet:
+                    _loc.AddPassengerToFleet(baby.Id, loc.HostId);
+                    break;
+                default:
+                    _loc.StageAtHolding(baby.Id, loc.HostId);
+                    break;
+            }
 
             return baby;
         }
@@ -242,13 +246,20 @@ namespace SkyHorizont.Infrastructure.DomainServices
             if (_rng.NextDouble() < p)
             {
                 character.MarkDead();
+                if (character.Sex == Sex.Female && character.ActivePregnancy is { Status: PregnancyStatus.Active } preg)
+                {
+                    _events.Publish(new DomainEventLog("PregnancyTerminatedByDeath", character.Id, $"Father={preg.FatherId}"));
+                    character.ClearPregnancy();
+                }
             }
         }
         
         private string ExtractSurname(string fullName)
         {
-            var parts = fullName?.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            return (parts is { Length: > 1 }) ? parts[^1] : fullName ?? "Doe";
+            if (string.IsNullOrWhiteSpace(fullName))
+                return "Doe";
+            var parts = fullName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length > 1 ? parts[^1] : parts[0];
         }
     }
 }
