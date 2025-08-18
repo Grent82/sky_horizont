@@ -10,7 +10,9 @@ namespace SkyHorizont.Domain.Social
         DefectionAttempt,
         Negotiation,
         Quarrel,
-        AssassinationAttempt
+        AssassinationAttempt,
+        TortureAttempt,
+        RapeAttempt
     }
 
     public interface ISocialEvent

@@ -1,21 +1,31 @@
 using SkyHorizont.Domain.Entity.Task;
 using SkyHorizont.Domain.Shared;
+using System;
+using System.Collections.Generic;
 
 namespace SkyHorizont.Domain.Entity
 {
+    public enum TraumaType
+    {
+        None,
+        Torture,
+        Rape
+    }
+
     public class Character
     {
         private static readonly Dictionary<Rank, int> MeritThresholds = new()
         {
-            { Rank.Civilian,     0 },
+            { Rank.Civilian, 0 },
             { Rank.Lieutenant, 100 },
-            { Rank.Captain,    300 },
-            { Rank.Major,      700 },
-            { Rank.Colonel,    1500 },
-            { Rank.General,    3000 },
+            { Rank.Captain, 300 },
+            { Rank.Major, 700 },
+            { Rank.Colonel, 1500 },
+            { Rank.General, 3000 },
         };
 
         private int _balance;
+        private readonly List<TraumaType> _traumas = new();
 
         public Guid Id { get; }
         public string Name { get; private set; }
@@ -28,22 +38,21 @@ namespace SkyHorizont.Domain.Entity
         public SkillSet Skills { get; private set; }
         public Rank Rank { get; private set; }
         public int Merit { get; private set; }
-
         public List<CharacterRelationship> Relationships { get; } = new();
-
         public Pregnancy? ActivePregnancy { get; private set; }
-
         private readonly List<Guid> _familyLinkIds = new();
         public IReadOnlyList<Guid> FamilyLinkIds => _familyLinkIds.AsReadOnly();
-
-        public bool IsAssigned => AssignedTask is not null;
+        public bool IsAssigned => AssignedTask != null;
         public EntityTask? AssignedTask { get; private set; }
         public int Balance => _balance;
+        public IReadOnlyList<TraumaType> Traumas => _traumas.AsReadOnly();
 
         public Character(
             Guid id,
             string name,
-            int age, int birthYear, int birthMonth,
+            int age,
+            int birthYear,
+            int birthMonth,
             Sex sex,
             Personality personality,
             SkillSet skills,
@@ -52,18 +61,22 @@ namespace SkyHorizont.Domain.Entity
         {
             Id = id;
             Name = name ?? throw new ArgumentNullException(nameof(name));
-            Age = age;
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Name cannot be empty or whitespace.", nameof(name));
+            Age = age >= 0 ? age : throw new ArgumentException("Age cannot be negative.", nameof(age));
             BirthYear = birthYear;
-            BirthMonth = birthMonth;
+            BirthMonth = birthMonth > 0 && birthMonth <= 12 ? birthMonth : throw new ArgumentException("Birth month must be between 1 and 12.", nameof(birthMonth));
             Sex = sex;
-            Personality = personality;
-            Skills = skills;
+            Personality = personality ?? throw new ArgumentNullException(nameof(personality));
+            Skills = skills ?? throw new ArgumentNullException(nameof(skills));
             Rank = initialRank;
-            Merit = initialMerit;
+            Merit = initialMerit >= 0 ? initialMerit : throw new ArgumentException("Merit cannot be negative.", nameof(initialMerit));
         }
 
         public bool AssignTo(EntityTask task)
         {
+            if (task == null)
+                throw new ArgumentNullException(nameof(task));
             if (IsAssigned)
                 throw new DomainException($"Character {Name} is already assigned to a task.");
 
@@ -83,7 +96,8 @@ namespace SkyHorizont.Domain.Entity
 
         public void GainMerit(int amount)
         {
-            if (amount <= 0) return;
+            if (amount <= 0)
+                return;
 
             Merit += amount;
             while (Merit >= NextMeritThreshold())
@@ -97,11 +111,10 @@ namespace SkyHorizont.Domain.Entity
 
         private void Promote()
         {
-            if (Rank == Rank.Leader) return;
+            if (Rank == Rank.Leader)
+                return;
             Rank = Rank + 1;
-            // Todo: side-effects
-            // ToDo: events? is this thrigth place for promote
-
+            // TODO: Publish promotion event?
         }
 
         public bool CanPerform(TaskType type)
@@ -120,7 +133,8 @@ namespace SkyHorizont.Domain.Entity
 
         public void StartPregnancy(Guid fatherId, int conceptionYear, int conceptionMonth)
         {
-            if (Sex != Sex.Female) throw new DomainException("Only female characters can be pregnant.");
+            if (Sex != Sex.Female)
+                throw new DomainException("Only female characters can be pregnant.");
             if (ActivePregnancy is { Status: PregnancyStatus.Active })
                 throw new DomainException("Already pregnant.");
             ActivePregnancy = Pregnancy.Start(fatherId, conceptionYear, conceptionMonth);
@@ -128,7 +142,8 @@ namespace SkyHorizont.Domain.Entity
 
         public void EndPregnancy(PregnancyStatus status)
         {
-            if (ActivePregnancy is null) return;
+            if (ActivePregnancy == null)
+                return;
             ActivePregnancy = ActivePregnancy.WithStatus(status);
         }
 
@@ -136,23 +151,38 @@ namespace SkyHorizont.Domain.Entity
 
         #endregion
 
+        public void ApplyTrauma(TraumaType trauma)
+        {
+            if (trauma != TraumaType.None && !_traumas.Contains(trauma))
+                _traumas.Add(trauma);
+        }
+
+        public bool HasTrauma(TraumaType trauma) => _traumas.Contains(trauma);
+
         public void IncreaseAge() => Age++;
+
         public void MarkDead() => IsAlive = false;
 
         public void LinkFamilyMember(Guid otherId)
         {
+            if (otherId == Guid.Empty)
+                throw new ArgumentException("Family member ID cannot be empty.", nameof(otherId));
             if (otherId != Id && !_familyLinkIds.Contains(otherId))
                 _familyLinkIds.Add(otherId);
         }
 
         public void AddRelationship(Guid otherCharacterId, RelationshipType type)
         {
+            if (otherCharacterId == Guid.Empty)
+                throw new ArgumentException("Other character ID cannot be empty.", nameof(otherCharacterId));
             if (!Relationships.Any(r => r.TargetCharacterId == otherCharacterId))
                 Relationships.Add(new CharacterRelationship(otherCharacterId, type));
         }
 
         public void RemoveRelationship(Guid otherCharacterId)
         {
+            if (otherCharacterId == Guid.Empty)
+                throw new ArgumentException("Other character ID cannot be empty.", nameof(otherCharacterId));
             Relationships.RemoveAll(r => r.TargetCharacterId == otherCharacterId);
         }
 
@@ -161,7 +191,8 @@ namespace SkyHorizont.Domain.Entity
             if (!IsAssigned)
                 throw new DomainException("No task to complete.");
             AssignedTask = null;
-            if (success) GainMerit(meritReward);
+            if (success)
+                GainMerit(meritReward);
         }
 
         public double GetAttackBonus()
@@ -178,11 +209,19 @@ namespace SkyHorizont.Domain.Entity
 
         public override string ToString() => $"{Name} (Rank: {Rank}, Merit: {Merit})";
 
-        public void Credit(int amount) => _balance += amount;
+        public void Credit(int amount)
+        {
+            if (amount < 0)
+                throw new ArgumentException("Credit amount cannot be negative.", nameof(amount));
+            _balance += amount;
+        }
 
         public bool Deduct(int amount)
         {
-            if (_balance < amount) return false;
+            if (amount < 0)
+                throw new ArgumentException("Deduct amount cannot be negative.", nameof(amount));
+            if (_balance < amount)
+                return false;
             _balance -= amount;
             return true;
         }

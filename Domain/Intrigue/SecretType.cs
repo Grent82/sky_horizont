@@ -8,6 +8,9 @@ namespace SkyHorizont.Domain.Intrigue
         Infidelity,
         TreasonousContact,
         AssassinationPlot,
-        PersonalInformation
+        PersonalInformation,
+        RapeIncident,
+        TortureAttempt,
+        RapeAttempt
     }
 }

@@ -3,6 +3,7 @@ using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Intrigue;
 using SkyHorizont.Domain.Services;
+using SkyHorizont.Domain.Shared;
 using SkyHorizont.Domain.Social;
 
 namespace SkyHorizont.Infrastructure.Social
@@ -19,6 +20,7 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly ISecretsRepository _secrets;
         private readonly IRandomService _rng;
         private readonly IDiplomacyService _diplomacy;
+        private readonly IEventBus _events;
 
         public InteractionResolver(
             ICharacterRepository characters,
@@ -26,51 +28,51 @@ namespace SkyHorizont.Infrastructure.Social
             IFactionService factions,
             ISecretsRepository secrets,
             IRandomService rng,
-            IDiplomacyService diplomacy)
+            IDiplomacyService diplomacy,
+            IEventBus events)
         {
-            _chars = characters;
-            _opinions = opinions;
-            _factions = factions;
-            _secrets = secrets;
-            _rng = rng;
-            _diplomacy = diplomacy;
+            _chars = characters ?? throw new ArgumentNullException(nameof(characters));
+            _opinions = opinions ?? throw new ArgumentNullException(nameof(opinions));
+            _factions = factions ?? throw new ArgumentNullException(nameof(factions));
+            _secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
+            _rng = rng ?? throw new ArgumentNullException(nameof(rng));
+            _diplomacy = diplomacy ?? throw new ArgumentNullException(nameof(diplomacy));
+            _events = events ?? throw new ArgumentNullException(nameof(events));
         }
 
         public IEnumerable<ISocialEvent> Resolve(CharacterIntent intent, int currentYear, int currentMonth)
         {
+            if (intent == null)
+                return Array.Empty<ISocialEvent>();
+
             var actor = _chars.GetById(intent.ActorId);
-            if (actor is null || !actor.IsAlive)
+            if (actor == null || !actor.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
             switch (intent.Type)
             {
                 case IntentType.Court:
                     return ResolveCourt(actor, intent, currentYear, currentMonth);
-
                 case IntentType.VisitFamily:
                     return ResolveVisitFamily(actor, intent, currentYear, currentMonth);
-
                 case IntentType.Spy:
                     return ResolveSpy(actor, intent, currentYear, currentMonth);
-
                 case IntentType.Bribe:
                     return ResolveBribe(actor, intent, currentYear, currentMonth);
-
                 case IntentType.Recruit:
                     return ResolveRecruit(actor, intent, currentYear, currentMonth);
-
                 case IntentType.Defect:
                     return ResolveDefect(actor, intent, currentYear, currentMonth);
-
                 case IntentType.Negotiate:
                     return ResolveNegotiate(actor, intent, currentYear, currentMonth);
-
-                //case IntentType.Quarrel:
-                //    return ResolveQuarrel(actor, intent, currentYear, currentMonth);
-
+                case IntentType.Quarrel:
+                    return ResolveQuarrel(actor, intent, currentYear, currentMonth);
                 case IntentType.Assassinate:
                     return ResolveAssassinate(actor, intent, currentYear, currentMonth);
-
+                case IntentType.TorturePrisoner:
+                    return ResolveTorture(actor, intent, currentYear, currentMonth);
+                case IntentType.RapePrisoner:
+                    return ResolveRape(actor, intent, currentYear, currentMonth);
                 default:
                     return Array.Empty<ISocialEvent>();
             }
@@ -79,19 +81,18 @@ namespace SkyHorizont.Infrastructure.Social
         #region Courtship
         private IEnumerable<ISocialEvent> ResolveCourt(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
-            if (intent.TargetCharacterId is null)
+            if (!intent.TargetCharacterId.HasValue)
                 return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
-            if (target is null || !target.IsAlive)
+            if (target == null || !target.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
             var compat = actor.Personality.CheckCompatibility(target.Personality); // 0..100
             var baseChance = 0.25 + compat / 300.0; // ~0.25..0.58
-            baseChance += (actor.Personality.Extraversion - 50) * 0.002; // +/– 0.1
+            baseChance += (actor.Personality.Extraversion - 50) * 0.002; // +/- 0.1
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
 
-            // Opinion deltas
             var deltaActorToTarget = success ? +4 : -2;
             var deltaTargetToActor = success ? +6 : -3;
 
@@ -113,7 +114,6 @@ namespace SkyHorizont.Infrastructure.Social
                 success ? "Shared time and chemistry." : "It didn’t land."
             );
 
-            // If already lovers/spouses, keep relationship warm
             if (success && !actor.Relationships.Any(r => r.TargetCharacterId == target.Id))
             {
                 actor.AddRelationship(target.Id, RelationshipType.Lover);
@@ -127,16 +127,18 @@ namespace SkyHorizont.Infrastructure.Social
         #region VisitFamily
         private IEnumerable<ISocialEvent> ResolveVisitFamily(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
-            if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
+            if (!intent.TargetCharacterId.HasValue)
+                return Array.Empty<ISocialEvent>();
             var relative = _chars.GetById(intent.TargetCharacterId.Value);
-            if (relative is null || !relative.IsAlive) return Array.Empty<ISocialEvent>();
+            if (relative == null || !relative.IsAlive)
+                return Array.Empty<ISocialEvent>();
 
             var pleasantness = 0.4
                 + (actor.Personality.Agreeableness - 50) * 0.003
                 + (actor.Personality.Conscientiousness - 50) * 0.002;
             var success = _rng.NextDouble() < Clamp01(pleasantness);
 
-            var delta = success ? +5 : +1; // even awkward visits help a bit
+            var delta = success ? +5 : +1; // Even awkward visits help a bit
             _opinions.AdjustOpinion(actor.Id, relative.Id, delta, "Family time");
             _opinions.AdjustOpinion(relative.Id, actor.Id, delta, "Family time");
 
@@ -149,7 +151,8 @@ namespace SkyHorizont.Infrastructure.Social
                 relative.Id,
                 null,
                 success,
-                delta, delta,
+                delta,
+                delta,
                 Array.Empty<Guid>(),
                 success ? "A warm reunion." : "A brief check-in."
             );
@@ -161,7 +164,8 @@ namespace SkyHorizont.Infrastructure.Social
         #region Spy
         private IEnumerable<ISocialEvent> ResolveSpy(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
-            if (intent.TargetFactionId is null) return Array.Empty<ISocialEvent>();
+            if (!intent.TargetFactionId.HasValue && !intent.TargetCharacterId.HasValue)
+                return Array.Empty<ISocialEvent>();
 
             var intel = actor.Skills.Intelligence; // 0..100
             var baseChance = 0.2 + intel / 200.0; // 0.2..0.7
@@ -188,7 +192,8 @@ namespace SkyHorizont.Infrastructure.Social
                         intent.TargetCharacterId.Value,
                         null,
                         severity,
-                        currentYear, currentMonth);
+                        currentYear,
+                        currentMonth);
                 }
                 else
                 {
@@ -199,7 +204,8 @@ namespace SkyHorizont.Infrastructure.Social
                         null,
                         intent.TargetFactionId,
                         severity,
-                        currentYear, currentMonth);
+                        currentYear,
+                        currentMonth);
                 }
 
                 _secrets.Add(secret);
@@ -210,7 +216,6 @@ namespace SkyHorizont.Infrastructure.Social
             }
             else
             {
-                // failure → slight suspicion on actor by random enemy character (optional: do nothing)
                 notes = "Operation compromised or yielded nothing.";
             }
 
@@ -220,7 +225,7 @@ namespace SkyHorizont.Infrastructure.Social
                 currentMonth,
                 SocialEventType.EspionageOperation,
                 actor.Id,
-                null,
+                intent.TargetCharacterId,
                 intent.TargetFactionId,
                 success,
                 0,
@@ -236,18 +241,20 @@ namespace SkyHorizont.Infrastructure.Social
         #region Bribe
         private IEnumerable<ISocialEvent> ResolveBribe(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
-            if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
+            if (!intent.TargetCharacterId.HasValue)
+                return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
-            if (target is null || !target.IsAlive) return Array.Empty<ISocialEvent>();
+            if (target == null || !target.IsAlive)
+                return Array.Empty<ISocialEvent>();
 
             var corruptibility = (100 - target.Personality.Conscientiousness + 100 - target.Personality.Agreeableness) / 200.0; // 0..1
-            var baseChance = 0.15 + corruptibility * 0.6; // up to ~0.75
+            var baseChance = 0.15 + corruptibility * 0.6; // Up to ~0.75
             baseChance += (actor.Personality.Extraversion - 50) * 0.002;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
 
-            int deltaActorToTarget = success ? +3 : -5;
-            int deltaTargetToActor = success ? +8 : -10;
+            var deltaActorToTarget = success ? +3 : -5;
+            var deltaTargetToActor = success ? +8 : -10;
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, success ? "Successful bribe" : "Bribe rebuffed");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Took the money" : "Offended by bribe");
@@ -255,7 +262,6 @@ namespace SkyHorizont.Infrastructure.Social
             var secrets = new List<Guid>();
             if (success)
             {
-                // Create corruption secret about target
                 var secret = new Secret(
                     Guid.NewGuid(),
                     SecretType.Corruption,
@@ -263,7 +269,8 @@ namespace SkyHorizont.Infrastructure.Social
                     target.Id,
                     null,
                     60 + _rng.NextInt(0, 25),
-                    currentYear, currentMonth);
+                    currentYear,
+                    currentMonth);
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
             }
@@ -290,9 +297,11 @@ namespace SkyHorizont.Infrastructure.Social
         #region Recruit
         private IEnumerable<ISocialEvent> ResolveRecruit(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
-            if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
+            if (!intent.TargetCharacterId.HasValue)
+                return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
-            if (target is null || !target.IsAlive) return Array.Empty<ISocialEvent>();
+            if (target == null || !target.IsAlive)
+                return Array.Empty<ISocialEvent>();
 
             var pitch = 0.25
                 + (actor.Personality.Agreeableness - 50) * 0.002
@@ -301,8 +310,8 @@ namespace SkyHorizont.Infrastructure.Social
 
             var success = _rng.NextDouble() < Clamp01(pitch);
 
-            int deltaActorToTarget = success ? +5 : -2;
-            int deltaTargetToActor = success ? +6 : -4;
+            var deltaActorToTarget = success ? +5 : -2;
+            var deltaTargetToActor = success ? +6 : -4;
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, success ? "Effective recruitment talk" : "Rejected recruitment");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Motivated by recruiter" : "Annoyed by recruiter");
@@ -329,10 +338,12 @@ namespace SkyHorizont.Infrastructure.Social
         #region Defect
         private IEnumerable<ISocialEvent> ResolveDefect(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
-            if (intent.TargetFactionId is null) return Array.Empty<ISocialEvent>();
+            if (!intent.TargetFactionId.HasValue)
+                return Array.Empty<ISocialEvent>();
 
             var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
-            if (myFaction == Guid.Empty) return Array.Empty<ISocialEvent>();
+            if (myFaction == Guid.Empty)
+                return Array.Empty<ISocialEvent>();
 
             var myLeader = _factions.GetLeaderId(myFaction);
             var dislikeLeader = myLeader.HasValue ? Math.Max(0, -_opinions.GetOpinion(actor.Id, myLeader.Value)) : 0; // 0..100
@@ -344,7 +355,6 @@ namespace SkyHorizont.Infrastructure.Social
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
 
-            // Deltas: actor vs leader/faction could be handled elsewhere; here we just log event
             var ev = new SocialEvent(
                 Guid.NewGuid(),
                 currentYear,
@@ -367,7 +377,8 @@ namespace SkyHorizont.Infrastructure.Social
         #region Negotiate
         private IEnumerable<ISocialEvent> ResolveNegotiate(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
-            if (intent.TargetFactionId is null) return Array.Empty<ISocialEvent>();
+            if (!intent.TargetFactionId.HasValue)
+                return Array.Empty<ISocialEvent>();
             var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
 
             var baseChance = 0.2
@@ -377,7 +388,8 @@ namespace SkyHorizont.Infrastructure.Social
 
             bool atWar = _factions.IsAtWar(myFaction, intent.TargetFactionId.Value);
 
-            if (atWar) baseChance += 0.0;
+            if (atWar)
+                baseChance += 0.0;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
 
@@ -396,7 +408,8 @@ namespace SkyHorizont.Infrastructure.Social
                 null,
                 intent.TargetFactionId,
                 success,
-                0, 0,
+                0,
+                0,
                 Array.Empty<Guid>(),
                 success ? "Talks progressed." : "Talks stalled."
             );
@@ -408,9 +421,11 @@ namespace SkyHorizont.Infrastructure.Social
         #region Quarrel
         private IEnumerable<ISocialEvent> ResolveQuarrel(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
-            if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
+            if (!intent.TargetCharacterId.HasValue)
+                return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
-            if (target is null || !target.IsAlive) return Array.Empty<ISocialEvent>();
+            if (target == null || !target.IsAlive)
+                return Array.Empty<ISocialEvent>();
 
             var heat = 0.4
                 + (actor.Personality.Neuroticism - 50) * 0.003
@@ -447,22 +462,23 @@ namespace SkyHorizont.Infrastructure.Social
         #region Assassinate
         private IEnumerable<ISocialEvent> ResolveAssassinate(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
         {
-            if (intent.TargetCharacterId is null) return Array.Empty<ISocialEvent>();
+            if (!intent.TargetCharacterId.HasValue)
+                return Array.Empty<ISocialEvent>();
             var target = _chars.GetById(intent.TargetCharacterId.Value);
-            if (target is null || !target.IsAlive) return Array.Empty<ISocialEvent>();
+            if (target == null || !target.IsAlive)
+                return Array.Empty<ISocialEvent>();
 
             var baseChance = 0.05
-                + actor.Skills.Military / 150.0   // up to ~0.71
+                + actor.Skills.Military / 150.0 // Up to ~0.71
                 + (actor.Personality.Neuroticism - 50) * 0.002
                 + (actor.Personality.Extraversion - 50) * 0.001;
 
-            baseChance -= (target.Rank - actor.Rank) * 0.02; // harder if target outranks you
+            baseChance -= (target.Rank - actor.Rank) * 0.02; // Harder if target outranks
             var success = _rng.NextDouble() < Clamp01(baseChance);
 
             var secrets = new List<Guid>();
             if (!success)
             {
-                // Plot unveiled as a secret if botched
                 var secret = new Secret(
                     Guid.NewGuid(),
                     SecretType.AssassinationPlot,
@@ -470,13 +486,13 @@ namespace SkyHorizont.Infrastructure.Social
                     actor.Id,
                     null,
                     70 + _rng.NextInt(0, 20),
-                    currentYear, currentMonth);
+                    currentYear,
+                    currentMonth);
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
             }
             else
             {
-                // Mark target dead (domain rule)
                 target.MarkDead();
                 _chars.Save(target);
             }
@@ -490,7 +506,8 @@ namespace SkyHorizont.Infrastructure.Social
                 target.Id,
                 null,
                 success,
-                0, 0,
+                0,
+                0,
                 secrets,
                 success ? "Target eliminated." : "Attempt failed; whispers spread."
             );
@@ -499,12 +516,180 @@ namespace SkyHorizont.Infrastructure.Social
         }
         #endregion
 
+        #region Torture
+        private IEnumerable<ISocialEvent> ResolveTorture(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        {
+            if (!intent.TargetCharacterId.HasValue)
+                return Array.Empty<ISocialEvent>();
+            var target = _chars.GetById(intent.TargetCharacterId.Value);
+            if (target == null || !target.IsAlive)
+                return Array.Empty<ISocialEvent>();
 
+            var baseChance = 0.3
+                + actor.Skills.Military / 200.0 // Up to ~0.8
+                + (50 - actor.Personality.Agreeableness) * 0.003
+                + (actor.Personality.Conscientiousness - 50) * 0.002;
+
+            baseChance -= (target.Rank - actor.Rank) * 0.01; // Harder if target outranks
+            var success = _rng.NextDouble() < Clamp01(baseChance);
+
+            var secrets = new List<Guid>();
+            string notes;
+
+            if (success)
+            {
+                // Gain intelligence secret
+                var secret = new Secret(
+                    Guid.NewGuid(),
+                    SecretType.PersonalInformation,
+                    $"Interrogation of {target.Name} yielded sensitive information.",
+                    target.Id,
+                    null,
+                    60 + _rng.NextInt(0, 30),
+                    currentYear,
+                    currentMonth);
+                _secrets.Add(secret);
+                secrets.Add(secret.Id);
+                notes = "Torture yielded valuable information.";
+
+                // Apply opinion penalties
+                _opinions.AdjustOpinion(actor.Id, target.Id, -10, "Tortured prisoner");
+                _opinions.AdjustOpinion(target.Id, actor.Id, -20, "Victim of torture");
+
+                // ToDo: Apply trauma to target (increase mortality risk, handled in CharacterLifecycleService)
+                //target.ApplyTrauma(TraumaType.Torture); 
+                _chars.Save(target);
+            }
+            else
+            {
+                // Failed torture creates a secret about the attempt
+                var secret = new Secret(
+                    Guid.NewGuid(),
+                    SecretType.TortureAttempt,
+                    $"{actor.Name} attempted to torture {target.Name}.",
+                    actor.Id,
+                    null,
+                    50 + _rng.NextInt(0, 20),
+                    currentYear,
+                    currentMonth);
+                _secrets.Add(secret);
+                secrets.Add(secret.Id);
+                notes = "Torture attempt failed; rumors spread.";
+            }
+
+            var ev = new SocialEvent(
+                Guid.NewGuid(),
+                currentYear,
+                currentMonth,
+                SocialEventType.TortureAttempt,
+                actor.Id,
+                target.Id,
+                null,
+                success,
+                success ? -10 : 0,
+                success ? -20 : 0,
+                secrets,
+                notes
+            );
+
+            return new[] { ev };
+        }
+        #endregion
+
+        #region Rape
+        private IEnumerable<ISocialEvent> ResolveRape(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        {
+            if (!intent.TargetCharacterId.HasValue)
+                return Array.Empty<ISocialEvent>();
+            var target = _chars.GetById(intent.TargetCharacterId.Value);
+            if (target == null || !target.IsAlive)
+                return Array.Empty<ISocialEvent>();
+
+            var baseChance = 0.2
+                + (50 - actor.Personality.Agreeableness) * 0.004
+                + (50 - actor.Personality.Conscientiousness) * 0.003
+                + (int)actor.Rank * 0.02;
+
+            var success = _rng.NextDouble() < Clamp01(baseChance);
+
+            var secrets = new List<Guid>();
+            string notes;
+
+            if (success)
+            {
+                // Create secret about the act
+                var secret = new Secret(
+                    Guid.NewGuid(),
+                    SecretType.RapeIncident,
+                    $"{actor.Name} committed a heinous act against {target.Name}.",
+                    actor.Id,
+                    null,
+                    80 + _rng.NextInt(0, 15),
+                    currentYear,
+                    currentMonth);
+                _secrets.Add(secret);
+                secrets.Add(secret.Id);
+                notes = "Act committed; grave consequences loom.";
+
+                // Apply severe opinion penalties
+                _opinions.AdjustOpinion(actor.Id, target.Id, -15, "Committed rape");
+                _opinions.AdjustOpinion(target.Id, actor.Id, -30, "Victim of rape");
+
+                // ToDo: Apply trauma to target
+                //target.ApplyTrauma(TraumaType.Rape);
+                _chars.Save(target);
+
+                // If target is female and of fertile age, initiate non-consensual conception
+                if (target.Sex == Sex.Female && target.Age >= 14 && target.Age <= 45)
+                {
+                    target.StartPregnancy(actor.Id, currentYear, currentMonth);
+                    _chars.Save(target);
+                    _events.Publish(new DomainEventLog("NonConsensualConception", target.Id, $"perpetrator={actor.Id}; year={currentYear}; month={currentMonth}"));
+                }
+            }
+            else
+            {
+                // Failed attempt creates a secret
+                var secret = new Secret(
+                    Guid.NewGuid(),
+                    SecretType.RapeAttempt,
+                    $"{actor.Name} attempted to assault {target.Name}.",
+                    actor.Id,
+                    null,
+                    60 + _rng.NextInt(0, 20),
+                    currentYear,
+                    currentMonth);
+                _secrets.Add(secret);
+                secrets.Add(secret.Id);
+                notes = "Attempt failed; whispers spread.";
+            }
+
+            var ev = new SocialEvent(
+                Guid.NewGuid(),
+                currentYear,
+                currentMonth,
+                SocialEventType.RapeAttempt,
+                actor.Id,
+                target.Id,
+                null,
+                success,
+                success ? -15 : 0,
+                success ? -30 : 0,
+                secrets,
+                notes
+            );
+
+            return new[] { ev };
+        }
+        #endregion
+
+        #region Helpers
         private static double Clamp01(double v) => v < 0 ? 0 : (v > 1 ? 1 : v);
-        
+
         private TreatyType ChooseTreatyType(Character actor, Guid myFactionId, Guid targetFactionId, bool atWar)
         {
-            if (atWar) return TreatyType.Ceasefire;
+            if (atWar)
+                return TreatyType.Ceasefire;
 
             var p = actor.Personality;
 
@@ -513,7 +698,7 @@ namespace SkyHorizont.Infrastructure.Social
                 + actor.Skills.Military * 0.20
                 + (PersonalityTraits.Assertive(p) ? 10 : 0)
                 + (PersonalityTraits.ThrillSeeker(p) ? 5 : 0)
-                - (p.Agreeableness - 50) * 0.10;  // less agreeable → more force‑bloc leaning
+                - (p.Agreeableness - 50) * 0.10;
 
             double tradeScore =
                 20
@@ -537,15 +722,14 @@ namespace SkyHorizont.Infrastructure.Social
 
             var best = new[]
             {
-                (TreatyType.Alliance,      allianceScore),
-                (TreatyType.Trade,         tradeScore),
-                (TreatyType.ResearchPact,  researchScore),
+                (TreatyType.Alliance, allianceScore),
+                (TreatyType.Trade, tradeScore),
+                (TreatyType.ResearchPact, researchScore),
                 (TreatyType.NonAggression, napScore)
             }.OrderByDescending(t => t.Item2).First().Item1;
 
             return best;
         }
-
-
+        #endregion
     }
 }
