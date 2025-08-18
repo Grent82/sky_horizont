@@ -27,20 +27,22 @@ namespace SkyHorizont.Tests.Common
             var secrets = new SecretsRepository(new InMemorySecretsDbContext());
             var diplomacies = new DiplomacyRepository(new InMemoryDiplomacyDbContext());
             var socialLog = new InMemorySocialEventLog();
+            var events = new InMemoryEventBus();
 
             var clock = new GameClockService(3001, 1, 12);
             var rng = new RandomService(12345);
-            var mortality = new GompertzMortalityModel(); // your test implementation
-            var nameGen = new NameGenerator(rng);     // you already have this
-            var inherit = new SimplePersonalityInheritanceService(rng); // your implementation
-            var pregPolicy = new DefaultPregnancyPolicy(rng);     // your implementation
-            var skillInh = new SimpleSkillInheritanceService(); // your implementation
+            var mortality = new GompertzMortalityModel();
+            var nameGen = new NameGenerator(rng);
+            var inherit = new SimplePersonalityInheritanceService(rng);
             var loc = new LocationService(planets, fleets);
-            var bus = new InMemoryEventBus();              // your test event bus
+            var pregPolicy = new DefaultPregnancyPolicy(rng, opinions, loc);
+            var skillInh = new SimpleSkillInheritanceService();
+            
+            var bus = new InMemoryEventBus();
             var faction = new FactionService(factions);
-            var planner = new IntentPlanner(characters, opinions, faction, rng);
+            var planner = new IntentPlanner(characters, opinions, faction, rng, planets, fleets);
             var diplomacy = new DiplomacyService(diplomacies, faction, clock, opinions);
-            var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy);
+            var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy, events);
 
             var lifecycle = new CharacterLifecycleService(
                 characters, lineage, clock, rng, mortality, nameGen,

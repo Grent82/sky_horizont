@@ -217,7 +217,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _characters.Save(mother);
 
             var loc = _loc.GetCharacterLocation(mother.Id);
-            switch (loc.Kind)
+            switch (loc!.Kind)
             {
                 case LocationKind.Planet:
                     _loc.AddCitizenToPlanet(baby.Id, loc.HostId);
