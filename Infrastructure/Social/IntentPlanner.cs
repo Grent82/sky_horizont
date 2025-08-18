@@ -29,16 +29,16 @@ namespace SkyHorizont.Infrastructure.Social
             IOpinionRepository opinions,
             IFactionService factions,
             IRandomService rng,
-            IPlanetRepository planets, // Added
-            IFleetRepository fleets, // Added
+            IPlanetRepository planets,
+            IFleetRepository fleets,
             PlannerConfig? config = null)
         {
-            _chars = characters;
-            _opinions = opinions;
-            _factions = factions;
-            _rng = rng;
-            _planets = planets;
-            _fleets = fleets;
+            _chars = characters ?? throw new ArgumentNullException(nameof(characters));
+            _opinions = opinions ?? throw new ArgumentNullException(nameof(opinions));
+            _factions = factions ?? throw new ArgumentNullException(nameof(factions));
+            _rng = rng ?? throw new ArgumentNullException(nameof(rng));
+            _planets = planets ?? throw new ArgumentNullException(nameof(planets));
+            _fleets = fleets ?? throw new ArgumentNullException(nameof(fleets));
             _cfg = config ?? PlannerConfig.Default;
         }
 
