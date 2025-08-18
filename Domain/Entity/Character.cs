@@ -114,7 +114,7 @@ namespace SkyHorizont.Domain.Entity
             if (Rank == Rank.Leader)
                 return;
             Rank = Rank + 1;
-            // TODO: Publish promotion event?
+            // TODO: better promotion logic and Publish promotion event?
         }
 
         public bool CanPerform(TaskType type)
