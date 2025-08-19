@@ -2,16 +2,11 @@ using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Social;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Factions;
-using SkyHorizont.Domain.Galaxy.Planet; // Added for IPlanetRepository
-using SkyHorizont.Domain.Fleets; // Added for IFleetRepository
+using SkyHorizont.Domain.Galaxy.Planet;
+using SkyHorizont.Domain.Fleets;
 
 namespace SkyHorizont.Infrastructure.Social
 {
-    /// <summary>
-    /// Utility-based monthly intent planner. 
-    /// Produces 0..2 intents per character, based on personality, skills, relationships,
-    /// opinions, rank, and faction context.
-    /// </summary>
     public sealed class IntentPlanner : IIntentPlanner
     {
         private readonly ICharacterRepository _chars;
@@ -20,8 +15,6 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly IRandomService _rng;
         private readonly IPlanetRepository _planets;
         private readonly IFleetRepository _fleets;
-
-        // Tuning knobs (0..100 style target values; scores roughly 0..100 range)
         private readonly PlannerConfig _cfg;
 
         public IntentPlanner(
@@ -48,7 +41,6 @@ namespace SkyHorizont.Infrastructure.Social
             if (!actor.IsAlive || actor.IsAssigned || actor.Age < 13)
                 return Enumerable.Empty<CharacterIntent>();
 
-            // Basic context
             var actorFactionId = _factions.GetFactionIdForCharacter(actor.Id);
             var actorLeaderId = actorFactionId != Guid.Empty ? _factions.GetLeaderId(actorFactionId) : null;
             var opinionCache = new Dictionary<Guid, int>(32);
@@ -63,22 +55,16 @@ namespace SkyHorizont.Infrastructure.Social
                     ? f
                     : (factionCache[charId] = _factions.GetFactionIdForCharacter(charId));
 
-            // Gather potential targets (characters, captives)
             var (sameFaction, otherFaction, captives) = SelectRelevantCharacters(actor, actorFactionId, GetFactionForCharacter, GetOpinionOfCharacter);
 
-            // ── Score core intents ─────────────────────────────────────────────
-
-            // Courtship / Maintain romance
             var romanticTarget = PickRomanticTarget(actor, sameFaction, GetFactionForCharacter, GetOpinionOfCharacter);
             if (romanticTarget != null)
                 AddIfAboveZero(intents, ScoreCourtship(actor, romanticTarget, GetOpinionOfCharacter), IntentType.Court, romanticTarget.Id);
 
-            // Visit family (keeps ties warm)
             var familyTarget = PickFamilyTarget(actor, GetOpinionOfCharacter);
             if (familyTarget.HasValue)
                 AddIfAboveZero(intents, ScoreVisitFamily(actor, familyTarget.Value, GetOpinionOfCharacter), IntentType.VisitFamily, familyTarget.Value);
 
-            // Spy (enemy or rival)
             var spyTargetFaction = PickSpyFaction(actorFactionId);
             if (spyTargetFaction != Guid.Empty)
                 AddIfAboveZero(intents, ScoreSpy(actor), IntentType.Spy, null, spyTargetFaction);
@@ -87,12 +73,10 @@ namespace SkyHorizont.Infrastructure.Social
             if (spyTargetChar != null)
                 AddIfAboveZero(intents, ScoreSpy(actor), IntentType.Spy, spyTargetChar.Id, null);
 
-            // Bribe (swing neutral or enemy asset)
             var bribeTarget = PickBribeTarget(otherFaction, GetOpinionOfCharacter);
             if (bribeTarget != null)
                 AddIfAboveZero(intents, ScoreBribe(actor, bribeTarget, actorFactionId, GetFactionForCharacter), IntentType.Bribe, bribeTarget.Id);
 
-            // Recruit (leaders/commanders recruiting sub-commanders)
             if (IsRecruiter(actor))
             {
                 var recruitTarget = PickRecruitTarget(actorFactionId, otherFaction, GetFactionForCharacter);
@@ -100,7 +84,6 @@ namespace SkyHorizont.Infrastructure.Social
                     AddIfAboveZero(intents, ScoreRecruit(actor, recruitTarget, actorFactionId, GetFactionForCharacter), IntentType.Recruit, recruitTarget.Id);
             }
 
-            // Defect (if hates leader / wooed by enemy)
             if (actorLeaderId.HasValue)
             {
                 var defectTargetFaction = PickDefectionFaction(actorFactionId);
@@ -108,35 +91,28 @@ namespace SkyHorizont.Infrastructure.Social
                     AddIfAboveZero(intents, ScoreDefect(actor, actorLeaderId.Value, actorFactionId, defectTargetFaction, GetOpinionOfCharacter), IntentType.Defect, null, defectTargetFaction);
             }
 
-            // Negotiate (diplomatic outreach)
             var negotiateTargetFaction = PickNegotiateFaction(actor, actorFactionId);
             if (negotiateTargetFaction != Guid.Empty)
                 AddIfAboveZero(intents, ScoreNegotiate(actor, actorFactionId, negotiateTargetFaction), IntentType.Negotiate, null, negotiateTargetFaction);
 
-            // Quarrel (pick fight with rival/enemy)
             var quarrelTarget = PickQuarrelTarget(actor, otherFaction, GetOpinionOfCharacter);
             if (quarrelTarget != null)
                 AddIfAboveZero(intents, ScoreQuarrel(actor, quarrelTarget, GetOpinionOfCharacter), IntentType.Quarrel, quarrelTarget.Id);
 
-            // Assassinate (very rare, high stakes)
             var assassinateTarget = PickAssassinationTarget(otherFaction, GetOpinionOfCharacter);
             if (assassinateTarget != null)
                 AddIfAboveZero(intents, ScoreAssassinate(actor, assassinateTarget, actorFactionId, GetFactionForCharacter, GetOpinionOfCharacter), IntentType.Assassinate, assassinateTarget.Id);
 
-            // Torture prisoner for information
             var tortureTarget = PickTortureTarget(captives, GetOpinionOfCharacter);
             if (tortureTarget != null)
                 AddIfAboveZero(intents, ScoreTorture(actor, tortureTarget, actorFactionId, GetFactionForCharacter, GetOpinionOfCharacter), IntentType.TorturePrisoner, tortureTarget.Id);
 
-            // Rape prisoner
             var rapeTarget = PickRapeTarget(captives, GetOpinionOfCharacter);
             if (rapeTarget != null)
                 AddIfAboveZero(intents, ScoreRape(actor, rapeTarget, actorFactionId, GetFactionForCharacter, GetOpinionOfCharacter), IntentType.RapePrisoner, rapeTarget.Id);
 
-            // ── Pick top N with a little exploration randomness ────────────────
             if (intents.Count == 0) return Enumerable.Empty<CharacterIntent>();
 
-            // Add small noise to avoid deterministic ties
             intents = intents
                 .Select(si => new ScoredIntent(
                     si.Type,
@@ -155,19 +131,17 @@ namespace SkyHorizont.Infrastructure.Social
                 .ToList();
         }
 
-        // ────────────────────────── Scoring ──────────────────────────
-
         private double ScoreCourtship(Character actor, Character target, Func<Guid, int> opin)
         {
-            var opinion = opin(target.Id);   // -100..+100
-            var compat = actor.Personality.CheckCompatibility(target.Personality); // 0..100
+            var opinion = opin(target.Id);
+            var compat = actor.Personality.CheckCompatibility(target.Personality);
             var baseScore = 0.0;
 
             baseScore += Clamp0to100Map(compat);
             baseScore += Clamp0to100Map(Math.Max(0, opinion + 50));
 
-            if (PersonalityTraits.Cheerful(actor.Personality)) baseScore += 10;
-            if (PersonalityTraits.WarmAndFriendly(actor.Personality)) baseScore += 10;
+            baseScore += PersonalityTraits.GetTraitEffect("Cheerful", actor.Personality);
+            baseScore += PersonalityTraits.GetTraitEffect("WarmAndFriendly", actor.Personality);
 
             if (actor.Relationships.Any(r => r.TargetCharacterId == target.Id &&
                                              (r.Type == RelationshipType.Lover || r.Type == RelationshipType.Spouse)))
@@ -191,12 +165,12 @@ namespace SkyHorizont.Infrastructure.Social
 
         private double ScoreSpy(Character actor)
         {
-            var intel = actor.Skills.Intelligence; // 0..100
+            var intel = actor.Skills.Intelligence;
             var s = intel * 0.6;
 
-            if (PersonalityTraits.Adventurous(actor.Personality)) s += 10;
-            if (PersonalityTraits.IntellectuallyCurious(actor.Personality)) s += 10;
-            if (PersonalityTraits.Anxious(actor.Personality)) s -= 10;
+            s += PersonalityTraits.GetTraitEffect("Adventurous", actor.Personality);
+            s += PersonalityTraits.GetTraitEffect("IntellectuallyCurious", actor.Personality);
+            s += PersonalityTraits.GetTraitEffect("Anxious", actor.Personality);
 
             s += (int)actor.Rank * 2;
 
@@ -243,7 +217,7 @@ namespace SkyHorizont.Infrastructure.Social
 
         private double ScoreDefect(Character actor, Guid leaderId, Guid actorFactionId, Guid targetFactionId, Func<Guid, int> opin)
         {
-            var opinionLeader = opin(leaderId); // -100..+100
+            var opinionLeader = opin(leaderId);
             var baseScore = 0.0;
 
             baseScore += Clamp0to100Map(-opinionLeader) * 0.8;
@@ -271,8 +245,8 @@ namespace SkyHorizont.Infrastructure.Social
             if (_factions.IsAtWar(myFactionId, targetFactionId))
             {
                 baseScore += 10;
-                if (PersonalityTraits.EasilyAngered(actor.Personality)) baseScore -= 10;
-                if (PersonalityTraits.Anxious(actor.Personality)) baseScore -= 10;
+                baseScore += PersonalityTraits.GetTraitEffect("EasilyAngered", actor.Personality);
+                baseScore += PersonalityTraits.GetTraitEffect("Anxious", actor.Personality);
             }
 
             baseScore += (int)actor.Rank * 3;
@@ -288,8 +262,8 @@ namespace SkyHorizont.Infrastructure.Social
             if (opinion < _cfg.QuarrelOpinionThreshold)
                 baseScore += Clamp0to100Map(_cfg.QuarrelOpinionThreshold - opinion);
 
-            if (PersonalityTraits.EasilyAngered(actor.Personality)) baseScore += 15;
-            if (PersonalityTraits.Cheerful(actor.Personality)) baseScore -= 5;
+            baseScore += PersonalityTraits.GetTraitEffect("EasilyAngered", actor.Personality);
+            baseScore += PersonalityTraits.GetTraitEffect("Cheerful", actor.Personality);
 
             if ((int)target.Rank > (int)actor.Rank) baseScore -= 10;
 
@@ -304,8 +278,8 @@ namespace SkyHorizont.Infrastructure.Social
             baseScore += actor.Skills.Military * 0.4;
             baseScore += Math.Max(0, -opinion) * 0.2;
 
-            if (PersonalityTraits.Impulsive(actor.Personality)) baseScore += 10;
-            if (PersonalityTraits.EasilyAngered(actor.Personality)) baseScore += 10;
+            baseScore += PersonalityTraits.GetTraitEffect("Impulsive", actor.Personality);
+            baseScore += PersonalityTraits.GetTraitEffect("EasilyAngered", actor.Personality);
             baseScore -= (actor.Personality.Conscientiousness - 50) * 0.2;
             baseScore -= (actor.Personality.Agreeableness - 50) * 0.2;
 
@@ -324,30 +298,23 @@ namespace SkyHorizont.Infrastructure.Social
             var opinion = opin(target.Id);
             var baseScore = 0.0;
 
-            // Low agreeableness (cruelty) and high conscientiousness (duty to extract info) increase score
             baseScore += (50 - actor.Personality.Agreeableness) * 0.4;
             baseScore += (actor.Personality.Conscientiousness - 50) * 0.2;
 
-            // Target value: high rank or intelligence means more info potential
             baseScore += (int)target.Rank * 5;
             baseScore += target.Skills.Intelligence * 0.3;
 
-            // Negative opinion boosts (personal grudge)
             if (opinion < 0) baseScore += Clamp0to100Map(-opinion) * 0.5;
 
-            // At war with target's faction? Higher urgency for info
             var targetFaction = fac(target.Id);
             if (_factions.IsAtWar(actorFactionId, targetFaction)) baseScore += 15;
 
-            // Traits: angry/impulsive raise, anxious lower
-            if (PersonalityTraits.EasilyAngered(actor.Personality)) baseScore += 10;
-            if (PersonalityTraits.Impulsive(actor.Personality)) baseScore += 10;
-            if (PersonalityTraits.Anxious(actor.Personality)) baseScore -= 15;
+            baseScore += PersonalityTraits.GetTraitEffect("EasilyAngered", actor.Personality);
+            baseScore += PersonalityTraits.GetTraitEffect("Impulsive", actor.Personality);
+            baseScore += PersonalityTraits.GetTraitEffect("Anxious", actor.Personality);
 
-            // High rank actor more likely (authority to order torture)
             baseScore += (int)actor.Rank * 3;
 
-            // Make it somewhat rare, especially for civilians
             if (actor.Rank < Rank.Captain) baseScore -= 20;
 
             return Clamp0to100(baseScore * _cfg.TortureWeight);
@@ -358,34 +325,29 @@ namespace SkyHorizont.Infrastructure.Social
             var opinion = opin(target.Id);
             var baseScore = 0.0;
 
-            // Low agreeableness (lack of empathy) and low conscientiousness (impulsivity) increase score
             baseScore += (50 - actor.Personality.Agreeableness) * 0.5;
             baseScore += (50 - actor.Personality.Conscientiousness) * 0.3;
 
-            // Negative opinion boosts (dominance/humiliation motive)
             if (opinion < 0) baseScore += Clamp0to100Map(-opinion) * 0.6;
 
-            // Traits: angry/impulsive raise, cheerful/warm lower
-            if (PersonalityTraits.EasilyAngered(actor.Personality)) baseScore += 15;
-            if (PersonalityTraits.Impulsive(actor.Personality)) baseScore += 15;
-            if (PersonalityTraits.Cheerful(actor.Personality)) baseScore -= 10;
-            if (PersonalityTraits.WarmAndFriendly(actor.Personality)) baseScore -= 15;
+            baseScore += PersonalityTraits.GetTraitEffect("EasilyAngered", actor.Personality);
+            baseScore += PersonalityTraits.GetTraitEffect("Impulsive", actor.Personality);
+            baseScore += PersonalityTraits.GetTraitEffect("Cheerful", actor.Personality);
+            baseScore += PersonalityTraits.GetTraitEffect("WarmAndFriendly", actor.Personality);
 
-            // At war? Small boost (wartime atrocities)
+            // Add combined effect of Impulsive + EasilyAngered
+            baseScore += PersonalityTraits.GetTraitCombinationEffect("ImpulsiveAnger", actor.Personality);
+
             var targetFaction = fac(target.Id);
             if (_factions.IsAtWar(actorFactionId, targetFaction)) baseScore += 10;
 
-            // High rank actor more likely (power abuse)
             baseScore += (int)actor.Rank * 2;
 
-            // Make it rare, deduct for high neuroticism (guilt/fear)
             baseScore -= (actor.Personality.Neuroticism - 50) * 0.2;
             if (actor.Rank < Rank.Captain) baseScore -= 25;
 
             return Clamp0to100(baseScore * _cfg.RapeWeight);
         }
-
-        // ───────────────────── Target pickers ───────────────────────
 
         private Character? PickRomanticTarget(Character actor, List<Character> candidates, Func<Guid, Guid> fac, Func<Guid, int> opin)
         {
@@ -532,7 +494,6 @@ namespace SkyHorizont.Infrastructure.Social
         {
             if (captives.Count == 0) return null;
 
-            // Prefer high-value targets: high rank or intelligence (likely to have useful info)
             var pool = captives
                 .Select(c => new
                 {
@@ -549,7 +510,6 @@ namespace SkyHorizont.Infrastructure.Social
         {
             if (captives.Count == 0) return null;
 
-            // Prefer targets actor hates (personal motive), with some randomness
             var pool = captives
                 .Select(c => new
                 {
@@ -562,8 +522,6 @@ namespace SkyHorizont.Infrastructure.Social
 
             return pool.Count == 0 ? null : pool.First().C;
         }
-
-        // ───────────────────── Helpers ──────────────────────────────
 
         private (List<Character> sameFaction, List<Character> otherFaction, List<Character> captives) SelectRelevantCharacters(
             Character actor, Guid actorFactionId, Func<Guid, Guid> fac, Func<Guid, int> opin)
@@ -602,7 +560,6 @@ namespace SkyHorizont.Infrastructure.Social
                                     .Take(_cfg.MaxCrossFactionPool)
                                     .ToList();
 
-            // Gather captives from planets and fleets controlled by actor's faction
             var myPlanets = _planets.GetPlanetsControlledByFaction(actorFactionId);
             var myFleets = _fleets.GetFleetsForFaction(actorFactionId);
             var captiveIds = myPlanets.SelectMany(p => p.CapturedCharacterIds)
