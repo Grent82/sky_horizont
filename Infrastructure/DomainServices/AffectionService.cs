@@ -28,7 +28,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             foreach (var planet in _planetRepo.GetAll())
             {
-                foreach (var captiveId in planet.CapturedCharacterIds)
+                foreach (var captiveId in planet.Prisoners)
                 {
                     if (planet.GovernorId is not Guid captorId) continue;
                     ApplyAffectionChange(captiveId, captorId, isFleet: false);
@@ -37,7 +37,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             foreach (var fleet in _fleetRepo.GetAll())
             {
-                foreach (var captiveId in fleet.CapturedCharacterIds)
+                foreach (var captiveId in fleet.Prisoners)
                 {
                     if (fleet.AssignedCharacterId is not Guid captorId) continue;
                     ApplyAffectionChange(captiveId, captorId, isFleet: true);

@@ -562,8 +562,8 @@ namespace SkyHorizont.Infrastructure.Social
 
             var myPlanets = _planets.GetPlanetsControlledByFaction(actorFactionId);
             var myFleets = _fleets.GetFleetsForFaction(actorFactionId);
-            var captiveIds = myPlanets.SelectMany(p => p.CapturedCharacterIds)
-                                      .Concat(myFleets.SelectMany(f => f.CapturedCharacterIds))
+            var captiveIds = myPlanets.SelectMany(p => p.Prisoners)
+                                      .Concat(myFleets.SelectMany(f => f.Prisoners))
                                       .Distinct()
                                       .ToList();
             var captives = _chars.GetByIds(captiveIds).Where(c => c.IsAlive).ToList();

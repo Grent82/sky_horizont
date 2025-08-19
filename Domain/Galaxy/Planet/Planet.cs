@@ -20,7 +20,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public double BaseDefense { get; private set; }
         public int StationedTroops { get; private set; }
         public double BaseTaxRate { get; private set; }
-        public IList<Guid> CapturedCharacterIds { get; } = new List<Guid>();
+        public IList<Guid> Prisoners { get; } = new List<Guid>();
         public IList<Guid> Citizens { get; } = new List<Guid>();
         private readonly List<Fleet> _stationedFleets = new();
 
@@ -155,8 +155,8 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             return list.Distinct().ToList();
         }
 
-        public void AddCaptured(Guid cmdrId) => CapturedCharacterIds.Add(cmdrId);
-        public void ClearCapturedAfterResolution() => CapturedCharacterIds.Clear();
+        public void AddCaptured(Guid cmdrId) => Prisoners.Add(cmdrId);
+        public void ClearCapturedAfterResolution() => Prisoners.Clear();
 
         public void AddCitizen(Guid cmdrId) => Citizens.Add(cmdrId);
         public void RemoveCitizen(Guid cmdrId) => Citizens.Remove(cmdrId);

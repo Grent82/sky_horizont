@@ -201,10 +201,10 @@ namespace SkyHorizont.Tests.Fleets
             f.AddCaptured(c1);
             f.AddCaptured(c2);
 
-            f.CapturedCharacterIds.Should().BeEquivalentTo(new[] { c1, c2 }, o => o.WithoutStrictOrdering());
+            f.Prisoners.Should().BeEquivalentTo(new[] { c1, c2 }, o => o.WithoutStrictOrdering());
 
             f.ClearCapturedAfterResolution();
-            f.CapturedCharacterIds.Should().BeEmpty();
+            f.Prisoners.Should().BeEmpty();
         }
 
         // --------------- helper order stub ---------------

@@ -26,7 +26,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             {
                 if (p.Citizens.Contains(characterId))
                     return new CharacterLocation(LocationKind.Planet, p.Id, p.SystemId);
-                if (p.CapturedCharacterIds.Contains(characterId))
+                if (p.Prisoners.Contains(characterId))
                     return new CharacterLocation(LocationKind.Planet, p.Id, p.SystemId);
             }
 
@@ -34,7 +34,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
             {
                 if (f.AssignedCharacterId == characterId)
                     return new CharacterLocation(LocationKind.Fleet, f.Id, f.CurrentSystemId);
-                if (f.CapturedCharacterIds.Contains(characterId))
+                if (f.Passengers.Contains(characterId))
+                    return new CharacterLocation(LocationKind.Fleet, f.Id, f.CurrentSystemId);
+                if (f.Prisoners.Contains(characterId))
                     return new CharacterLocation(LocationKind.Fleet, f.Id, f.CurrentSystemId);
             }
 
@@ -66,33 +68,46 @@ namespace SkyHorizont.Infrastructure.DomainServices
             if (p.GovernorId.HasValue && p.GovernorId.Value != Guid.Empty)
                 yield return p.GovernorId.Value;
 
-            foreach (var f in p.GetStationedFleets())
-                if (f.AssignedCharacterId.HasValue) yield return f.AssignedCharacterId.Value;
+            foreach (var c in p.Citizens)
+                yield return c;
 
-            foreach (var c in p.CapturedCharacterIds)
+            foreach (var f in p.GetStationedFleets())
+            {
+                if (f.AssignedCharacterId.HasValue)
+                    yield return f.AssignedCharacterId.Value;
+                foreach (var pax in f.Passengers)
+                    yield return pax;
+                foreach (var cap in f.Prisoners)
+                    yield return cap;
+            }
+
+            foreach (var c in p.Prisoners)
                 yield return c;
         }
 
         public IEnumerable<Guid> GetCharactersOnFleet(Guid fleetId)
         {
             var f = _fleets.GetById(fleetId);
-            if (f is null) yield break;
-
-            if (f.AssignedCharacterId.HasValue) yield return f.AssignedCharacterId.Value;
-            foreach (var c in f.CapturedCharacterIds)
+            if (f is null)
+                yield break;
+            if (f.AssignedCharacterId.HasValue)
+                yield return f.AssignedCharacterId.Value;
+            foreach (var pax in f.Passengers)
+                yield return pax;
+            foreach (var c in f.Prisoners)
                 yield return c;
         }
 
         public IEnumerable<Guid> GetCaptivesOnPlanet(Guid planetId)
         {
             var p = _planets.GetById(planetId);
-            return p is null ? Enumerable.Empty<Guid>() : p.CapturedCharacterIds;
+            return p is null ? Enumerable.Empty<Guid>() : p.Prisoners;
         }
 
         public IEnumerable<Guid> GetCaptivesOnFleet(Guid fleetId)
         {
             var f = _fleets.GetById(fleetId);
-            return f is null ? Enumerable.Empty<Guid>() : f.CapturedCharacterIds;
+            return f is null ? Enumerable.Empty<Guid>() : f.Prisoners;
         }
 
         public void AddCitizenToPlanet(Guid character, Guid locationId)
@@ -130,7 +145,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             // Planet case
             foreach (var p in _planets.GetAll())
             {
-                if (!p.CapturedCharacterIds.Contains(prisonerId)) continue;
+                if (!p.Prisoners.Contains(prisonerId)) continue;
                 if (p.GovernorId.HasValue && p.GovernorId.Value == captorId) return true;
 
                 // Also count stationed fleet commanders of the same planet as valid captors
@@ -141,7 +156,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             // Fleet case
             foreach (var f in _fleets.GetAll())
             {
-                if (!f.CapturedCharacterIds.Contains(prisonerId)) continue;
+                if (!f.Prisoners.Contains(prisonerId)) continue;
                 if (f.AssignedCharacterId == captorId) return true;
             }
 

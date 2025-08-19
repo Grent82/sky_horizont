@@ -18,9 +18,9 @@ namespace SkyHorizont.Domain.Fleets
         public IReadOnlyCollection<Ship> Ships => _ships.Values;
         public IReadOnlyList<FleetOrder> Orders => _orders.AsReadOnly();
 
-        public IList<Guid> CapturedCharacterIds { get; } = new List<Guid>();
+        public IList<Guid> Prisoners { get; } = new List<Guid>();
 
-        public IList<Guid> PassengerCharacterIds { get; } = new List<Guid>();
+        public IList<Guid> Passengers { get; } = new List<Guid>();
 
         public double AverageFleetSpeed => _ships.Values.Any()
             ? _ships.Values.Average(s => s.Speed)
@@ -100,13 +100,13 @@ namespace SkyHorizont.Domain.Fleets
             outcomeService.ProcessFleetBattle(this, result.LoserFleet!, result);
         }
 
-        public void AddCaptured(Guid cmdrId) => CapturedCharacterIds.Add(cmdrId);
+        public void AddCaptured(Guid cmdrId) => Prisoners.Add(cmdrId);
 
-        public void RemoveCaptured(Guid cmdrId) => CapturedCharacterIds.Remove(cmdrId);
-        public void ClearCapturedAfterResolution() => CapturedCharacterIds.Clear();
+        public void RemoveCaptured(Guid cmdrId) => Prisoners.Remove(cmdrId);
+        public void ClearCapturedAfterResolution() => Prisoners.Clear();
 
-        public void AddPassenger(Guid cmdrId) => PassengerCharacterIds.Add(cmdrId);
-        public void RemovePassenger(Guid cmdrId) => PassengerCharacterIds.Remove(cmdrId);
-        public void ClearPassengers() => PassengerCharacterIds.Clear();
+        public void AddPassenger(Guid cmdrId) => Passengers.Add(cmdrId);
+        public void RemovePassenger(Guid cmdrId) => Passengers.Remove(cmdrId);
+        public void ClearPassengers() => Passengers.Clear();
     }
 }
