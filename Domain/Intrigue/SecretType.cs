@@ -11,6 +11,9 @@ namespace SkyHorizont.Domain.Intrigue
         PersonalInformation,
         RapeIncident,
         TortureAttempt,
-        RapeAttempt
+        RapeAttempt,
+        TravelRisk,
+        DefectionPlot,
+        PiracyAttempt
     }
 }

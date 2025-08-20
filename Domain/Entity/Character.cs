@@ -12,6 +12,15 @@ namespace SkyHorizont.Domain.Entity
         Rape
     }
 
+    public enum CharacterAmbition
+    {
+        None,
+        GainPower,
+        BuildWealth,
+        EnsureFamilyLegacy,
+        SeekAdventure
+    }
+
     public class Character
     {
         private static readonly Dictionary<Rank, int> MeritThresholds = new()
@@ -46,6 +55,7 @@ namespace SkyHorizont.Domain.Entity
         public EntityTask? AssignedTask { get; private set; }
         public int Balance => _balance;
         public IReadOnlyList<TraumaType> Traumas => _traumas.AsReadOnly();
+        public CharacterAmbition? Ambition { get; set; }
 
         public Character(
             Guid id,

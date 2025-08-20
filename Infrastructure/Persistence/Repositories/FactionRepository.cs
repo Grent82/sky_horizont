@@ -34,9 +34,14 @@ namespace SkyHorizont.Infrastructure.Repository
             _context.CharacterFaction[characterId] = newFactionId;
         }
 
+
+        public Faction? GetFaction(Guid factionId)
+        {
+            return _context.Factions.TryGetValue(factionId, out var faction) ? faction : null;
+        }
         public void Save(Faction faction)
         {
-            throw new NotImplementedException();
+            _context.Factions.Add(faction.Id, faction);
         }
     }
 }

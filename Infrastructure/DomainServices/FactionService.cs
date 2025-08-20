@@ -1,22 +1,21 @@
-using SkyHorizont.Domain.Factions;
-using SkyHorizont.Infrastructure.Persistence.Interfaces;
+using SkyHorizont.Domain.Galaxy.Planet;
+using SkyHorizont.Domain.Shared;
 
-namespace SkyHorizont.Infrastructure.DomainServices
+namespace SkyHorizont.Domain.Factions
 {
-    /// <summary>
-    /// Read-only service that implements IFactionInfo from an IFactionsDbContext.
-    /// Stores war/rival relations as undirected pairs of faction IDs.
-    /// </summary>
     public sealed class FactionService : IFactionService
     {
         private readonly IFactionRepository _factionRepository;
+        private readonly IPlanetRepository _planetRepository;
 
-        public FactionService(IFactionRepository factionRepository) =>_factionRepository = factionRepository;
+        public FactionService(IFactionRepository factionRepository, IPlanetRepository planetRepository)
+        {
+            _factionRepository = factionRepository ?? throw new ArgumentNullException(nameof(factionRepository));
+            _planetRepository = planetRepository ?? throw new ArgumentNullException(nameof(planetRepository));
+        }
 
         public Guid GetFactionIdForCharacter(Guid characterId)
         {
-            // If unknown, return Guid.Empty to indicate "no faction".
-            // Swap to throw NotFoundException if you prefer strictness.
             return _factionRepository.GetFactionIdForCharacter(characterId);
         }
 
@@ -32,11 +31,43 @@ namespace SkyHorizont.Infrastructure.DomainServices
             return _factionRepository.GetWarPairs().Contains(key);
         }
 
+        public bool HasAlliance(Guid factionA, Guid factionB)
+        {
+            if (factionA == Guid.Empty || factionB == Guid.Empty || factionA == factionB) return false;
+            var faction = _factionRepository.GetFaction(factionA);
+            return faction != null && faction.Diplomacy.TryGetValue(factionB, out var standing) && standing.Value >= 50;
+        }
+
+        public Guid GetFactionIdForPlanet(Guid planetId)
+        {
+            var planet = _planetRepository.GetById(planetId);
+            return planet?.FactionId ?? Guid.Empty;
+        }
+
+        public Guid GetFactionIdForSystem(Guid systemId)
+        {
+            var planets = _planetRepository.GetAll().Where(p => p.SystemId == systemId).ToList();
+            if (!planets.Any()) return Guid.Empty;
+            var factionCounts = planets.GroupBy(p => p.FactionId)
+                                      .Select(g => new { FactionId = g.Key, Count = g.Count() })
+                                      .OrderByDescending(g => g.Count)
+                                      .First();
+            return factionCounts.FactionId;
+        }
+
+        public int GetEconomicStrength(Guid factionId)
+        {
+            var planets = _planetRepository.GetPlanetsControlledByFaction(factionId);
+            var totalInfrastructure = planets.Sum(p => p.InfrastructureLevel);
+            var totalStability = planets.Sum(p => p.Stability * 100);
+            var planetCount = planets.Count();
+            return planetCount > 0 ? (int)((totalInfrastructure + totalStability) / (2 * planetCount)) : 0;
+        }
+
         public IEnumerable<Guid> GetAllRivalFactions(Guid forFaction)
         {
             if (forFaction == Guid.Empty) return Enumerable.Empty<Guid>();
 
-            // Rivals are all opponents from RivalPairs ∪ WarPairs (planner may treat both as "rivals").
             IEnumerable<Guid> rivalsFromRivalPairs = _factionRepository.GetRivalPairs()
                 .Where(p => p.a == forFaction || p.b == forFaction)
                 .Select(p => p.a == forFaction ? p.b : p.a);
@@ -45,17 +76,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 .Where(p => p.a == forFaction || p.b == forFaction)
                 .Select(p => p.a == forFaction ? p.b : p.a);
 
-            return rivalsFromRivalPairs
-                .Concat(rivalsFromWars)
-                .Distinct();
-        }
-
-        #region Helper
-
-        private static (Guid a, Guid b) Normalize(Guid x, Guid y)
-        {
-            // Store undirected relations canonically: (min, max)
-            return x.CompareTo(y) <= 0 ? (x, y) : (y, x);
+            return rivalsFromRivalPairs.Concat(rivalsFromWars).Distinct();
         }
 
         public void MoveCharacterToFaction(Guid characterId, Guid newFactionId)
@@ -63,6 +84,19 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _factionRepository.MoveCharacterToFaction(characterId, newFactionId);
         }
 
-        #endregion
+        private static (Guid a, Guid b) Normalize(Guid x, Guid y)
+        {
+            return x.CompareTo(y) <= 0 ? (x, y) : (y, x);
+        }
+
+        public void Save(Faction faction)
+        {
+            _factionRepository.Save(faction);
+        }
+
+        public Faction? GetFaction(Guid factionId)
+        {
+            return _factionRepository.GetFaction(factionId);
+        }
     }
 }

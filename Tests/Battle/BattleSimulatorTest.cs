@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -11,6 +8,7 @@ using SkyHorizont.Domain.Fleets;
 using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Shared;
+using SkyHorizont.Infrastructure.DomainServices;
 
 namespace SkyHorizont.Tests.Battle
 {
@@ -23,7 +21,7 @@ namespace SkyHorizont.Tests.Battle
         // --- helpers wired for most tests ---
         private static Fleet MakeFleet(Guid faction, Guid system, int ships, double atkPerShip, double defPerShip, bool withCharacter = false, Character? character = null)
         {
-            var f = new Fleet(Guid.NewGuid(), faction, system);
+            var f = new Fleet(Guid.NewGuid(), faction, system, new PiracyService(null, null, Guid.NewGuid()));
             for (int i = 0; i < ships; i++)
                 f.AddShip(ShipFactory.Create(atkPerShip, defPerShip));
             if (withCharacter && character != null)
@@ -33,7 +31,7 @@ namespace SkyHorizont.Tests.Battle
 
         private static Planet MakePlanet(Guid system, Guid faction, double baseDef = 0, int troops = 0)
         {
-            return new Planet(Guid.NewGuid(), "Gaia", system, faction, new Resources(100,100,100),
+            return new Planet(Guid.NewGuid(), "Gaia", system, faction, new Resources(100,100,100), null, null,
                 initialStability: 1.0, infrastructureLevel: 10, baseAtk: 0, baseDef: baseDef, troops: troops);
         }
 

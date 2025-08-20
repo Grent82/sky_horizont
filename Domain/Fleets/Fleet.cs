@@ -1,6 +1,8 @@
 using SkyHorizont.Domain.Battle;
 using SkyHorizont.Domain.Factions;
+using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Shared;
+using SkyHorizont.Domain.Travel;
 using TaskStatus = SkyHorizont.Domain.Entity.Task.TaskStatus;
 
 namespace SkyHorizont.Domain.Fleets
@@ -9,6 +11,7 @@ namespace SkyHorizont.Domain.Fleets
     {
         private readonly Dictionary<Guid, Ship> _ships = new();
         private readonly List<FleetOrder> _orders = new();
+        private Resources _cargo;
 
         public Guid Id { get; }
         public Guid FactionId { get; private set; }
@@ -25,6 +28,10 @@ namespace SkyHorizont.Domain.Fleets
         public double AverageFleetSpeed => _ships.Values.Any()
             ? _ships.Values.Average(s => s.Speed)
             : 0;
+
+        public bool IsPirateFleet { get; set; }
+        public bool IsAssigned { get; set; }
+
         public FleetStrength CalculateStrength()
         {
             double totalAtk = Ships.Sum(s => s.CurrentAttack);
@@ -33,7 +40,7 @@ namespace SkyHorizont.Domain.Fleets
             return new FleetStrength(totalAtk + totalDef, cargo);
         }
 
-        public Fleet(Guid id, Guid factionId, Guid startingSystem)
+        public Fleet(Guid id, Guid factionId, Guid startingSystem, IPiracyService piracyService)
         {
             Id = id != Guid.Empty ? id : throw new ArgumentException(nameof(id));
             FactionId = factionId;
@@ -108,5 +115,20 @@ namespace SkyHorizont.Domain.Fleets
         public void AddPassenger(Guid cmdrId) => Passengers.Add(cmdrId);
         public void RemovePassenger(Guid cmdrId) => Passengers.Remove(cmdrId);
         public void ClearPassengers() => Passengers.Clear();
+
+        public void AddCargo(Resources resources)
+        {
+            var totalCargo = _cargo + resources;
+            var capacity = Ships.Sum(s => s.CargoCapacity);
+            if (totalCargo.Total > capacity)
+                throw new DomainException("Cargo exceeds fleet capacity.");
+            _cargo = totalCargo;
+        }
+
+        public void RemoveCargo(Resources resources)
+        {
+            var newCargo = _cargo - resources;
+            _cargo = newCargo;
+        }
     }
 }

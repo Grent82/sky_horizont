@@ -1,5 +1,7 @@
 using FluentAssertions;
+using Infrastructure.Persistence.Repositories;
 using SkyHorizont.Application.Turns;
+using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Infrastructure.DomainServices;
 using SkyHorizont.Infrastructure.Persistence;
@@ -25,9 +27,14 @@ namespace SkyHorizont.Tests.Common
             var opinions = new OpinionRepository(new InMemoryOpinionsDbContext());
             var factions = new FactionRepository(new InMemoryFactionsDbContext());
             var secrets = new SecretsRepository(new InMemorySecretsDbContext());
+            var travels = new TravelRepository(new InMemoryTravelDbContext());
             var diplomacies = new DiplomacyRepository(new InMemoryDiplomacyDbContext());
+            var funds = new CharacterFundsRepository(new InMemoryCharacterFundsDbContext());
+            var factionFunds = new FactionFundsRepository(new InMemoryFundsDbContext());
+            var eco = new PlanetEconomyRepository(new InMemoryPlanetEconomyDbContext());
             var socialLog = new InMemorySocialEventLog();
             var events = new InMemoryEventBus();
+            var affections = new AffectionRepository(new InMemoryAffectionDbContext());
 
             var clock = new GameClockService(3001, 1, 12);
             var rng = new RandomService(12345);
@@ -37,18 +44,25 @@ namespace SkyHorizont.Tests.Common
             var loc = new LocationService(planets, fleets);
             var pregPolicy = new DefaultPregnancyPolicy(rng, opinions, loc);
             var skillInh = new SimpleSkillInheritanceService();
+            var faction = new FactionService(factions, planets);
+            var piracy = new PiracyService(faction, rng, Guid.NewGuid());
+            var travel = new TravelService(planets, fleets, rng, travels, piracy, clock);
+            var fund = new CharacterFundsService(funds);
+            var tax = new FactionTaxService(factionFunds, funds, planets, eco, faction, characters, clock);
+            var moral = new MoraleService(characters);
+            var battle = new BattleOutcomeService(fund, factionFunds, tax, characters, moral);
+            var affection = new AffectionService(characters, planets, fleets, affections);
             
             var bus = new InMemoryEventBus();
-            var faction = new FactionService(factions);
-            var planner = new IntentPlanner(characters, opinions, faction, rng, planets, fleets);
+            var planner = new IntentPlanner(characters, opinions, faction, rng, planets, fleets, travel, piracy);
             var diplomacy = new DiplomacyService(diplomacies, faction, clock, opinions);
-            var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy, events);
+            var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy, travel, piracy, planets, fleets, events, battle);
 
             var lifecycle = new CharacterLifecycleService(
                 characters, lineage, clock, rng, mortality, nameGen,
                 inherit, pregPolicy, skillInh, loc, bus);
 
-            var runner = new LifecycleSimulationRunner(characters, lineage, planets, lifecycle, planner, resolver, socialLog, clock);
+            var runner = new LifecycleSimulationRunner(characters, lineage, planets, lifecycle, planner, resolver, socialLog, clock, affection);
 
             // One planet, one super couple:
             runner.SeedCoupleOnPlanet(systemId: Guid.NewGuid());
@@ -58,7 +72,7 @@ namespace SkyHorizont.Tests.Common
 
             // Now assert on characters.GetAll() for newborns, lineage links, etc.
             clock.CurrentYear.Should().Be(3051);
-            characters.GetAll().Count().Should().Be(45);
+            characters.GetAll().Count().Should().Be(26);
 
         }
 

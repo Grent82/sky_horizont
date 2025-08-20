@@ -4,12 +4,10 @@ namespace SkyHorizont.Domain.Factions
     {
         Guid GetFactionIdForCharacter(Guid characterId);
         Guid? GetLeaderId(Guid factionId);
-
         HashSet<(Guid a, Guid b)> GetWarPairs();
         HashSet<(Guid a, Guid b)> GetRivalPairs();
-
         void MoveCharacterToFaction(Guid characterId, Guid newFactionId);
-
+        Faction? GetFaction(Guid factionId);
         void Save(Faction faction);
     }
 }

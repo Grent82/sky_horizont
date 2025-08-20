@@ -2,8 +2,8 @@ namespace SkyHorizont.Domain.Diplomacy
 {
     public interface IDiplomacyService
     {
-        // ToDo: Diplomacy implementation
         void ProposeTreaty(Guid fromFaction, Guid toFaction, TreatyType type);
-        void TickTreaties(); // decay, violations, casus belli
+        void TickTreaties();
+        void AdjustRelations(Guid factionA, Guid factionB, int delta);
     }
 }

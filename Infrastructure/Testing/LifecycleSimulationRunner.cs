@@ -20,6 +20,7 @@ namespace SkyHorizont.Infrastructure.Testing
         private readonly InteractionResolver _resolver;
         private readonly InMemorySocialEventLog _socialLog;
         private readonly IGameClockService _clock;
+        private readonly IAffectionService _affection;
 
         public LifecycleSimulationRunner(
             ICharacterRepository characters,
@@ -29,7 +30,8 @@ namespace SkyHorizont.Infrastructure.Testing
             IntentPlanner planner,
             InteractionResolver resolver,
             InMemorySocialEventLog socialLog,
-            IGameClockService clock)
+            IGameClockService clock,
+            IAffectionService affection)
         {
             _characters = characters;
             _lineage = lineage;
@@ -37,8 +39,9 @@ namespace SkyHorizont.Infrastructure.Testing
             _lifecycle = lifecycle;
             _planner = planner;
             _resolver = resolver;
-             _socialLog = socialLog;
+            _socialLog = socialLog;
             _clock = clock;
+            _affection = affection;
         }
 
         public void SeedCoupleOnPlanet(Guid systemId)
@@ -50,6 +53,8 @@ namespace SkyHorizont.Infrastructure.Testing
                 systemId: systemId,
                 factionId: Guid.NewGuid(),
                 initialResources: new Resources(10_000, 10_000, 10_000),
+                characterRepository: _characters,
+                planetRepository: _planets,
                 initialStability: 1.0,
                 infrastructureLevel: 50,
                 baseTaxRate: 15.0
@@ -65,6 +70,9 @@ namespace SkyHorizont.Infrastructure.Testing
                 id: Guid.NewGuid(), name: "Vor Drak",
                 sex: Sex.Male, age: 24,
                 birthYear: _clock.CurrentYear - 24, birthMonth: 3);
+
+            _characters.Save(she);
+            _characters.Save(he);
 
             // Co-locate & romance link
             TestWorldBuilder.SeedSinglePlanetWithCouple(planet, she, he, makePositiveGovernor: true);
@@ -119,7 +127,7 @@ namespace SkyHorizont.Infrastructure.Testing
             });
 
             // 4) Affection drift / captive affection adjustments (monthly)
-            //SafeRun("Affection.Update", () => _affection.UpdateAffection());
+            SafeRun("Affection.Update", () => _affection.UpdateAffection());
         }
 
         private static void SafeRun(string label, Action action)

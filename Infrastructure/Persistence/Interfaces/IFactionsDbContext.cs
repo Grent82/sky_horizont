@@ -1,3 +1,5 @@
+using SkyHorizont.Domain.Factions;
+
 namespace SkyHorizont.Infrastructure.Persistence.Interfaces
 {
     public interface IFactionsDbContext : IBaseDbContext
@@ -7,6 +9,7 @@ namespace SkyHorizont.Infrastructure.Persistence.Interfaces
 
         /// <summary>Faction Leader</summary>
         Dictionary<Guid, Guid?> FactionLeaders { get; }
+        Dictionary<Guid, Faction?> Factions { get; }
 
         /// <summary>Undirected war pairs between factions.</summary>
         HashSet<(Guid a, Guid b)> WarPairs { get; }

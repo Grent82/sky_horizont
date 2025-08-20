@@ -1,17 +1,18 @@
+using SkyHorizont.Domain.Battle;
 using SkyHorizont.Domain.Diplomacy;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Factions;
+using SkyHorizont.Domain.Fleets;
+using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Intrigue;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Shared;
 using SkyHorizont.Domain.Social;
+using SkyHorizont.Domain.Travel;
+using TaskStatus = SkyHorizont.Domain.Entity.Task.TaskStatus;
 
 namespace SkyHorizont.Infrastructure.Social
 {
-    /// <summary>
-    /// Turns planned intents into outcomes. Applies opinion deltas and produces secrets.
-    /// All numeric tuning is in the #region Tuning.
-    /// </summary>
     public sealed class InteractionResolver : IInteractionResolver
     {
         private readonly ICharacterRepository _chars;
@@ -20,7 +21,15 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly ISecretsRepository _secrets;
         private readonly IRandomService _rng;
         private readonly IDiplomacyService _diplomacy;
+        private readonly ITravelService _travel;
+        private readonly IPiracyService _piracy;
+        private readonly IPlanetRepository _planets;
+        private readonly IFleetRepository _fleets;
         private readonly IEventBus _events;
+        private readonly IBattleOutcomeService _battleOutcomeService;
+        private readonly InteractionConfig _cfg;
+        private readonly Dictionary<Guid, FactionStatus> _factionStatusCache;
+        private readonly Dictionary<Guid, SystemSecurity> _systemSecurityCache;
 
         public InteractionResolver(
             ICharacterRepository characters,
@@ -29,7 +38,13 @@ namespace SkyHorizont.Infrastructure.Social
             ISecretsRepository secrets,
             IRandomService rng,
             IDiplomacyService diplomacy,
-            IEventBus events)
+            ITravelService travel,
+            IPiracyService piracy,
+            IPlanetRepository planets,
+            IFleetRepository fleets,
+            IEventBus events,
+            IBattleOutcomeService battleOutcomeService,
+            InteractionConfig? config = null)
         {
             _chars = characters ?? throw new ArgumentNullException(nameof(characters));
             _opinions = opinions ?? throw new ArgumentNullException(nameof(opinions));
@@ -37,7 +52,15 @@ namespace SkyHorizont.Infrastructure.Social
             _secrets = secrets ?? throw new ArgumentNullException(nameof(secrets));
             _rng = rng ?? throw new ArgumentNullException(nameof(rng));
             _diplomacy = diplomacy ?? throw new ArgumentNullException(nameof(diplomacy));
+            _travel = travel ?? throw new ArgumentNullException(nameof(travel));
+            _piracy = piracy ?? throw new ArgumentNullException(nameof(piracy));
+            _planets = planets ?? throw new ArgumentNullException(nameof(planets));
+            _fleets = fleets ?? throw new ArgumentNullException(nameof(fleets));
             _events = events ?? throw new ArgumentNullException(nameof(events));
+            _battleOutcomeService = battleOutcomeService ?? throw new ArgumentNullException(nameof(battleOutcomeService));
+            _cfg = config ?? InteractionConfig.Default;
+            _factionStatusCache = new Dictionary<Guid, FactionStatus>();
+            _systemSecurityCache = new Dictionary<Guid, SystemSecurity>();
         }
 
         public IEnumerable<ISocialEvent> Resolve(CharacterIntent intent, int currentYear, int currentMonth)
@@ -49,37 +72,51 @@ namespace SkyHorizont.Infrastructure.Social
             if (actor == null || !actor.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
+            if (_cfg.DisableSensitiveIntents && (intent.Type == IntentType.TorturePrisoner || intent.Type == IntentType.RapePrisoner))
+                return Array.Empty<ISocialEvent>();
+
+            var actorFactionId = _factions.GetFactionIdForCharacter(actor.Id);
+            var factionStatus = GetFactionStatus(actorFactionId);
+            var actorSystemId = FindSystemOfCharacter(actor.Id);
+            var systemSecurity = actorSystemId.HasValue ? GetSystemSecurity(actorSystemId.Value) : null;
+
             switch (intent.Type)
             {
                 case IntentType.Court:
-                    return ResolveCourt(actor, intent, currentYear, currentMonth);
+                    return ResolveCourt(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.VisitFamily:
-                    return ResolveVisitFamily(actor, intent, currentYear, currentMonth);
+                    return ResolveVisitFamily(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.Spy:
-                    return ResolveSpy(actor, intent, currentYear, currentMonth);
+                    return ResolveSpy(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.Bribe:
-                    return ResolveBribe(actor, intent, currentYear, currentMonth);
+                    return ResolveBribe(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.Recruit:
-                    return ResolveRecruit(actor, intent, currentYear, currentMonth);
+                    return ResolveRecruit(actor, intent, currentYear, currentMonth, factionStatus, actorFactionId);
                 case IntentType.Defect:
-                    return ResolveDefect(actor, intent, currentYear, currentMonth);
+                    return ResolveDefect(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.Negotiate:
-                    return ResolveNegotiate(actor, intent, currentYear, currentMonth);
+                    return ResolveNegotiate(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.Quarrel:
-                    return ResolveQuarrel(actor, intent, currentYear, currentMonth);
+                    return ResolveQuarrel(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.Assassinate:
-                    return ResolveAssassinate(actor, intent, currentYear, currentMonth);
+                    return ResolveAssassinate(actor, intent, currentYear, currentMonth, factionStatus, actorFactionId);
                 case IntentType.TorturePrisoner:
-                    return ResolveTorture(actor, intent, currentYear, currentMonth);
+                    return ResolveTorture(actor, intent, currentYear, currentMonth, factionStatus, actorFactionId);
                 case IntentType.RapePrisoner:
-                    return ResolveRape(actor, intent, currentYear, currentMonth);
+                    return ResolveRape(actor, intent, currentYear, currentMonth, factionStatus, actorFactionId);
+                case IntentType.TravelToPlanet:
+                    return ResolveTravelToPlanet(actor, intent, currentYear, currentMonth, factionStatus, systemSecurity);
+                case IntentType.BecomePirate:
+                    return ResolveBecomePirate(actor, intent, currentYear, currentMonth, factionStatus, systemSecurity);
+                case IntentType.RaidConvoy:
+                    return ResolveRaidConvoy(actor, intent, currentYear, currentMonth, factionStatus, systemSecurity);
                 default:
                     return Array.Empty<ISocialEvent>();
             }
         }
 
         #region Courtship
-        private IEnumerable<ISocialEvent> ResolveCourt(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        private IEnumerable<ISocialEvent> ResolveCourt(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
         {
             if (!intent.TargetCharacterId.HasValue)
                 return Array.Empty<ISocialEvent>();
@@ -87,45 +124,43 @@ namespace SkyHorizont.Infrastructure.Social
             if (target == null || !target.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
-            var compat = actor.Personality.CheckCompatibility(target.Personality); // 0..100
-            var baseChance = 0.25 + compat / 300.0; // ~0.25..0.58
-            baseChance += (actor.Personality.Extraversion - 50) * 0.002; // +/- 0.1
+            var baseChance = 0.25 + actor.Personality.CheckCompatibility(target.Personality) / 300.0;
+            baseChance += (actor.Personality.Extraversion - 50) * 0.002;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Extraversion"].Concat(traits["Agreeableness"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            if (factionStatus.HasAlliance) baseChance += 0.1;
+            if (actor.Ambition == CharacterAmbition.EnsureFamilyLegacy) baseChance += 0.15;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
-
-            var deltaActorToTarget = success ? +4 : -2;
-            var deltaTargetToActor = success ? +6 : -3;
+            var deltaActorToTarget = success ? 5 : -3;
+            var deltaTargetToActor = success ? 7 : -4;
+            var meritChange = success ? (actor.Ambition == CharacterAmbition.EnsureFamilyLegacy ? 10 : 5) : -3;
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, success ? "Romance success" : "Awkward attempt");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Charmed" : "Turned down");
-
-            var ev = new SocialEvent(
-                Guid.NewGuid(),
-                currentYear,
-                currentMonth,
-                SocialEventType.CourtshipAttempt,
-                actor.Id,
-                target.Id,
-                null,
-                success,
-                deltaActorToTarget,
-                deltaTargetToActor,
-                Array.Empty<Guid>(),
-                success ? "Shared time and chemistry." : "It didn’t land."
-            );
-
-            if (success && !actor.Relationships.Any(r => r.TargetCharacterId == target.Id))
+            if (success)
             {
-                actor.AddRelationship(target.Id, RelationshipType.Lover);
+                actor.GainMerit(meritChange);
+                if (!actor.Relationships.Any(r => r.TargetCharacterId == target.Id))
+                    actor.AddRelationship(target.Id, RelationshipType.Lover);
                 _chars.Save(actor);
+                _diplomacy.AdjustRelations(_factions.GetFactionIdForCharacter(actor.Id), _factions.GetFactionIdForCharacter(target.Id), 5);
             }
 
+            var ev = new SocialEvent(
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.CourtshipAttempt,
+                actor.Id, target.Id, null, null, success,
+                deltaActorToTarget, deltaTargetToActor, Array.Empty<Guid>(),
+                success ? "Shared time and chemistry." : "It didn’t land."
+            );
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
 
         #region VisitFamily
-        private IEnumerable<ISocialEvent> ResolveVisitFamily(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        private IEnumerable<ISocialEvent> ResolveVisitFamily(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
         {
             if (!intent.TargetCharacterId.HasValue)
                 return Array.Empty<ISocialEvent>();
@@ -133,113 +168,101 @@ namespace SkyHorizont.Infrastructure.Social
             if (relative == null || !relative.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
-            var pleasantness = 0.4
-                + (actor.Personality.Agreeableness - 50) * 0.003
-                + (actor.Personality.Conscientiousness - 50) * 0.002;
-            var success = _rng.NextDouble() < Clamp01(pleasantness);
+            var baseChance = 0.4 + (actor.Personality.Agreeableness - 50) * 0.003 + (actor.Personality.Conscientiousness - 50) * 0.002;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Agreeableness"])
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            if (factionStatus.HasUnrest) baseChance += 0.1;
+            if (actor.Ambition == CharacterAmbition.EnsureFamilyLegacy) baseChance += 0.15;
 
-            var delta = success ? +5 : +1; // Even awkward visits help a bit
+            var success = _rng.NextDouble() < Clamp01(baseChance);
+            var delta = success ? 6 : 2;
+            var meritChange = success ? (actor.Ambition == CharacterAmbition.EnsureFamilyLegacy ? 8 : 4) : 0;
+
             _opinions.AdjustOpinion(actor.Id, relative.Id, delta, "Family time");
             _opinions.AdjustOpinion(relative.Id, actor.Id, delta, "Family time");
+            if (success)
+            {
+                actor.GainMerit(meritChange);
+                _chars.Save(actor);
+            }
 
             var ev = new SocialEvent(
-                Guid.NewGuid(),
-                currentYear,
-                currentMonth,
-                SocialEventType.FamilyVisit,
-                actor.Id,
-                relative.Id,
-                null,
-                success,
-                delta,
-                delta,
-                Array.Empty<Guid>(),
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.FamilyVisit,
+                actor.Id, relative.Id, null, null, success,
+                delta, delta, Array.Empty<Guid>(),
                 success ? "A warm reunion." : "A brief check-in."
             );
-
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
 
         #region Spy
-        private IEnumerable<ISocialEvent> ResolveSpy(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        private IEnumerable<ISocialEvent> ResolveSpy(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
         {
             if (!intent.TargetFactionId.HasValue && !intent.TargetCharacterId.HasValue)
                 return Array.Empty<ISocialEvent>();
 
-            var intel = actor.Skills.Intelligence; // 0..100
-            var baseChance = 0.2 + intel / 200.0; // 0.2..0.7
-            baseChance += (actor.Personality.Openness - 50) * 0.002;
-            baseChance -= (actor.Personality.Neuroticism - 50) * 0.002;
+            var baseChance = 0.2 + actor.Skills.Intelligence / 200.0;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Openness"].Concat(traits["Neuroticism"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            if (factionStatus.IsAtWar)
+                baseChance += 0.15;
+            if (actor.Ambition == CharacterAmbition.SeekAdventure)
+                baseChance += 0.1;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
-
             var secrets = new List<Guid>();
+            var meritChange = success ? (actor.Ambition == CharacterAmbition.SeekAdventure ? 10 : 5) : -3;
             string notes;
 
             if (success)
             {
-                var severity = 50 + _rng.NextInt(0, 40); // 50..89
+                var severity = 50 + _rng.NextInt(0, 40);
                 Secret secret;
-
                 if (intent.TargetCharacterId.HasValue)
                 {
                     var about = _chars.GetById(intent.TargetCharacterId.Value);
                     secret = new Secret(
-                        Guid.NewGuid(),
-                        SecretType.PersonalInformation,
-                        about != null ? $"Informations observed for {about.Name}" : "Target informations observed",
-                        intent.TargetCharacterId.Value,
-                        null,
-                        severity,
-                        currentYear,
-                        currentMonth);
+                        Guid.NewGuid(), SecretType.PersonalInformation,
+                        about != null ? $"Information observed for {about.Name}" : "Target information observed",
+                        intent.TargetCharacterId.Value, null, severity, currentYear, currentMonth);
                 }
                 else
                 {
                     secret = new Secret(
-                        Guid.NewGuid(),
-                        SecretType.MilitaryDisposition,
-                        "Enemy fleet movement intel",
-                        null,
-                        intent.TargetFactionId,
-                        severity,
-                        currentYear,
-                        currentMonth);
+                        Guid.NewGuid(), SecretType.MilitaryDisposition,
+                        "Enemy fleet movement intel", null, intent.TargetFactionId, severity, currentYear, currentMonth);
                 }
-
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
                 notes = intent.TargetCharacterId.HasValue
-                    ? "Acquired sensitive personal informations."
+                    ? "Acquired sensitive personal information."
                     : "Acquired fleet disposition report.";
+                actor.GainMerit(meritChange);
+                _chars.Save(actor);
             }
             else
             {
                 notes = "Operation compromised or yielded nothing.";
+                if (intent.TargetFactionId.HasValue)
+                    _diplomacy.AdjustRelations(_factions.GetFactionIdForCharacter(actor.Id), intent.TargetFactionId.Value, -5);
             }
 
             var ev = new SocialEvent(
-                Guid.NewGuid(),
-                currentYear,
-                currentMonth,
-                SocialEventType.EspionageOperation,
-                actor.Id,
-                intent.TargetCharacterId,
-                intent.TargetFactionId,
-                success,
-                0,
-                0,
-                secrets,
-                notes
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.EspionageOperation,
+                actor.Id, intent.TargetCharacterId, intent.TargetFactionId, null, success,
+                0, 0, secrets, notes
             );
-
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
 
         #region Bribe
-        private IEnumerable<ISocialEvent> ResolveBribe(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        private IEnumerable<ISocialEvent> ResolveBribe(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
         {
             if (!intent.TargetCharacterId.HasValue)
                 return Array.Empty<ISocialEvent>();
@@ -247,55 +270,53 @@ namespace SkyHorizont.Infrastructure.Social
             if (target == null || !target.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
-            var corruptibility = (100 - target.Personality.Conscientiousness + 100 - target.Personality.Agreeableness) / 200.0; // 0..1
-            var baseChance = 0.15 + corruptibility * 0.6; // Up to ~0.75
-            baseChance += (actor.Personality.Extraversion - 50) * 0.002;
+            var corruptibility = (100 - target.Personality.Conscientiousness + 100 - target.Personality.Agreeableness) / 200.0;
+            var baseChance = 0.15 + corruptibility * 0.6;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Extraversion"])
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            if (factionStatus.EconomyWeak) baseChance += 0.1;
+            if (actor.Ambition == CharacterAmbition.BuildWealth) baseChance += 0.1;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
-
-            var deltaActorToTarget = success ? +3 : -5;
-            var deltaTargetToActor = success ? +8 : -10;
+            var deltaActorToTarget = success ? 3 : -5;
+            var deltaTargetToActor = success ? 8 : -10;
+            var meritChange = success ? (actor.Ambition == CharacterAmbition.BuildWealth ? 8 : 4) : -5;
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, success ? "Successful bribe" : "Bribe rebuffed");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Took the money" : "Offended by bribe");
+            actor.GainMerit(meritChange);
+            _chars.Save(actor);
 
             var secrets = new List<Guid>();
             if (success)
             {
                 var secret = new Secret(
-                    Guid.NewGuid(),
-                    SecretType.Corruption,
-                    $"{target.Name} accepted bribes.",
-                    target.Id,
-                    null,
-                    60 + _rng.NextInt(0, 25),
-                    currentYear,
-                    currentMonth);
+                    Guid.NewGuid(), SecretType.Corruption,
+                    $"{target.Name} accepted bribes.", target.Id, null,
+                    60 + _rng.NextInt(0, 25), currentYear, currentMonth);
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
+                _diplomacy.AdjustRelations(_factions.GetFactionIdForCharacter(actor.Id), _factions.GetFactionIdForCharacter(target.Id), 5);
+            }
+            else
+            {
+                _diplomacy.AdjustRelations(_factions.GetFactionIdForCharacter(actor.Id), _factions.GetFactionIdForCharacter(target.Id), -5);
             }
 
             var ev = new SocialEvent(
-                Guid.NewGuid(),
-                currentYear,
-                currentMonth,
-                SocialEventType.BriberyAttempt,
-                actor.Id,
-                target.Id,
-                null,
-                success,
-                deltaActorToTarget,
-                deltaTargetToActor,
-                secrets,
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.BriberyAttempt,
+                actor.Id, target.Id, null, null, success,
+                deltaActorToTarget, deltaTargetToActor, secrets,
                 success ? "Greased palms; influence secured." : "Refusal and offense taken."
             );
-
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
 
         #region Recruit
-        private IEnumerable<ISocialEvent> ResolveRecruit(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        private IEnumerable<ISocialEvent> ResolveRecruit(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus, Guid actorFactionId)
         {
             if (!intent.TargetCharacterId.HasValue)
                 return Array.Empty<ISocialEvent>();
@@ -303,40 +324,46 @@ namespace SkyHorizont.Infrastructure.Social
             if (target == null || !target.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
-            var pitch = 0.25
-                + (actor.Personality.Agreeableness - 50) * 0.002
-                + (actor.Personality.Extraversion - 50) * 0.002
-                + (int)actor.Rank * 0.02;
+            var baseChance = 0.25 + (actor.Personality.Agreeableness - 50) * 0.002 + (actor.Personality.Extraversion - 50) * 0.002 + (int)actor.Rank * 0.02;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Extraversion"].Concat(traits["Agreeableness"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            if (factionStatus.HasUnrest) baseChance += 0.1;
+            if (actor.Ambition == CharacterAmbition.GainPower) baseChance += 0.1;
 
-            var success = _rng.NextDouble() < Clamp01(pitch);
-
-            var deltaActorToTarget = success ? +5 : -2;
-            var deltaTargetToActor = success ? +6 : -4;
+            var success = _rng.NextDouble() < Clamp01(baseChance);
+            var deltaActorToTarget = success ? 5 : -2;
+            var deltaTargetToActor = success ? 6 : -4;
+            var meritChange = success ? (actor.Ambition == CharacterAmbition.GainPower ? 10 : 5) : -3;
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, success ? "Effective recruitment talk" : "Rejected recruitment");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Motivated by recruiter" : "Annoyed by recruiter");
+            if (success)
+            {
+                actor.GainMerit(meritChange);
+                _factions.MoveCharacterToFaction(target.Id, actorFactionId);
+                _chars.Save(actor);
+                _chars.Save(target);
+                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), 5);
+            }
+            else
+            {
+                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -5);
+            }
 
             var ev = new SocialEvent(
-                Guid.NewGuid(),
-                currentYear,
-                currentMonth,
-                SocialEventType.RecruitmentAttempt,
-                actor.Id,
-                target.Id,
-                null,
-                success,
-                deltaActorToTarget,
-                deltaTargetToActor,
-                Array.Empty<Guid>(),
-                success ? "Target agreed to collaborate." : "Recruitment declined."
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.RecruitmentAttempt,
+                actor.Id, target.Id, null, null, success,
+                deltaActorToTarget, deltaTargetToActor, Array.Empty<Guid>(),
+                success ? "Target agreed to join faction." : "Recruitment declined."
             );
-
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
 
         #region Defect
-        private IEnumerable<ISocialEvent> ResolveDefect(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        private IEnumerable<ISocialEvent> ResolveDefect(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
         {
             if (!intent.TargetFactionId.HasValue)
                 return Array.Empty<ISocialEvent>();
@@ -346,80 +373,96 @@ namespace SkyHorizont.Infrastructure.Social
                 return Array.Empty<ISocialEvent>();
 
             var myLeader = _factions.GetLeaderId(myFaction);
-            var dislikeLeader = myLeader.HasValue ? Math.Max(0, -_opinions.GetOpinion(actor.Id, myLeader.Value)) : 0; // 0..100
-
-            var baseChance = 0.05
-                + dislikeLeader / 200.0
-                + (50 - actor.Personality.Conscientiousness) * 0.002
-                + (50 - actor.Personality.Agreeableness) * 0.002;
+            var dislikeLeader = myLeader.HasValue ? Math.Max(0, -_opinions.GetOpinion(actor.Id, myLeader.Value)) : 0;
+            var baseChance = 0.05 + dislikeLeader / 200.0 + (50 - actor.Personality.Conscientiousness) * 0.002 + (50 - actor.Personality.Agreeableness) * 0.002;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Openness"].Concat(traits["Neuroticism"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            if (factionStatus.HasUnrest) baseChance += 0.15;
+            if (actor.Ambition == CharacterAmbition.SeekAdventure) baseChance += 0.1;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
+            var meritChange = success ? (actor.Ambition == CharacterAmbition.GainPower ? 10 : 5) : -5;
+            var secrets = new List<Guid>();
+
+            if (success)
+            {
+                _factions.MoveCharacterToFaction(actor.Id, intent.TargetFactionId.Value);
+                actor.GainMerit(meritChange);
+                _chars.Save(actor);
+                if (myLeader.HasValue)
+                    _opinions.AdjustOpinion(actor.Id, myLeader.Value, -20, "Defected from faction");
+                _diplomacy.AdjustRelations(myFaction, intent.TargetFactionId.Value, -10);
+            }
+            else
+            {
+                var secret = new Secret(
+                    Guid.NewGuid(), SecretType.DefectionPlot,
+                    $"{actor.Name} plotted to defect.", actor.Id, null,
+                    50 + _rng.NextInt(0, 20), currentYear, currentMonth);
+                _secrets.Add(secret);
+                secrets.Add(secret.Id);
+                if (myLeader.HasValue)
+                    _opinions.AdjustOpinion(actor.Id, myLeader.Value, -10, "Suspected defection");
+                _diplomacy.AdjustRelations(myFaction, intent.TargetFactionId.Value, -5);
+            }
 
             var ev = new SocialEvent(
-                Guid.NewGuid(),
-                currentYear,
-                currentMonth,
-                SocialEventType.DefectionAttempt,
-                actor.Id,
-                null,
-                intent.TargetFactionId,
-                success,
-                0,
-                0,
-                Array.Empty<Guid>(),
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.DefectionAttempt,
+                actor.Id, null, intent.TargetFactionId, null, success,
+                0, myLeader.HasValue ? (success ? -20 : -10) : 0, secrets,
                 success ? "Defection succeeded; new allegiance sworn." : "Attempt to defect failed or aborted."
             );
-
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
 
         #region Negotiate
-        private IEnumerable<ISocialEvent> ResolveNegotiate(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        private IEnumerable<ISocialEvent> ResolveNegotiate(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
         {
             if (!intent.TargetFactionId.HasValue)
                 return Array.Empty<ISocialEvent>();
             var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
+            if (myFaction == Guid.Empty)
+                return Array.Empty<ISocialEvent>();
 
-            var baseChance = 0.2
-                + (actor.Personality.Agreeableness - 50) * 0.003
-                + (actor.Personality.Extraversion - 50) * 0.002
-                + (int)actor.Rank * 0.02;
+            var baseChance = 0.2 + (actor.Personality.Agreeableness - 50) * 0.003 + (actor.Personality.Extraversion - 50) * 0.002 + (int)actor.Rank * 0.02;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Agreeableness"].Concat(traits["Extraversion"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            if (factionStatus.EconomyWeak) baseChance += 0.15;
+            if (actor.Ambition == CharacterAmbition.BuildWealth) baseChance += 0.1;
 
-            bool atWar = _factions.IsAtWar(myFaction, intent.TargetFactionId.Value);
-
-            if (atWar)
-                baseChance += 0.0;
-
+            var atWar = _factions.IsAtWar(myFaction, intent.TargetFactionId.Value);
             var success = _rng.NextDouble() < Clamp01(baseChance);
+            var meritChange = success ? (actor.Ambition == CharacterAmbition.BuildWealth ? 8 : 4) : -2;
 
             if (success)
             {
                 var treatyType = ChooseTreatyType(actor, myFaction, intent.TargetFactionId.Value, atWar);
                 _diplomacy.ProposeTreaty(myFaction, intent.TargetFactionId.Value, treatyType);
+                actor.GainMerit(meritChange);
+                _chars.Save(actor);
+            }
+            else
+            {
+                _diplomacy.AdjustRelations(myFaction, intent.TargetFactionId.Value, -5);
             }
 
             var ev = new SocialEvent(
-                Guid.NewGuid(),
-                currentYear,
-                currentMonth,
-                SocialEventType.Negotiation,
-                actor.Id,
-                null,
-                intent.TargetFactionId,
-                success,
-                0,
-                0,
-                Array.Empty<Guid>(),
-                success ? "Talks progressed." : "Talks stalled."
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.Negotiation,
+                actor.Id, null, intent.TargetFactionId, null, success,
+                0, 0, Array.Empty<Guid>(),
+                success ? "Talks progressed with treaty proposed." : "Talks stalled."
             );
-
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
 
         #region Quarrel
-        private IEnumerable<ISocialEvent> ResolveQuarrel(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        private IEnumerable<ISocialEvent> ResolveQuarrel(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
         {
             if (!intent.TargetCharacterId.HasValue)
                 return Array.Empty<ISocialEvent>();
@@ -427,40 +470,37 @@ namespace SkyHorizont.Infrastructure.Social
             if (target == null || !target.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
-            var heat = 0.4
-                + (actor.Personality.Neuroticism - 50) * 0.003
-                + (target.Personality.Neuroticism - 50) * 0.002
-                - (actor.Personality.Agreeableness - 50) * 0.003;
+            var baseChance = 0.4 + (actor.Personality.Neuroticism - 50) * 0.003 + (target.Personality.Neuroticism - 50) * 0.002 - (actor.Personality.Agreeableness - 50) * 0.003;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Neuroticism"])
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            if (factionStatus.HasUnrest) baseChance += 0.1;
 
-            var success = _rng.NextDouble() < Clamp01(heat);
-
+            var success = _rng.NextDouble() < Clamp01(baseChance);
             var deltaActorToTarget = success ? -6 : -2;
             var deltaTargetToActor = success ? -6 : -2;
+            var meritChange = success ? -3 : -1;
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, "Quarrel");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, "Quarrel");
+            actor.GainMerit(meritChange);
+            _chars.Save(actor);
+            if (success)
+                _diplomacy.AdjustRelations(_factions.GetFactionIdForCharacter(actor.Id), _factions.GetFactionIdForCharacter(target.Id), -5);
 
             var ev = new SocialEvent(
-                Guid.NewGuid(),
-                currentYear,
-                currentMonth,
-                SocialEventType.Quarrel,
-                actor.Id,
-                target.Id,
-                null,
-                success,
-                deltaActorToTarget,
-                deltaTargetToActor,
-                Array.Empty<Guid>(),
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.Quarrel,
+                actor.Id, target.Id, null, null, success,
+                deltaActorToTarget, deltaTargetToActor, Array.Empty<Guid>(),
                 success ? "Harsh words exchanged." : "Tense but contained."
             );
-
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
 
         #region Assassinate
-        private IEnumerable<ISocialEvent> ResolveAssassinate(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        private IEnumerable<ISocialEvent> ResolveAssassinate(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus, Guid actorFactionId)
         {
             if (!intent.TargetCharacterId.HasValue)
                 return Array.Empty<ISocialEvent>();
@@ -468,56 +508,56 @@ namespace SkyHorizont.Infrastructure.Social
             if (target == null || !target.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
-            var baseChance = 0.05
-                + actor.Skills.Military / 150.0 // Up to ~0.71
-                + (actor.Personality.Neuroticism - 50) * 0.002
-                + (actor.Personality.Extraversion - 50) * 0.001;
+            var baseChance = 0.05 + actor.Skills.Military / 150.0 + (actor.Personality.Neuroticism - 50) * 0.002 + (actor.Personality.Extraversion - 50) * 0.001;
+            baseChance -= (target.Rank - actor.Rank) * 0.02;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Neuroticism"].Concat(traits["Extraversion"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            baseChance += PersonalityTraits.GetTraitCombinationEffect("ImpulsiveAnger", actor.Personality) / 100.0;
+            var targetTraits = PersonalityTraits.GetActiveTraits(target.Personality);
+            foreach (var (traitName, intensity) in targetTraits["Conscientiousness"])
+                baseChance -= PersonalityTraits.GetTraitEffect(traitName, target.Personality) / 100.0;
+            if (_factions.IsAtWar(actorFactionId, _factions.GetFactionIdForCharacter(target.Id))) baseChance += 0.2;
+            if (factionStatus.HasUnrest) baseChance += 0.1;
+            if (actor.Ambition == CharacterAmbition.GainPower) baseChance += 0.1;
 
-            baseChance -= (target.Rank - actor.Rank) * 0.02; // Harder if target outranks
             var success = _rng.NextDouble() < Clamp01(baseChance);
-
             var secrets = new List<Guid>();
+            var meritChange = success ? (actor.Ambition == CharacterAmbition.GainPower ? 15 : 10) : -10;
+
             if (!success)
             {
                 var secret = new Secret(
-                    Guid.NewGuid(),
-                    SecretType.AssassinationPlot,
-                    $"{actor.Name} allegedly plotted against {target.Name}",
-                    actor.Id,
-                    null,
-                    70 + _rng.NextInt(0, 20),
-                    currentYear,
-                    currentMonth);
+                    Guid.NewGuid(), SecretType.AssassinationPlot,
+                    $"{actor.Name} plotted against {target.Name}", actor.Id, null,
+                    70 + _rng.NextInt(0, 20), currentYear, currentMonth);
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
+                _opinions.AdjustOpinion(target.Id, actor.Id, -10, "Suspected assassination attempt");
+                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -10);
             }
             else
             {
                 target.MarkDead();
                 _chars.Save(target);
+                actor.GainMerit(meritChange);
+                _chars.Save(actor);
+                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -20);
             }
 
             var ev = new SocialEvent(
-                Guid.NewGuid(),
-                currentYear,
-                currentMonth,
-                SocialEventType.AssassinationAttempt,
-                actor.Id,
-                target.Id,
-                null,
-                success,
-                0,
-                0,
-                secrets,
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.AssassinationAttempt,
+                actor.Id, target.Id, null, null, success,
+                0, success ? 0 : -10, secrets,
                 success ? "Target eliminated." : "Attempt failed; whispers spread."
             );
-
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
 
         #region Torture
-        private IEnumerable<ISocialEvent> ResolveTorture(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        private IEnumerable<ISocialEvent> ResolveTorture(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus, Guid actorFactionId)
         {
             if (!intent.TargetCharacterId.HasValue)
                 return Array.Empty<ISocialEvent>();
@@ -525,135 +565,388 @@ namespace SkyHorizont.Infrastructure.Social
             if (target == null || !target.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
-            var baseChance = 0.3
-                + actor.Skills.Military / 200.0 // Up to ~0.8
-                + (50 - actor.Personality.Agreeableness) * 0.003
-                + (actor.Personality.Conscientiousness - 50) * 0.002;
+            var baseChance = 0.3 + actor.Skills.Military / 200.0 + (50 - actor.Personality.Agreeableness) * 0.003 + (actor.Personality.Conscientiousness - 50) * 0.002;
+            baseChance -= (target.Rank - actor.Rank) * 0.01;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Neuroticism"])
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            baseChance += PersonalityTraits.GetTraitCombinationEffect("ImpulsiveAnger", actor.Personality) / 100.0;
+            var targetTraits = PersonalityTraits.GetActiveTraits(target.Personality);
+            foreach (var (traitName, intensity) in targetTraits["Conscientiousness"])
+                baseChance -= PersonalityTraits.GetTraitEffect(traitName, target.Personality) / 100.0;
+            if (_factions.IsAtWar(actorFactionId, _factions.GetFactionIdForCharacter(target.Id))) baseChance += 0.15;
+            if (factionStatus.IsAtWar) baseChance += 0.1;
 
-            baseChance -= (target.Rank - actor.Rank) * 0.01; // Harder if target outranks
             var success = _rng.NextDouble() < Clamp01(baseChance);
+            var secrets = new List<Guid>();
+            var meritChange = success ? 5 : -8;
+            string notes;
 
+            if (success)
+            {
+                var secret = new Secret(
+                    Guid.NewGuid(), SecretType.PersonalInformation,
+                    $"Interrogation of {target.Name} yielded sensitive information.",
+                    target.Id, null, 60 + _rng.NextInt(0, 30), currentYear, currentMonth);
+                _secrets.Add(secret);
+                secrets.Add(secret.Id);
+                notes = "Torture yielded valuable information.";
+                _opinions.AdjustOpinion(actor.Id, target.Id, -10, "Tortured prisoner");
+                _opinions.AdjustOpinion(target.Id, actor.Id, -20, "Victim of torture");
+                target.ApplyTrauma(TraumaType.Torture);
+                actor.GainMerit(meritChange);
+                _chars.Save(actor);
+                _chars.Save(target);
+                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -15);
+            }
+            else
+            {
+                var secret = new Secret(
+                    Guid.NewGuid(), SecretType.TortureAttempt,
+                    $"{actor.Name} attempted to torture {target.Name}.",
+                    actor.Id, null, 50 + _rng.NextInt(0, 20), currentYear, currentMonth);
+                _secrets.Add(secret);
+                secrets.Add(secret.Id);
+                notes = "Torture attempt failed; rumors spread.";
+                _opinions.AdjustOpinion(target.Id, actor.Id, -10, "Failed torture attempt");
+                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -5);
+            }
+
+            var ev = new SocialEvent(
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.TortureAttempt,
+                actor.Id, target.Id, null, null, success,
+                success ? -10 : 0, success ? -20 : -10, secrets, notes
+            );
+            _events.Publish(ev);
+            return new[] { ev };
+        }
+        #endregion
+
+        #region Rape
+        private IEnumerable<ISocialEvent> ResolveRape(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus, Guid actorFactionId)
+        {
+            if (!intent.TargetCharacterId.HasValue)
+                return Array.Empty<ISocialEvent>();
+            var target = _chars.GetById(intent.TargetCharacterId.Value);
+            if (target == null || !target.IsAlive)
+                return Array.Empty<ISocialEvent>();
+
+            var baseChance = 0.2 + (50 - actor.Personality.Agreeableness) * 0.004 + (50 - actor.Personality.Conscientiousness) * 0.003 + (int)actor.Rank * 0.02;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Neuroticism"].Concat(traits["Extraversion"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            baseChance += PersonalityTraits.GetTraitCombinationEffect("ImpulsiveAnger", actor.Personality) / 100.0;
+            var targetTraits = PersonalityTraits.GetActiveTraits(target.Personality);
+            foreach (var (traitName, intensity) in targetTraits["Conscientiousness"])
+                baseChance -= PersonalityTraits.GetTraitEffect(traitName, target.Personality) / 100.0;
+            if (_factions.IsAtWar(actorFactionId, _factions.GetFactionIdForCharacter(target.Id))) baseChance += 0.15;
+            if (factionStatus.HasUnrest) baseChance += 0.05;
+
+            var success = _rng.NextDouble() < Clamp01(baseChance);
+            var secrets = new List<Guid>();
+            var meritChange = success ? -20 : -10;
+            string notes;
+
+            if (success)
+            {
+                var secret = new Secret(
+                    Guid.NewGuid(), SecretType.RapeIncident,
+                    $"{actor.Name} committed a heinous act against {target.Name}.",
+                    actor.Id, null, 80 + _rng.NextInt(0, 15), currentYear, currentMonth);
+                _secrets.Add(secret);
+                secrets.Add(secret.Id);
+                notes = "Act committed; grave consequences loom.";
+                _opinions.AdjustOpinion(actor.Id, target.Id, -15, "Committed rape");
+                _opinions.AdjustOpinion(target.Id, actor.Id, -30, "Victim of rape");
+                target.ApplyTrauma(TraumaType.Rape);
+                if (target.Sex == Sex.Female && target.Age >= 14 && target.Age <= 45)
+                {
+                    target.StartPregnancy(actor.Id, currentYear, currentMonth);
+                    _events.Publish(new DomainEventLog("NonConsensualConception", target.Id, $"perpetrator={actor.Id}; year={currentYear}; month={currentMonth}"));
+                }
+                actor.GainMerit(meritChange);
+                _chars.Save(actor);
+                _chars.Save(target);
+                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -30);
+            }
+            else
+            {
+                var secret = new Secret(
+                    Guid.NewGuid(), SecretType.RapeAttempt,
+                    $"{actor.Name} attempted to assault {target.Name}.",
+                    actor.Id, null, 60 + _rng.NextInt(0, 20), currentYear, currentMonth);
+                _secrets.Add(secret);
+                secrets.Add(secret.Id);
+                notes = "Attempt failed; whispers spread.";
+                _opinions.AdjustOpinion(target.Id, actor.Id, -15, "Failed assault attempt");
+                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -10);
+            }
+
+            var ev = new SocialEvent(
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.RapeAttempt,
+                actor.Id, target.Id, null, null, success,
+                success ? -15 : 0, success ? -30 : -15, secrets, notes
+            );
+            _events.Publish(ev);
+            return new[] { ev };
+        }
+        #endregion
+
+        #region Travel
+        private IEnumerable<ISocialEvent> ResolveTravelToPlanet(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus, SystemSecurity? systemSecurity)
+        {
+            if (!intent.TargetPlanetId.HasValue)
+                return Array.Empty<ISocialEvent>();
+
+            var originPlanetId = FindPlanetOfCharacter(actor.Id);
+            if (!originPlanetId.HasValue)
+                return Array.Empty<ISocialEvent>();
+
+            var destPlanet = _planets.GetById(intent.TargetPlanetId.Value);
+            if (destPlanet == null)
+                return Array.Empty<ISocialEvent>();
+
+            var actorFactionId = _factions.GetFactionIdForCharacter(actor.Id);
+
+            // same success model you had, just executing a fleet-level plan on success
+            var baseChance = 0.8;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Extraversion"].Concat(traits["Openness"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+
+            if (systemSecurity != null && systemSecurity.PirateActivity > 50)
+                baseChance -= systemSecurity.PirateActivity / 500.0;
+            if (destPlanet.UnrestLevel > 50)
+                baseChance -= destPlanet.UnrestLevel / 500.0;
+            if (factionStatus.HasAlliance && _factions.GetFactionIdForPlanet(destPlanet.Id) == actorFactionId)
+                baseChance += 0.1;
+            if (actor.Ambition == CharacterAmbition.SeekAdventure)
+                baseChance += 0.15;
+
+            bool success = _rng.NextDouble() < Clamp01(baseChance);
             var secrets = new List<Guid>();
             string notes;
 
             if (success)
             {
-                // Gain intelligence secret
-                var secret = new Secret(
-                    Guid.NewGuid(),
-                    SecretType.PersonalInformation,
-                    $"Interrogation of {target.Name} yielded sensitive information.",
-                    target.Id,
-                    null,
-                    60 + _rng.NextInt(0, 30),
-                    currentYear,
-                    currentMonth);
-                _secrets.Add(secret);
-                secrets.Add(secret.Id);
-                notes = "Torture yielded valuable information.";
+                // CHANGED: plan travel for a FLEET, adding the actor as a passenger
+                var fleetId = GetAvailableFleet(actorFactionId);
+                if (fleetId == Guid.Empty)
+                {
+                    success = false;
+                    notes = "No available fleet to transport the passenger.";
+                }
+                else
+                {
+                    _travel.PlanFleetTravel(
+                        fleetId: fleetId,
+                        originPlanetId: originPlanetId.Value,
+                        destPlanetId: destPlanet.Id,
+                        cargo: null,
+                        passengerIds: new[] { actor.Id }
+                    );
 
-                // Apply opinion penalties
-                _opinions.AdjustOpinion(actor.Id, target.Id, -10, "Tortured prisoner");
-                _opinions.AdjustOpinion(target.Id, actor.Id, -20, "Victim of torture");
+                    _chars.Save(actor);
+                    notes = "Fleet travel planned; passenger added to manifest.";
 
-                // ToDo: Apply trauma to target (increase mortality risk, handled in CharacterLifecycleService)
-                //target.ApplyTrauma(TraumaType.Torture); 
-                _chars.Save(target);
+                    if (_factions.HasAlliance(actorFactionId, _factions.GetFactionIdForPlanet(destPlanet.Id)))
+                        _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForPlanet(destPlanet.Id), 5);
+                }
             }
             else
             {
-                // Failed torture creates a secret about the attempt
-                var secret = new Secret(
-                    Guid.NewGuid(),
-                    SecretType.TortureAttempt,
-                    $"{actor.Name} attempted to torture {target.Name}.",
-                    actor.Id,
-                    null,
-                    50 + _rng.NextInt(0, 20),
-                    currentYear,
-                    currentMonth);
-                _secrets.Add(secret);
-                secrets.Add(secret.Id);
-                notes = "Torture attempt failed; rumors spread.";
+                notes = "Travel planning failed due to logistical issues or risks.";
+                if (systemSecurity != null && systemSecurity.PirateActivity > 50)
+                {
+                    var secret = new Secret(
+                        Guid.NewGuid(),
+                        SecretType.TravelRisk,
+                        $"{actor.Name} faced high piracy risk en route.",
+                        actor.Id,
+                        null,
+                        50 + _rng.NextInt(0, 20),
+                        currentYear,
+                        currentMonth);
+                    _secrets.Add(secret);
+                    secrets.Add(secret.Id);
+                }
+                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForPlanet(destPlanet.Id), -3);
             }
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
                 currentYear,
                 currentMonth,
-                SocialEventType.TortureAttempt,
+                SocialEventType.TravelBooked,
                 actor.Id,
-                target.Id,
                 null,
+                null,
+                intent.TargetPlanetId,
                 success,
-                success ? -10 : 0,
-                success ? -20 : 0,
+                0,
+                0,
                 secrets,
                 notes
             );
-
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
 
-        #region Rape
-        private IEnumerable<ISocialEvent> ResolveRape(Character actor, CharacterIntent intent, int currentYear, int currentMonth)
+        #region BecomePirate
+        private IEnumerable<ISocialEvent> ResolveBecomePirate(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus, SystemSecurity? systemSecurity)
         {
-            if (!intent.TargetCharacterId.HasValue)
-                return Array.Empty<ISocialEvent>();
-            var target = _chars.GetById(intent.TargetCharacterId.Value);
-            if (target == null || !target.IsAlive)
+            var actorFactionId = _factions.GetFactionIdForCharacter(actor.Id);
+            if (_piracy.IsPirateFaction(actorFactionId))
                 return Array.Empty<ISocialEvent>();
 
-            var baseChance = 0.2
-                + (50 - actor.Personality.Agreeableness) * 0.004
-                + (50 - actor.Personality.Conscientiousness) * 0.003
-                + (int)actor.Rank * 0.02;
+            var baseChance = 0.3 + (50 - actor.Personality.Conscientiousness) * 0.003 + (50 - actor.Personality.Agreeableness) * 0.003;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Extraversion"].Concat(traits["Neuroticism"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            baseChance += PersonalityTraits.GetTraitCombinationEffect("ImpulsiveAnger", actor.Personality) / 100.0;
+            if (systemSecurity != null)
+                baseChance += systemSecurity.PirateActivity / 500.0;
+            if (factionStatus.HasUnrest)
+                baseChance += 0.15;
+            if (actor.Ambition == CharacterAmbition.SeekAdventure)
+                baseChance += 0.15;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
-
+            var meritChange = success ? (actor.Ambition == CharacterAmbition.SeekAdventure ? 10 : 5) : -5;
             var secrets = new List<Guid>();
             string notes;
 
             if (success)
             {
-                // Create secret about the act
-                var secret = new Secret(
-                    Guid.NewGuid(),
-                    SecretType.RapeIncident,
-                    $"{actor.Name} committed a heinous act against {target.Name}.",
-                    actor.Id,
-                    null,
-                    80 + _rng.NextInt(0, 15),
-                    currentYear,
-                    currentMonth);
-                _secrets.Add(secret);
-                secrets.Add(secret.Id);
-                notes = "Act committed; grave consequences loom.";
-
-                // Apply severe opinion penalties
-                _opinions.AdjustOpinion(actor.Id, target.Id, -15, "Committed rape");
-                _opinions.AdjustOpinion(target.Id, actor.Id, -30, "Victim of rape");
-
-                // ToDo: Apply trauma to target
-                //target.ApplyTrauma(TraumaType.Rape);
-                _chars.Save(target);
-
-                // If target is female and of fertile age, initiate non-consensual conception
-                if (target.Sex == Sex.Female && target.Age >= 14 && target.Age <= 45)
+                var pirateFactionId = _piracy.GetPirateFactionId();
+                if (_piracy.BecomePirate(actor.Id))
                 {
-                    target.StartPregnancy(actor.Id, currentYear, currentMonth);
-                    _chars.Save(target);
-                    _events.Publish(new DomainEventLog("NonConsensualConception", target.Id, $"perpetrator={actor.Id}; year={currentYear}; month={currentMonth}"));
+                    _factions.MoveCharacterToFaction(actor.Id, pirateFactionId);
+                    actor.GainMerit(meritChange);
+                    _chars.Save(actor);
+                    var leaderId = _factions.GetLeaderId(actorFactionId);
+                    if (leaderId.HasValue)
+                        _opinions.AdjustOpinion(actor.Id, leaderId.Value, -20, "Defected to pirates");
+                    _diplomacy.AdjustRelations(actorFactionId, pirateFactionId, -15);
+                    notes = "Joined pirates successfully.";
+                }
+                else
+                {
+                    notes = "Failed to join pirates.";
+                    success = false;
                 }
             }
             else
             {
-                // Failed attempt creates a secret
+                var secret = new Secret(
+                    Guid.NewGuid(), SecretType.DefectionPlot,
+                    $"{actor.Name} considered joining pirates.", actor.Id, null,
+                    50 + _rng.NextInt(0, 20), currentYear, currentMonth);
+                _secrets.Add(secret);
+                secrets.Add(secret.Id);
+                notes = "Attempt to join pirates failed.";
+                var leaderId = _factions.GetLeaderId(actorFactionId);
+                if (leaderId.HasValue)
+                    _opinions.AdjustOpinion(actor.Id, leaderId.Value, -10, "Suspected pirate defection");
+                _diplomacy.AdjustRelations(actorFactionId, _piracy.GetPirateFactionId(), -5);
+            }
+
+            var ev = new SocialEvent(
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.PirateDefection,
+                actor.Id, null, null, null, success,
+                0, 0, secrets, notes
+            );
+            _events.Publish(ev);
+            return new[] { ev };
+        }
+        #endregion
+
+        #region RaidConvoy
+        private IEnumerable<ISocialEvent> ResolveRaidConvoy(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus, SystemSecurity? systemSecurity)
+        {
+            if (!intent.TargetFactionId.HasValue || systemSecurity == null)
+                return Array.Empty<ISocialEvent>();
+
+            var actorFactionId = _factions.GetFactionIdForCharacter(actor.Id);
+            if (!_piracy.IsPirateFaction(actorFactionId))
+                return Array.Empty<ISocialEvent>();
+
+            var targetSystemId = intent.TargetFactionId!.Value;
+
+            var baseChance = 0.3 + actor.Skills.Military / 200.0;
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Extraversion"].Concat(traits["Neuroticism"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+            baseChance += PersonalityTraits.GetTraitCombinationEffect("ImpulsiveAnger", actor.Personality) / 100.0;
+            baseChance += systemSecurity.Traffic / 500.0;
+            baseChance -= systemSecurity.PatrolStrength / 500.0;
+            if (actor.Ambition == CharacterAmbition.SeekAdventure) baseChance += 0.15;
+
+            var success = _rng.NextDouble() < Clamp01(baseChance);
+            var secrets = new List<Guid>();
+            var meritChange = success ? (actor.Ambition == CharacterAmbition.SeekAdventure ? 12 : 8) : -5;
+            string notes;
+
+            if (success)
+            {
+                var plan = GetRandomTravelPlanInSystem(targetSystemId);
+                if (plan != null)
+                {
+                    var convoyFleet = _fleets.GetById(plan.FleetId);
+                    var pirateFleet = GetPirateFleet(actorFactionId);
+
+                    if (convoyFleet == null || pirateFleet == null)
+                    {
+                        notes = "No valid fleets available for the raid.";
+                        success = false;
+                    }
+                    else
+                    {
+                        var result = ResolveFleetBattleQuick(pirateFleet, convoyFleet);
+
+                        _battleOutcomeService.ProcessFleetBattle(pirateFleet, convoyFleet, result);
+
+                        if (result.WinnerFleet?.Id == pirateFleet.Id)
+                        {
+                            notes = "Convoy raid succeeded; resources captured.";
+                            actor.GainMerit(meritChange);
+
+                            // give pirates some physical loot too
+                            var resources = new Resources(_rng.NextInt(50, 200), _rng.NextInt(50, 200), _rng.NextInt(50, 200));
+                            pirateFleet.AddCargo(resources);
+
+                            _chars.Save(actor);
+                            _fleets.Save(pirateFleet);
+                            _fleets.Save(convoyFleet);
+
+                            _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForSystem(targetSystemId), -20);
+                        }
+                        else
+                        {
+                            notes = "Convoy raid failed in battle.";
+                            success = false;
+                            actor.GainMerit(-meritChange);
+                            _chars.Save(actor);
+                            _fleets.Save(pirateFleet);
+                            _fleets.Save(convoyFleet);
+                            _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForSystem(targetSystemId), -10);
+                        }
+                    }
+                }
+                else
+                {
+                    notes = "No suitable convoy found for raid.";
+                    success = false;
+                    _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForSystem(targetSystemId), -5);
+                }
+            }
+            else
+            {
                 var secret = new Secret(
                     Guid.NewGuid(),
-                    SecretType.RapeAttempt,
-                    $"{actor.Name} attempted to assault {target.Name}.",
+                    SecretType.PiracyAttempt,
+                    $"{actor.Name} planned a convoy raid.",
                     actor.Id,
                     null,
                     60 + _rng.NextInt(0, 20),
@@ -661,24 +954,33 @@ namespace SkyHorizont.Infrastructure.Social
                     currentMonth);
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
-                notes = "Attempt failed; whispers spread.";
+                notes = "Raid planning failed; whispers spread.";
+                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForSystem(targetSystemId), -10);
+            }
+
+            var ok = _piracy.RegisterAmbush(actor.Id, targetSystemId, currentYear, currentMonth);
+            if (!ok && success)
+            {
+                notes = "Raid succeeded but ambush registration failed.";
+                success = false;
             }
 
             var ev = new SocialEvent(
                 Guid.NewGuid(),
                 currentYear,
                 currentMonth,
-                SocialEventType.RapeAttempt,
+                SocialEventType.RaidPlanned,
                 actor.Id,
-                target.Id,
+                null,
+                intent.TargetFactionId,
                 null,
                 success,
-                success ? -15 : 0,
-                success ? -30 : 0,
+                0,
+                0,
                 secrets,
                 notes
             );
-
+            _events.Publish(ev);
             return new[] { ev };
         }
         #endregion
@@ -692,31 +994,23 @@ namespace SkyHorizont.Infrastructure.Social
                 return TreatyType.Ceasefire;
 
             var p = actor.Personality;
+            var traits = PersonalityTraits.GetActiveTraits(p);
+            double allianceScore = 20 + actor.Skills.Military * 0.20;
+            if (traits["Extraversion"].Any(t => t.Name == "Assertive")) allianceScore += 10;
+            if (traits["Extraversion"].Any(t => t.Name == "ThrillSeeker")) allianceScore += 5;
+            allianceScore -= (p.Agreeableness - 50) * 0.10;
 
-            double allianceScore =
-                20
-                + actor.Skills.Military * 0.20
-                + (PersonalityTraits.Assertive(p) ? 10 : 0)
-                + (PersonalityTraits.ThrillSeeker(p) ? 5 : 0)
-                - (p.Agreeableness - 50) * 0.10;
+            double tradeScore = 20 + actor.Skills.Economy * 0.30;
+            if (traits["Agreeableness"].Any(t => t.Name == "Cooperative")) tradeScore += 10;
+            if (traits["Extraversion"].Any(t => t.Name == "Cheerful")) tradeScore += 5;
 
-            double tradeScore =
-                20
-                + actor.Skills.Economy * 0.30
-                + (PersonalityTraits.Cooperative(p) ? 10 : 0)
-                + (PersonalityTraits.Cheerful(p) ? 5 : 0);
+            double researchScore = 15 + actor.Skills.Research * 0.35;
+            if (traits["Openness"].Any(t => t.Name == "IntellectuallyCurious")) researchScore += 12;
+            if (traits["Conscientiousness"].Any(t => t.Name == "SelfEfficient")) researchScore += 3;
 
-            double researchScore =
-                15
-                + actor.Skills.Research * 0.35
-                + (PersonalityTraits.IntellectuallyCurious(p) ? 12 : 0)
-                + (PersonalityTraits.SelfEfficient(p) ? 3 : 0);
-
-            double napScore =
-                10
-                + p.Agreeableness * 0.20
-                + (PersonalityTraits.Trusting(p) ? 8 : 0)
-                - (PersonalityTraits.EasilyAngered(p) ? 8 : 0);
+            double napScore = 10 + p.Agreeableness * 0.20;
+            if (traits["Agreeableness"].Any(t => t.Name == "Trusting")) napScore += 8;
+            if (traits["Neuroticism"].Any(t => t.Name == "EasilyAngered")) napScore -= 8;
 
             allianceScore += (int)actor.Rank * 1.5;
 
@@ -730,6 +1024,121 @@ namespace SkyHorizont.Infrastructure.Social
 
             return best;
         }
+
+        private Guid? FindPlanetOfCharacter(Guid characterId)
+        {
+            foreach (var p in _planets.GetAll())
+                if (p.Citizens.Contains(characterId) || p.Prisoners.Contains(characterId))
+                    return p.Id;
+            return null;
+        }
+
+        private Guid? FindSystemOfCharacter(Guid characterId)
+        {
+            foreach (var p in _planets.GetAll())
+                if (p.Citizens.Contains(characterId) || p.Prisoners.Contains(characterId))
+                    return p.SystemId;
+            foreach (var f in _fleets.GetAll())
+                if (f.AssignedCharacterId == characterId || f.Prisoners.Contains(characterId))
+                    return f.CurrentSystemId;
+            return null;
+        }
+
+        private FactionStatus GetFactionStatus(Guid factionId)
+        {
+            if (_factionStatusCache.TryGetValue(factionId, out var status))
+                return status;
+
+            var isAtWar = _factions.GetAllRivalFactions(factionId).Any(f => _factions.IsAtWar(factionId, f));
+            var hasAlliance = _factions.GetAllRivalFactions(factionId).Any(f => _factions.HasAlliance(factionId, f));
+            var hasUnrest = _planets.GetPlanetsControlledByFaction(factionId).Any(p => p.UnrestLevel > 50);
+            var economyWeak = _factions.GetEconomicStrength(factionId) < 50;
+
+            status = new FactionStatus(isAtWar, hasAlliance, hasUnrest, economyWeak);
+            _factionStatusCache[factionId] = status;
+            return status;
+        }
+
+        private SystemSecurity GetSystemSecurity(Guid systemId)
+        {
+            if (_systemSecurityCache.TryGetValue(systemId, out var security))
+                return security;
+
+            var securityLevel = _piracy.GetPirateActivity(systemId);
+            var traffic = _piracy.GetTrafficLevel(systemId);
+            var patrolStrength = _planets.GetAll()
+                .Where(p => p.SystemId == systemId)
+                .Sum(p => p.StationedTroops + p.BaseDefense);
+
+            security = new SystemSecurity(systemId, (int)patrolStrength, securityLevel, traffic);
+            _systemSecurityCache[systemId] = security;
+            return security;
+        }
+
+        private Guid GetAvailableFleet(Guid factionId, bool isEscort = false)
+        {
+            var fleets = _fleets
+                .GetFleetsForFaction(factionId)
+                .Where(f => !f.Orders.Any(o => o.Status == TaskStatus.Active))
+                .ToList();
+            if (!fleets.Any()) return Guid.Empty;
+            return fleets[_rng.NextInt(0, fleets.Count)].Id;
+        }
+
+        private TravelPlan? GetRandomTravelPlanInSystem(Guid systemId)
+        {
+            var plans = _travel.GetPlansInSystem(systemId).ToList();
+            if (!plans.Any()) return null;
+            return plans[_rng.NextInt(0, plans.Count)];
+        }
+
+        private Fleet GetPirateFleet(Guid factionId)
+        {
+            var fleets = _fleets.GetFleetsForFaction(factionId)
+                                .Where(f => _piracy.IsPirateFaction(f.FactionId))
+                                .ToList();
+            if (!fleets.Any())
+                return new Fleet(Guid.NewGuid(), factionId, Guid.Empty, _piracy);
+            return fleets[_rng.NextInt(0, fleets.Count)];
+        }
+
+        // ToDo: replace with your preferred combat sim when available
+        private BattleResult ResolveFleetBattleQuick(Fleet attacker, Fleet defender)
+        {
+            var atk = Math.Max(1.0, attacker.CalculateStrength().MilitaryPower);
+            var def = Math.Max(1.0, defender.CalculateStrength().MilitaryPower);
+
+            var p = atk / (atk + def);
+            p = Math.Clamp(p + (_rng.NextDouble() - 0.5) * 0.1, 0.05, 0.95);
+
+            var attackerWins = _rng.NextDouble() < p;
+
+            var winner = attackerWins ? attacker : defender;
+            var loser  = attackerWins ? defender : attacker;
+
+            var loot = (int)Math.Round(def * (attackerWins ? 3.0 : 1.0));
+            var merit = attackerWins ? 8 : -4;
+
+            return new BattleResult(
+                Guid.NewGuid(),
+                winningFactionId: winner.FactionId,
+                losingFactionId: loser.FactionId,
+                winnerFleet: winner,
+                loserFleet: loser,
+                attackerWins: attackerWins,
+                defenseRetreated: !attackerWins && def > atk * 1.2,
+                lootCredits: loot,
+                outcomeMerit: merit,
+                planetCaptureBonus: 0,
+                occupationDurationHours: 0
+            );
+        }
         #endregion
+    }
+
+    public sealed class InteractionConfig
+    {
+        public bool DisableSensitiveIntents { get; init; } = true;
+        public static InteractionConfig Default => new();
     }
 }

@@ -8,6 +8,13 @@ namespace SkyHorizont.Domain.Entity
         High = 3
     }
 
+    public enum TraitKind
+    {
+        Any = 0,
+        Trait = 1,
+        Combination = 2
+    }
+
     public record TraitDefinition(
         string Name,
         string Dimension, // Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism
@@ -300,11 +307,7 @@ namespace SkyHorizont.Domain.Entity
         /// <returns>The gameplay effect value (e.g., score bonus or penalty).</returns>
         public static double GetTraitEffect(string traitName, Personality personality)
         {
-            var trait = Traits.Find(t => t.Name == traitName);
-            if (trait == null)
-                throw new ArgumentException($"Unknown trait: {traitName}", nameof(traitName));
-            var intensity = trait.IntensityEvaluator(personality);
-            return trait.GameplayEffect(personality, intensity);
+            return GetTraitEffect(traitName, personality, TraitKind.Trait);
         }
 
         /// <summary>
@@ -315,16 +318,98 @@ namespace SkyHorizont.Domain.Entity
         /// <returns>The combined gameplay effect value (e.g., score bonus).</returns>
         public static double GetTraitCombinationEffect(string combinationName, Personality personality)
         {
-            var combination = TraitCombinations.Find(c => c.Name == combinationName);
-            if (combination == null)
-                throw new ArgumentException($"Unknown trait combination: {combinationName}", nameof(combinationName));
+            return GetTraitEffect(combinationName, personality, TraitKind.Combination);
+        }
 
-            var intensities = combination.TraitNames
-                .Select(t => GetTraitIntensity(t, personality))
-                .ToArray();
-            if (intensities.All(i => i >= combination.MinimumIntensity))
-                return combination.CombinedEffect(personality, intensities);
+        /// <summary>
+        /// Returns the gameplay effect for a name that can refer to either a Trait or a TraitCombination.
+        /// Use 'kind' to force resolution if you have name collisions.
+        /// Throws if not found or ambiguous (when kind == Any and both exist).
+        /// </summary>
+        public static double GetTraitEffect(string name, Personality personality, TraitKind kind = TraitKind.Any)
+        {
+            if (TryGetTraitEffect(name, personality, out var effect, kind))
+                return effect;
+
+            // Build a clear error
+            bool traitExists = Traits.Any(t => t.Name == name);
+            bool comboExists = TraitCombinations.Any(c => c.Name == name);
+
+            if (!traitExists && !comboExists)
+                throw new ArgumentException($"Unknown trait or combination: '{name}'", nameof(name));
+
+            if (kind == TraitKind.Any && traitExists && comboExists)
+                throw new InvalidOperationException(
+                    $"Name '{name}' exists as both a Trait and a TraitCombination. " +
+                    $"Disambiguate using TraitKind.Trait or TraitKind.Combination.");
+
+            // If we got here, it means resolution produced no active effect (e.g., intensities below threshold).
             return 0.0;
+        }
+
+        /// <summary>
+        /// Safe resolver: returns false if name not found or inactive (effect 0).
+        /// </summary>
+        public static bool TryGetTraitEffect(string name, Personality personality, out double effect, TraitKind kind = TraitKind.Any)
+        {
+            effect = 0.0;
+
+            bool traitExists = Traits.Any(t => t.Name == name);
+            bool comboExists = TraitCombinations.Any(c => c.Name == name);
+
+            if (kind == TraitKind.Trait || (kind == TraitKind.Any && traitExists && !comboExists))
+            {
+                var trait = Traits.FirstOrDefault(t => t.Name == name);
+                if (trait == null) return false;
+                var intensity = trait.IntensityEvaluator(personality);
+                if (intensity == TraitIntensity.None) return false;
+                effect = trait.GameplayEffect(personality, intensity);
+                return effect != 0.0;
+            }
+
+            if (kind == TraitKind.Combination || (kind == TraitKind.Any && comboExists && !traitExists))
+            {
+                var combo = TraitCombinations.FirstOrDefault(c => c.Name == name);
+                if (combo == null) return false;
+                var intensities = combo.TraitNames.Select(tn => GetTraitIntensity(tn, personality)).ToArray();
+                if (!intensities.All(i => i >= combo.MinimumIntensity)) return false;
+                effect = combo.CombinedEffect(personality, intensities);
+                return effect != 0.0;
+            }
+
+            // Ambiguous: both exist and kind == Any → let caller decide (we treat as not resolved here)
+            return false;
+        }
+
+        /// <summary>
+        /// Returns every active (non-zero) effect across traits and combinations with their kind.
+        /// Useful for UI/debugging or aggregate scoring.
+        /// </summary>
+        public static List<(string Name, double Effect, TraitKind Kind)> GetAllActiveEffects(Personality personality)
+        {
+            var results = new List<(string, double, TraitKind)>(Traits.Count + TraitCombinations.Count);
+
+            // Traits
+            foreach (var trait in Traits)
+            {
+                var intensity = trait.IntensityEvaluator(personality);
+                if (intensity == TraitIntensity.None) continue;
+                var eff = trait.GameplayEffect(personality, intensity);
+                if (eff != 0.0)
+                    results.Add((trait.Name, eff, TraitKind.Trait));
+            }
+
+            // Combinations
+            foreach (var combo in TraitCombinations)
+            {
+                var intensities = combo.TraitNames.Select(tn => GetTraitIntensity(tn, personality)).ToArray();
+                if (!intensities.All(i => i >= combo.MinimumIntensity)) continue;
+                var eff = combo.CombinedEffect(personality, intensities);
+                if (eff != 0.0)
+                    results.Add((combo.Name, eff, TraitKind.Combination));
+            }
+
+            return results;
         }
 
         /// <summary>

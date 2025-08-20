@@ -1,3 +1,4 @@
+using SkyHorizont.Domain.Factions;
 using SkyHorizont.Infrastructure.Persistence.Interfaces;
 
 namespace SkyHorizont.Infrastructure.Persistence
@@ -13,6 +14,8 @@ namespace SkyHorizont.Infrastructure.Persistence
         // Store as normalized unordered pairs (minGuid, maxGuid)
         public HashSet<(Guid a, Guid b)> WarPairs { get; } = new();
         public HashSet<(Guid a, Guid b)> RivalPairs { get; } = new();
+
+        public Dictionary<Guid, Faction?> Factions { get; } = new();
 
         public void SaveChanges()
         {

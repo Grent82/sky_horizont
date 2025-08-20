@@ -12,7 +12,10 @@ namespace SkyHorizont.Domain.Social
         Quarrel,
         AssassinationAttempt,
         TortureAttempt,
-        RapeAttempt
+        RapeAttempt,
+        TravelBooked,
+        PirateDefection,
+        RaidPlanned
     }
 
     public interface ISocialEvent
@@ -24,13 +27,10 @@ namespace SkyHorizont.Domain.Social
         Guid ActorId { get; }
         Guid? TargetCharacterId { get; }
         Guid? TargetFactionId { get; }
+        Guid? TargetPlanetId { get; }
         bool Success { get; }
-
-        // Opinion/affection deltas for convenience (apply already done by resolver)
         int DeltaOpinionActorToTarget { get; }
         int DeltaOpinionTargetToActor { get; }
-
-        // Any new secrets uncovered or created by this event
         IReadOnlyList<Guid> SecretIds { get; }
         string Notes { get; }
     }
@@ -43,6 +43,7 @@ namespace SkyHorizont.Domain.Social
         Guid ActorId,
         Guid? TargetCharacterId,
         Guid? TargetFactionId,
+        Guid? TargetPlanetId,
         bool Success,
         int DeltaOpinionActorToTarget,
         int DeltaOpinionTargetToActor,

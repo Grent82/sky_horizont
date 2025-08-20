@@ -14,11 +14,11 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private static readonly Dictionary<TreatyType, int?> DurationByType = new()
         {
-            { TreatyType.Ceasefire,      6 },
+            { TreatyType.Ceasefire, 6 },
             { TreatyType.NonAggression, 12 },
-            { TreatyType.Trade,         24 },
-            { TreatyType.ResearchPact,  24 },
-            { TreatyType.Alliance,      36 }, // make null for indefinite if you prefer
+            { TreatyType.Trade, 24 },
+            { TreatyType.ResearchPact, 24 },
+            { TreatyType.Alliance, 36 }
         };
 
         public DiplomacyService(
@@ -38,12 +38,10 @@ namespace SkyHorizont.Infrastructure.DomainServices
             if (fromFaction == Guid.Empty || toFaction == Guid.Empty || fromFaction == toFaction)
                 return;
 
-            // If at war, only allow de-escalation treaties
             bool atWar = _factions.IsAtWar(fromFaction, toFaction);
             if (atWar && type is not (TreatyType.Ceasefire or TreatyType.NonAggression))
                 return;
 
-            // Abort if an active treaty of the same type already exists
             var activeSameType = _treaties.FindBetween(fromFaction, toFaction)
                 .Any(t => t.Type == type && !IsExpired(t));
             if (activeSameType) return;
@@ -56,7 +54,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
             var treaty = new Treaty(Guid.NewGuid(), fromFaction, toFaction, type, startTurn, endTurn);
             _treaties.Add(treaty);
 
-            // Light opinion boost between leaders to reflect goodwill
             var aLeader = _factions.GetLeaderId(fromFaction);
             var bLeader = _factions.GetLeaderId(toFaction);
             if (aLeader.HasValue && bLeader.HasValue)
@@ -64,6 +61,34 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 _opinions.AdjustOpinion(aLeader.Value, bLeader.Value, +10, $"Treaty signed: {type}");
                 _opinions.AdjustOpinion(bLeader.Value, aLeader.Value, +10, $"Treaty signed: {type}");
             }
+
+            AdjustRelations(fromFaction, toFaction, type == TreatyType.Alliance ? 20 : 10);
+        }
+
+        public void AdjustRelations(Guid factionA, Guid factionB, int delta)
+        {
+            if (factionA == Guid.Empty || factionB == Guid.Empty || factionA == factionB)
+                return;
+
+            var faction = _factions.GetFaction(factionA);
+            if (faction == null) return;
+
+            var newVal = faction.Diplomacy.TryGetValue(factionB, out var current)
+                ? current.Adjust(delta)
+                : new DiplomaticStanding(delta);
+            faction.UpdateDiplomacy(factionB, newVal);
+
+            var otherFaction = _factions.GetFaction(factionB);
+            if (otherFaction != null)
+            {
+                var reciprocalVal = otherFaction.Diplomacy.TryGetValue(factionA, out var currentB)
+                    ? currentB.Adjust(delta)
+                    : new DiplomaticStanding(delta);
+                otherFaction.UpdateDiplomacy(factionA, reciprocalVal);
+            }
+
+            _factions.Save(faction);
+            if (otherFaction != null) _factions.Save(otherFaction);
         }
 
         public void TickTreaties()
@@ -73,16 +98,11 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             foreach (var t in all)
             {
-                // Expire by time
                 if (t.EndTurn.HasValue && t.EndTurn.Value <= now)
                 {
-                    _treaties.Remove(t.Id);
+                    EndTreaty(t, "Expired naturally");
                     continue;
                 }
-
-                // ToDo: (Hook) Violations / casus belli:
-                // If you later track violations (border incidents, espionage during NAP, etc.),
-                // call EndTreaty(t, reason) here and maybe adjust opinions / add a CB flag.
             }
         }
 
@@ -93,7 +113,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         }
 
         private int CurrentTurn() => _clock.CurrentYear * _clock.MonthsPerYear + _clock.CurrentMonth;
-        
+
         private void EndTreaty(Treaty t, string reason, int opinionHit = -8)
         {
             _treaties.Remove(t.Id);
@@ -104,6 +124,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 _opinions.AdjustOpinion(aLeader.Value, bLeader.Value, opinionHit, $"Treaty ended: {t.Type} ({reason})");
                 _opinions.AdjustOpinion(bLeader.Value, aLeader.Value, opinionHit, $"Treaty ended: {t.Type} ({reason})");
             }
+            AdjustRelations(t.FactionA, t.FactionB, -10);
         }
     }
 }

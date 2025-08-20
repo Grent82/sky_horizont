@@ -1,4 +1,3 @@
-
 using SkyHorizont.Domain.Shared;
 
 namespace SkyHorizont.Domain.Factions
@@ -7,15 +6,13 @@ namespace SkyHorizont.Domain.Factions
     {
         private readonly HashSet<Guid> _characterIds = new();
         private readonly HashSet<Guid> _planetIds = new();
+        private readonly Dictionary<Guid, DiplomaticStanding> _diplomacy = new();
 
         public Guid Id { get; }
         public string Name { get; private set; }
         public Guid LeaderId { get; private set; }
         public IReadOnlyCollection<Guid> CharacterIds => _characterIds.ToList().AsReadOnly();
         public IReadOnlyCollection<Guid> PlanetIds => _planetIds.ToList().AsReadOnly();
-
-        // Diplomacy with others: key = other‑faction ID
-        private readonly Dictionary<Guid, DiplomaticStanding> _diplomacy = new();
         public IReadOnlyDictionary<Guid, DiplomaticStanding> Diplomacy => _diplomacy;
 
         public Faction(Guid id, string name, Guid leaderId)
@@ -46,9 +43,12 @@ namespace SkyHorizont.Domain.Factions
             var newVal = _diplomacy.TryGetValue(other.Id, out var current)
                 ? current.Adjust(proposedChange)
                 : new DiplomaticStanding(proposedChange);
-
             _diplomacy[other.Id] = newVal;
-            // ToDo: Optionally: signal domain event or auto-copy reciprocal with dampening
+        }
+
+        public void UpdateDiplomacy(Guid otherFactionId, DiplomaticStanding standing)
+        {
+            _diplomacy[otherFactionId] = standing;
         }
 
         public DiplomaticStanding GetStandingWith(Faction other)
@@ -71,10 +71,8 @@ namespace SkyHorizont.Domain.Factions
 
         public void ChangeLeader(Guid newLeader)
         {
-            if (! _characterIds.Contains(newLeader))
-                throw new DomainException(
-                    $"Character {newLeader} is not part of faction {Name}.");
-
+            if (!_characterIds.Contains(newLeader))
+                throw new DomainException($"Character {newLeader} is not part of faction {Name}.");
             LeaderId = newLeader;
         }
     }

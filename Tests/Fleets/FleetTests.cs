@@ -13,13 +13,15 @@ using SkyHorizont.Domain.Shared;
 using SkyHorizont.Domain.Entity.Task;
 using TaskStatus = SkyHorizont.Domain.Entity.Task.TaskStatus;
 using System.Data.Common;
+using SkyHorizont.Domain.Travel;
+using SkyHorizont.Infrastructure.DomainServices;
 
 namespace SkyHorizont.Tests.Fleets
 {
     public class FleetTests
     {
-        private static Fleet NewFleet(Guid? id = null, Guid? faction = null, Guid? system = null)
-            => new Fleet(id ?? Guid.NewGuid(), faction ?? Guid.NewGuid(), system ?? Guid.NewGuid());
+        private static Fleet NewFleet(Guid? id = null, Guid? faction = null, Guid? system = null, IPiracyService? pirates = null)
+            => new Fleet(id ?? Guid.NewGuid(), faction ?? Guid.NewGuid(), system ?? Guid.NewGuid(), pirates ?? new PiracyService(null, null, Guid.NewGuid()));
 
         private static Ship MkShip(double atk, double def, double speed = 1, double cargo = 0)
             => new Ship(Guid.NewGuid(), ShipClass.Scout, atk, def, cargoCapacity: cargo, speed: speed, cost: 0);
@@ -28,7 +30,7 @@ namespace SkyHorizont.Tests.Fleets
         [Fact]
         public void Ctor_EmptyId_Throws()
         {
-            Action act = () => new Fleet(Guid.Empty, Guid.NewGuid(), Guid.NewGuid());
+            Action act = () => new Fleet(Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), new PiracyService(null, null, Guid.NewGuid()));
             //act.Should().Throw<ArgumentException>().Where(e => e.ParamName == "id");
         }
 
@@ -39,7 +41,7 @@ namespace SkyHorizont.Tests.Fleets
             var fac = Guid.NewGuid();
             var sys = Guid.NewGuid();
 
-            var f = new Fleet(id, fac, sys);
+            var f = new Fleet(id, fac, sys, new PiracyService(null, null, Guid.NewGuid()));
 
             f.Id.Should().Be(id);
             f.FactionId.Should().Be(fac);
