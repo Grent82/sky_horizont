@@ -86,6 +86,8 @@ namespace SkyHorizont.Infrastructure.Social
                     return ResolveCourt(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.VisitFamily:
                     return ResolveVisitFamily(actor, intent, currentYear, currentMonth, factionStatus);
+                case IntentType.VisitLover:
+                    return ResolveVisitLover(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.Spy:
                     return ResolveSpy(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.Bribe:
@@ -196,6 +198,118 @@ namespace SkyHorizont.Infrastructure.Social
             _events.Publish(ev);
             return new[] { ev };
         }
+        #endregion
+
+        #region 
+        private IEnumerable<ISocialEvent> ResolveVisitLover(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
+        {
+            if (!intent.TargetCharacterId.HasValue)
+                return Array.Empty<ISocialEvent>();
+
+            var lover = _chars.GetById(intent.TargetCharacterId.Value);
+            if (lover == null || !lover.IsAlive)
+                return Array.Empty<ISocialEvent>();
+
+            var isRomantic = actor.Relationships.Any(r => r.TargetCharacterId == lover.Id &&
+                (r.Type == RelationshipType.Lover || r.Type == RelationshipType.Spouse));
+            if (!isRomantic)
+                return Array.Empty<ISocialEvent>();
+
+            var originPlanetId = FindPlanetOfCharacter(actor.Id);
+            var loverPlanetId  = FindPlanetOfCharacter(lover.Id);
+
+            var travelSucceeded = true;
+            if (originPlanetId.HasValue && loverPlanetId.HasValue && originPlanetId.Value != loverPlanetId.Value)
+            {
+                var baseTravelChance = 0.75;
+                var systemSecurity = loverPlanetId.HasValue
+                    ? GetSystemSecurity(_planets.GetById(loverPlanetId.Value)?.SystemId ?? Guid.Empty)
+                    : null;
+
+                var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+                foreach (var (traitName, intensity) in traits["Extraversion"].Concat(traits["Openness"]))
+                    baseTravelChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+
+                if (systemSecurity != null)
+                    baseTravelChance -= systemSecurity.PirateActivity / 500.0;
+
+                travelSucceeded = _rng.NextDouble() < Clamp01(baseTravelChance);
+
+                if (travelSucceeded)
+                {
+                    var fleetId = GetAvailableFleet(_factions.GetFactionIdForCharacter(actor.Id));
+                    if (fleetId != Guid.Empty)
+                    {
+                        _travel.PlanFleetTravel(
+                            fleetId: fleetId,
+                            originPlanetId: originPlanetId.Value,
+                            destPlanetId: loverPlanetId.Value,
+                            cargo: null,
+                            passengerIds: new[] { actor.Id }
+                        );
+                    }
+                    else
+                    {
+                        travelSucceeded = false;
+                    }
+                }
+            }
+
+            if (!travelSucceeded)
+            {
+                var failEv = new SocialEvent(
+                    Guid.NewGuid(), currentYear, currentMonth, SocialEventType.LoverVisit,
+                    actor.Id, lover.Id, null, null, Success: false,
+                    0, 0, Array.Empty<Guid>(), "Travel failed; could not visit lover."
+                );
+                _events.Publish(failEv);
+                return new[] { failEv };
+            }
+
+            // together — improve bond, small merit, possible conception (age‑gated)
+            var baseChance = 0.55
+                + (actor.Personality.Agreeableness - 50) * 0.003
+                + (actor.Personality.Extraversion - 50) * 0.002;
+
+            var traits2 = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits2["Agreeableness"].Concat(traits2["Extraversion"]))
+                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
+
+            if (factionStatus.HasAlliance) baseChance += 0.05;
+            var success = _rng.NextDouble() < Clamp01(baseChance);
+
+            var deltaMutual = success ? 8 : 3;
+            _opinions.AdjustOpinion(actor.Id, lover.Id, deltaMutual, "Quality time");
+            _opinions.AdjustOpinion(lover.Id, actor.Id, deltaMutual, "Quality time");
+
+            if (success)
+            {
+                actor.GainMerit(4);
+                _chars.Save(actor);
+
+                var conceptionChance = 0.50;
+                if (lover.Sex == Sex.Female && lover.Age >= 14 && lover.Age <= 45 && _rng.NextDouble() < conceptionChance)
+                {
+                    lover.StartPregnancy(actor.Id, currentYear, currentMonth);
+                    _events.Publish(new DomainEventLog("ConsensualConception", lover.Id, $"partner={actor.Id}; year={currentYear}; month={currentMonth}"));
+                }
+                else if (actor.Sex == Sex.Female && actor.Age >= 14 && actor.Age <= 45 && _rng.NextDouble() < conceptionChance)
+                {
+                    actor.StartPregnancy(lover.Id, currentYear, currentMonth);
+                    _events.Publish(new DomainEventLog("ConsensualConception", actor.Id, $"partner={lover.Id}; year={currentYear}; month={currentMonth}"));
+                }
+            }
+
+            var ev = new SocialEvent(
+                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.LoverVisit,
+                actor.Id, lover.Id, null, null, success,
+                deltaMutual, deltaMutual, Array.Empty<Guid>(),
+                success ? "Shared intimate time together." : "Brief encounter; still appreciated."
+            );
+            _events.Publish(ev);
+            return new[] { ev };
+}
+
         #endregion
 
         #region Spy
@@ -1075,7 +1189,7 @@ namespace SkyHorizont.Infrastructure.Social
             return security;
         }
 
-        private Guid GetAvailableFleet(Guid factionId, bool isEscort = false)
+        private Guid GetAvailableFleet(Guid factionId)
         {
             var fleets = _fleets
                 .GetFleetsForFaction(factionId)

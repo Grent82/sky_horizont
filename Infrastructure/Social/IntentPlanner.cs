@@ -84,6 +84,10 @@ namespace SkyHorizont.Infrastructure.Social
             if (familyTarget.HasValue)
                 AddIfAboveZero(intents, ScoreVisitFamily(actor, familyTarget.Value, factionStatus, GetOpinionOfCharacter) * ambitionBias.Family, IntentType.VisitFamily, familyTarget.Value);
 
+            // Visit Lover (works across factions)
+            var loverTarget = PickLoverTarget(actor);
+            if (loverTarget != null)
+                AddIfAboveZero(intents, ScoreVisitLover(actor, loverTarget, factionStatus, GetOpinionOfCharacter) * _cfg.LoverVisitWeight, IntentType.VisitLover, loverTarget.Id);
             // Spy
             var spyTargetFaction = PickSpyFaction(actorFactionId);
             if (spyTargetFaction != Guid.Empty)
@@ -225,6 +229,38 @@ namespace SkyHorizont.Infrastructure.Social
             if (factionStatus.HasUnrest)
                 baseScore += 10;
             return Clamp0to100(baseScore * _cfg.FamilyWeight);
+        }
+
+        private double ScoreVisitLover(Character actor, Character lover, FactionStatus factionStatus, Func<Guid, int> opin)
+        {
+            var opinion = opin(lover.Id);
+            double baseScore = 35.0;
+
+            // liking + personality nudges
+            baseScore += Clamp0to100Map(opinion + 50) * 0.5;
+            baseScore += (actor.Personality.Agreeableness - 50) * 0.25;
+            baseScore += (actor.Personality.Extraversion - 50) * 0.20;
+
+            // traits that help spending time/affection
+            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
+            foreach (var (traitName, intensity) in traits["Agreeableness"].Concat(traits["Extraversion"]))
+                baseScore += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) * 0.6;
+
+            // cross‑faction relationships want visits even more
+            var actorFactionId = _factions.GetFactionIdForCharacter(actor.Id);
+            var loverFactionId = _factions.GetFactionIdForCharacter(lover.Id);
+            if (actorFactionId != Guid.Empty && loverFactionId != Guid.Empty && actorFactionId != loverFactionId)
+                baseScore += 15;
+
+            // alliances make it easier/logistically safer
+            if (_factions.HasAlliance(actorFactionId, loverFactionId))
+                baseScore += 10;
+
+            // unrest increases desire to check in
+            if (factionStatus.HasUnrest)
+                baseScore += 5;
+
+            return Clamp0to100(baseScore);
         }
 
         private double ScoreSpy(Character actor, FactionStatus factionStatus)
@@ -629,6 +665,31 @@ namespace SkyHorizont.Infrastructure.Social
             return weighted?.Id;
         }
 
+        private Character? PickLoverTarget(Character actor)
+        {
+            if (actor.Relationships.Count == 0)
+                return null;
+
+            var loverIds = actor.Relationships
+                .Where(r => r.Type == RelationshipType.Lover || r.Type == RelationshipType.Spouse)
+                .Select(r => r.TargetCharacterId)
+                .ToHashSet();
+
+            if (loverIds.Count == 0)
+                return null;
+
+            var lovers = _chars.GetByIds(loverIds).Where(c => c.IsAlive).ToList();
+            if (lovers.Count == 0)
+                return null;
+
+            // prefer stable/high-opinion partner
+            return lovers
+                .Select(c => new { C = c, O = _opinions.GetOpinion(actor.Id, c.Id) + _rng.NextInt(0, 10) })
+                .OrderByDescending(x => x.O)
+                .First().C;
+        }
+
+
         private Guid PickSpyFaction(Guid actorFactionId)
         {
             var rivals = _factions.GetAllRivalFactions(actorFactionId).ToList();
@@ -821,7 +882,8 @@ namespace SkyHorizont.Infrastructure.Social
                 new HashSet<IntentType> { IntentType.Bribe, IntentType.Recruit },
                 new HashSet<IntentType> { IntentType.TorturePrisoner, IntentType.Negotiate },
                 new HashSet<IntentType> { IntentType.RapePrisoner, IntentType.Negotiate },
-                new HashSet<IntentType> { IntentType.TravelToPlanet, IntentType.RaidConvoy }
+                new HashSet<IntentType> { IntentType.TravelToPlanet, IntentType.RaidConvoy },
+                new HashSet<IntentType> { IntentType.Court, IntentType.VisitLover },
             };
 
             var chosen = intents.ToList();
@@ -852,7 +914,10 @@ namespace SkyHorizont.Infrastructure.Social
                 var tf = si.TargetFactionId;
                 var tp = si.TargetPlanetId;
 
-                if (si.Type == IntentType.Bribe || si.Type == IntentType.Recruit || si.Type == IntentType.Court || si.Type == IntentType.Assassinate || si.Type == IntentType.Quarrel || si.Type == IntentType.TorturePrisoner || si.Type == IntentType.RapePrisoner)
+                if (si.Type == IntentType.Bribe || si.Type == IntentType.Recruit ||
+                    si.Type == IntentType.Court || si.Type == IntentType.Assassinate ||
+                    si.Type == IntentType.Quarrel || si.Type == IntentType.TorturePrisoner ||
+                    si.Type == IntentType.RapePrisoner || si.Type == IntentType.VisitLover)
                 {
                     if (tc.HasValue && chosenCharTargets.Contains(tc.Value))
                         conflict = true;
@@ -895,6 +960,7 @@ namespace SkyHorizont.Infrastructure.Social
         public double ScoreNoiseMax { get; init; } = 5.0;
         public double RomanceWeight { get; init; } = 0.9;
         public double FamilyWeight { get; init; } = 0.7;
+        public double LoverVisitWeight { get; init; } = 1.0;
         public double SpyWeight { get; init; } = 1.0;
         public double BribeWeight { get; init; } = 0.8;
         public double RecruitWeight { get; init; } = 0.9;

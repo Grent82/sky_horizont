@@ -3,7 +3,7 @@ namespace SkyHorizont.Domain.Social
     public enum IntentType
     {
         Court, Quarrel, Gift, Recruit, Bribe, Spy, Defect, Assassinate, Negotiate,
-        VisitFamily, TorturePrisoner, RapePrisoner,
+        VisitFamily, VisitLover, TorturePrisoner, RapePrisoner,
         TravelToPlanet, BecomePirate, RaidConvoy
     }
 

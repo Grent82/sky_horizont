@@ -4,6 +4,7 @@ namespace SkyHorizont.Domain.Social
     {
         CourtshipAttempt,
         FamilyVisit,
+        LoverVisit,
         EspionageOperation,
         BriberyAttempt,
         RecruitmentAttempt,
