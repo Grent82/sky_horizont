@@ -75,7 +75,7 @@ namespace SkyHorizont.Infrastructure.Social
             var ambitionBias = GetAmbitionBias(ambition);
 
             // Courtship
-            var romanticTarget = PickRomanticTarget(actor, sameFaction, GetFactionForCharacter, GetOpinionOfCharacter);
+            var romanticTarget = PickRomanticTarget(actor, sameFaction.Concat(otherFaction).Distinct().ToList(), GetFactionForCharacter, GetOpinionOfCharacter);
             if (romanticTarget != null)
                 AddIfAboveZero(intents, ScoreCourtship(actor, romanticTarget, factionStatus, GetOpinionOfCharacter) * ambitionBias.Court, IntentType.Court, romanticTarget.Id);
 
@@ -260,17 +260,39 @@ namespace SkyHorizont.Infrastructure.Social
         private double ScoreRecruit(Character actor, Character target, Guid actorFactionId, FactionStatus factionStatus, Func<Guid, Guid> fac)
         {
             var baseScore = 30.0;
+
             var talent = (target.Skills.Military + target.Skills.Intelligence + target.Skills.Economy + target.Skills.Research) / 4.0;
             baseScore += talent * 0.4;
             baseScore += (int)actor.Rank * 3;
             baseScore += (actor.Personality.Agreeableness - 50) * 0.2;
             baseScore += (actor.Personality.Extraversion - 50) * 0.2;
-            var sameFaction = actorFactionId == fac(target.Id);
-            if (sameFaction) baseScore -= 10;
-            if (factionStatus.HasUnrest) baseScore += 10;
+
+            var targetFactionId = fac(target.Id);
+            var sameFaction = actorFactionId == targetFactionId;
+            if (sameFaction)
+                baseScore -= 10;
+            if (factionStatus.HasUnrest)
+                baseScore += 10;
+
+            try
+            {
+                int opinion = _opinions.GetOpinion(actor.Id, target.Id);
+                baseScore += Math.Clamp(opinion, -50, 50) * 0.10;
+            }
+            catch {  }
+
+            if (_piracy.IsPirateFaction(actorFactionId))
+            {
+                if (target.Rank >= Rank.General)
+                    baseScore -= 10;
+                var isGovernor = _planets.GetAll().Any(p => p.GovernorId == target.Id);
+                if (isGovernor)
+                    baseScore -= 15;
+            }
 
             return Clamp0to100(baseScore * _cfg.RecruitWeight);
         }
+
 
         private double ScoreDefect(Character actor, Guid leaderId, Guid actorFactionId, Guid targetFactionId, FactionStatus factionStatus, Func<Guid, int> opin)
         {

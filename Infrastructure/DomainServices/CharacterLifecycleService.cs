@@ -112,7 +112,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private double ComputeMonthlyConceptionChance(Character mother, Character partner)
         {
-            double chance = 0.10; // 10% baseline per month for active couples
+            double chance = 0.10;
 
             if (mother.Age < 14)
                 return 0.0;

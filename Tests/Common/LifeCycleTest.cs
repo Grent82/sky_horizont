@@ -72,7 +72,7 @@ namespace SkyHorizont.Tests.Common
 
             // Now assert on characters.GetAll() for newborns, lineage links, etc.
             clock.CurrentYear.Should().Be(3051);
-            characters.GetAll().Count().Should().Be(26);
+            characters.GetAll().Count().Should().Be(25);
 
         }
 
