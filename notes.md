@@ -83,7 +83,7 @@ Awesome—here’s a clean, **complete-ish menu of useful intents** you can expo
 [ ] **BreakBlockade** – set‑piece battles; relief narrative.
 [ ] **SiegePlanet** – territorial change path without instant wipe.
 [ ] **LiftSiege** – heroic defense moments.
-[ ] **RaidConvoy** – your existing pirate pillar; dynamic economy hit.
+[x] **RaidConvoy** – your existing pirate pillar; dynamic economy hit.
 [ ] **StrikeTarget (Depot/Shipyard/Relay)** – surgical objectives; war tempo control.
 [ ] **EscortVIP** – mobile, time‑boxed defense missions.
 [ ] **RescuePrisoners** – morale splash + story; ethical alternative.
@@ -91,7 +91,7 @@ Awesome—here’s a clean, **complete-ish menu of useful intents** you can expo
 
 ### Piracy & Underworld (toggle as “dark/gray economy”)
 
-[ ] **BecomePirate** – opt‑in career switch; opens pirate tree.
+[x] **BecomePirate** – opt‑in career switch; opens pirate tree.
 [ ] **FenceLoot/Launder** – monetizes raids; risk of exposure.
 [ ] **BlackOpsHeist** – high‑risk tech/credit grab without open war.
 [ ] **InciteUnrest (Covert)** – proxy destabilization instead of armies.
