@@ -2,6 +2,7 @@ using Infrastructure.Persistence.Repositories;
 using SkyHorizont.Application;
 using SkyHorizont.Application.Turns;
 using SkyHorizont.Domain.Battle;
+using SkyHorizont.Domain.Diplomacy;
 using SkyHorizont.Domain.Economy;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Entity.Lineage;
@@ -12,8 +13,10 @@ using SkyHorizont.Domain.Intrigue;
 using SkyHorizont.Domain.Research;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Social;
+using SkyHorizont.Domain.Travel;
 using SkyHorizont.Infrastructure.DomainServices;
 using SkyHorizont.Infrastructure.Persistence;
+using SkyHorizont.Infrastructure.Persistence.Diplomacy;
 using SkyHorizont.Infrastructure.Persistence.Interfaces;
 using SkyHorizont.Infrastructure.Persistence.Intrigue;
 using SkyHorizont.Infrastructure.Repository;
@@ -26,70 +29,77 @@ namespace SkyHorizont.Infrastructure.Configuration
         public static IServiceCollection AddSkyHorizontSimulationServices(
             this IServiceCollection services, int rngSeed = 0)
         {
-            // Core utilities
             services.AddScoped<IAffectionDbContext, InMemoryAffectionDbContext>();
             services.AddScoped<ICharacterFundsDbContext, InMemoryCharacterFundsDbContext>();
             services.AddScoped<ICharactersDbContext, InMemoryCharactersDbContext>();
+            services.AddScoped<IDiplomacyDbContext, InMemoryDiplomacyDbContext>();
             services.AddScoped<IFactionFundsDbContext, InMemoryFundsDbContext>();
+            services.AddScoped<IFactionsDbContext, InMemoryFactionsDbContext>();
             services.AddScoped<IFleetsDbContext, InMemoryFleetsDbContext>();
-            services.AddScoped<IPlanetsDbContext, InMemoryPlanetsDbContext>();
+            services.AddScoped<IIntelDbContext, InMemoryIntelDbContext>();
+            services.AddScoped<IIntrigueDbContext, InMemoryIntrigueDbContext>();
             services.AddScoped<ILineageDbContext, InMemoryLinageDbContext>();
             services.AddScoped<IOpinionsDbContext, InMemoryOpinionsDbContext>();
-            services.AddScoped<ISecretsDbContext, InMemorySecretsDbContext>();
-            services.AddScoped<IFactionsDbContext, InMemoryFactionsDbContext>();
-            services.AddScoped<IIntrigueDbContext, InMemoryIntrigueDbContext>();
-            services.AddScoped<IIntelDbContext, InMemoryIntelDbContext>();
             services.AddScoped<IPlanetEconomyDbContext, InMemoryPlanetEconomyDbContext>();
+            services.AddScoped<IPlanetsDbContext, InMemoryPlanetsDbContext>();
             services.AddScoped<IResearchDbContext, InMemoryResearchDbContext>();
-
+            services.AddScoped<ISecretsDbContext, InMemorySecretsDbContext>();
+            services.AddScoped<ITravelDbContext, InMemoryTravelDbContext>();
 
             services.AddScoped<IAffectionRepository, AffectionRepository>();
             services.AddScoped<ICharacterFundsRepository, CharacterFundsRepository>();
             services.AddScoped<ICharacterRepository, CharactersRepository>();
+            services.AddScoped<IDiplomacyRepository, DiplomacyRepository>();
             services.AddScoped<IFactionFundsRepository, FactionFundsRepository>();
+            services.AddScoped<IFactionRepository, FactionRepository>();
             services.AddScoped<IFleetRepository, FleetsRepository>();
-            services.AddScoped<IPlanetRepository, PlanetsRepository>();
+            services.AddScoped<IIntelRepository, IntelRepository>();
             services.AddScoped<ILineageRepository, LineageRepository>();
             services.AddScoped<IOpinionRepository, OpinionRepository>();
-            services.AddScoped<ISecretsRepository, SecretsRepository>();
-            services.AddScoped<IFactionRepository, FactionRepository>();
-            services.AddScoped<IPlotRepository, PlotRepository>();
-            services.AddScoped<IIntelRepository, IntelRepository>();
             services.AddScoped<IPlanetEconomyRepository, PlanetEconomyRepository>();
+            services.AddScoped<IPlanetRepository, PlanetsRepository>();
+            services.AddScoped<IPlotRepository, PlotRepository>();
             services.AddScoped<IResearchRepository, ResearchRepository>();
-
+            services.AddScoped<ISecretsRepository, SecretsRepository>();
+            services.AddScoped<ITravelRepository, TravelRepository>();
 
             services.AddScoped<ISocialEventLog, InMemorySocialEventLog>();
 
-            // Domain Service Interfaces → Infrastructure Implementations
             services.AddScoped<IAffectionService, AffectionService>();
             services.AddScoped<IBattleOutcomeService, BattleOutcomeService>();
             services.AddScoped<ICharacterFundsService, CharacterFundsService>();
             services.AddScoped<ICharacterLifecycleService, CharacterLifecycleService>();
+            services.AddScoped<IDiplomacyService, DiplomacyService>();
+            services.AddScoped<IEconomyService, EconomyService>();
             services.AddScoped<IFactionService, FactionService>();
             services.AddScoped<IFactionTaxService, FactionTaxService>();
-            services.AddScoped<IFactionService, FactionService>();
-            services.AddScoped<IMortalityModel, GompertzMortalityModel>();
             services.AddScoped<IFundsService, FundsService>();
+            services.AddScoped<IMortalityModel, GompertzMortalityModel>();
             services.AddScoped<IIntelService, IntelService>();
+            services.AddScoped<IIntimacyLog, InMemoryIntimacyLog>();
             services.AddScoped<IIntrigueService, IntrigueService>();
+            services.AddScoped<ILocationService, LocationService>();
+            services.AddScoped<IMeritPolicy, MeritPolicy>();
             services.AddScoped<IMoraleService, MoraleService>();
+            services.AddScoped<IPiracyService, PiracyService>();
             services.AddScoped<IPlanetService, PlanetService>();
+            services.AddScoped<IPregnancyPolicy, DefaultPregnancyPolicy>();
             services.AddScoped<IRansomService, RansomService>();
-            services.AddScoped<IEconomyService, EconomyService>();
             services.AddScoped<IResearchService, ResearchService>();
-            services.AddScoped<IIntentPlanner, IntentPlanner>();
-            services.AddScoped<IInteractionResolver, InteractionResolver>();
-            services.AddSingleton<IPersonalityInheritanceService, SimplePersonalityInheritanceService>();
+            services.AddScoped<ITravelService, TravelService>();
 
 
-            // Application Layer
+            services.AddSingleton<IIntentPlanner, IntentPlanner>();
+            services.AddSingleton<IInteractionResolver, InteractionResolver>();
+
             services.AddSingleton<IGameClockService, GameClockService>();
             services.AddSingleton<ITurnProcessor, TurnProcessor>();
             services.AddSingleton<IRandomService>(_ => new RandomService(rngSeed));
             services.AddSingleton<INameGenerator, NameGenerator>();
+            services.AddSingleton<IPersonalityInheritanceService, SimplePersonalityInheritanceService>();
+            services.AddSingleton<ISkillInheritanceService, SimpleSkillInheritanceService>();
             
-
+        
             return services;
         }
     }

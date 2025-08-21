@@ -53,11 +53,12 @@ namespace SkyHorizont.Tests.Common
             var battle = new BattleOutcomeService(fund, factionFunds, tax, characters, moral);
             var affection = new AffectionService(characters, planets, fleets, affections);
             var intimacy = new InMemoryIntimacyLog();
+            var merit = new MeritPolicy();
             
             var bus = new InMemoryEventBus();
             var planner = new IntentPlanner(characters, opinions, faction, rng, planets, fleets, travel, piracy);
             var diplomacy = new DiplomacyService(diplomacies, faction, clock, opinions);
-            var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy, travel, piracy, planets, fleets, events, battle, intimacy);
+            var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy, travel, piracy, planets, fleets, events, battle, intimacy, merit);
 
             var lifecycle = new CharacterLifecycleService(
                 characters, lineage, clock, rng, mortality, nameGen,
