@@ -28,6 +28,7 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly IEventBus _events;
         private readonly IBattleOutcomeService _battleOutcomeService;
         private readonly IIntimacyLog _intimacy;
+        private readonly IMeritPolicy _merit;
         private readonly InteractionConfig _cfg;
         private readonly Dictionary<Guid, FactionStatus> _factionStatusCache;
         private readonly Dictionary<Guid, SystemSecurity> _systemSecurityCache;
@@ -46,6 +47,7 @@ namespace SkyHorizont.Infrastructure.Social
             IEventBus events,
             IBattleOutcomeService battleOutcomeService,
             IIntimacyLog intimacy,
+            IMeritPolicy merit,
             InteractionConfig? config = null)
         {
             _chars = characters ?? throw new ArgumentNullException(nameof(characters));
@@ -61,6 +63,7 @@ namespace SkyHorizont.Infrastructure.Social
             _events = events ?? throw new ArgumentNullException(nameof(events));
             _battleOutcomeService = battleOutcomeService ?? throw new ArgumentNullException(nameof(battleOutcomeService));
             _intimacy = intimacy ?? throw new ArgumentNullException(nameof(intimacy));
+            _merit = merit ?? throw new ArgumentNullException(nameof(merit));
             _cfg = config ?? InteractionConfig.Default;
             _factionStatusCache = new Dictionary<Guid, FactionStatus>();
             _systemSecurityCache = new Dictionary<Guid, SystemSecurity>();
@@ -140,7 +143,6 @@ namespace SkyHorizont.Infrastructure.Social
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var deltaActorToTarget = success ? 5 : -3;
             var deltaTargetToActor = success ? 7 : -4;
-            var meritChange = success ? (actor.Ambition == CharacterAmbition.EnsureFamilyLegacy ? 10 : 5) : -3;
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, success ? "Romance success" : "Awkward attempt");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Charmed" : "Turned down");
@@ -150,6 +152,8 @@ namespace SkyHorizont.Infrastructure.Social
                     actor.AddRelationship(target.Id, RelationshipType.Lover);
                 _chars.Save(actor);
                 _diplomacy.AdjustRelations(_factions.GetFactionIdForCharacter(actor.Id), _factions.GetFactionIdForCharacter(target.Id), 5);
+
+                AwardMerit(actor, _merit.Compute(MeritAction.Courtship, MeritContext.Succeeded(actor.Ambition)));
             }
 
             var ev = new SocialEvent(
@@ -161,6 +165,7 @@ namespace SkyHorizont.Infrastructure.Social
             _events.Publish(ev);
             return new[] { ev };
         }
+
         #endregion
 
         #region VisitFamily
@@ -192,11 +197,15 @@ namespace SkyHorizont.Infrastructure.Social
                 if (lover == null || !lover.IsAlive)
                     return Array.Empty<ISocialEvent>();
 
-                var isRomantic = actor.Relationships.Any(r => r.TargetCharacterId == lover.Id &&
-                    (r.Type == RelationshipType.Lover || r.Type == RelationshipType.Spouse));
-                if (isRomantic)
+                if (actor.Relationships.Any(r => r.TargetCharacterId == lover.Id && r.Type == RelationshipType.Spouse))
+                {
                     _intimacy.RecordIntimacyEncounter(actor.Id, lover.Id, currentYear, currentMonth);
+                    _opinions.AdjustOpinion(actor.Id, relative.Id, delta, "Intimicy time");
+                    _opinions.AdjustOpinion(relative.Id, actor.Id, delta, "Intimicy time");
+                }
             }
+            _chars.Save(actor);
+            _chars.Save(relative);
 
             var ev = new SocialEvent(
                 Guid.NewGuid(), currentYear, currentMonth, SocialEventType.FamilyVisit,
@@ -225,7 +234,7 @@ namespace SkyHorizont.Infrastructure.Social
                 return Array.Empty<ISocialEvent>();
 
             var originPlanetId = FindPlanetOfCharacter(actor.Id);
-            var loverPlanetId  = FindPlanetOfCharacter(lover.Id);
+            var loverPlanetId = FindPlanetOfCharacter(lover.Id);
 
             var travelSucceeded = true;
             if (originPlanetId.HasValue && loverPlanetId.HasValue && originPlanetId.Value != loverPlanetId.Value)
@@ -296,6 +305,9 @@ namespace SkyHorizont.Infrastructure.Social
                 _intimacy.RecordIntimacyEncounter(actor.Id, lover.Id, currentYear, currentMonth);
             }
 
+            _chars.Save(actor);
+            _chars.Save(lover);
+
             var ev = new SocialEvent(
                 Guid.NewGuid(), currentYear, currentMonth, SocialEventType.LoverVisit,
                 actor.Id, lover.Id, null, null, success,
@@ -304,7 +316,7 @@ namespace SkyHorizont.Infrastructure.Social
             );
             _events.Publish(ev);
             return new[] { ev };
-}
+        }
 
         #endregion
 
@@ -325,7 +337,7 @@ namespace SkyHorizont.Infrastructure.Social
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var secrets = new List<Guid>();
-            var meritChange = success ? (actor.Ambition == CharacterAmbition.SeekAdventure ? 10 : 5) : -3;
+
             string notes;
 
             if (success)
@@ -351,8 +363,8 @@ namespace SkyHorizont.Infrastructure.Social
                 notes = intent.TargetCharacterId.HasValue
                     ? "Acquired sensitive personal information."
                     : "Acquired fleet disposition report.";
-                actor.GainMerit(meritChange);
-                _chars.Save(actor);
+
+                AwardMerit(actor, _merit.Compute(MeritAction.Spy, new MeritContext { Success = success, Ambition = actor.Ambition, ProducedIntel = success, IntelSeverity = success ? severity : 0 }));
             }
             else
             {
@@ -391,12 +403,11 @@ namespace SkyHorizont.Infrastructure.Social
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var deltaActorToTarget = success ? 3 : -5;
             var deltaTargetToActor = success ? 8 : -10;
-            var meritChange = success ? (actor.Ambition == CharacterAmbition.BuildWealth ? 8 : 4) : -5;
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, success ? "Successful bribe" : "Bribe rebuffed");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Took the money" : "Offended by bribe");
-            actor.GainMerit(meritChange);
-            _chars.Save(actor);
+
+            AwardMerit(actor, _merit.Compute(MeritAction.Bribe, new MeritContext { Success = success, Ambition = actor.Ambition }));
 
             var secrets = new List<Guid>();
             if (success)
@@ -444,21 +455,20 @@ namespace SkyHorizont.Infrastructure.Social
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var deltaActorToTarget = success ? 5 : -2;
             var deltaTargetToActor = success ? 6 : -4;
-            var meritChange = success ? (actor.Ambition == CharacterAmbition.GainPower ? 10 : 5) : -3;
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, success ? "Effective recruitment talk" : "Rejected recruitment");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Motivated by recruiter" : "Annoyed by recruiter");
             if (success)
             {
-                actor.GainMerit(meritChange);
+                AwardMerit(actor, _merit.Compute(MeritAction.Recruit, new MeritContext { Success = success, Ambition = actor.Ambition }));
                 _factions.MoveCharacterToFaction(target.Id, actorFactionId);
-                _chars.Save(actor);
                 _chars.Save(target);
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), 5);
             }
             else
             {
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -5);
+                AwardMerit(actor, _merit.Compute(MeritAction.Recruit, new MeritContext { Success = success, Ambition = actor.Ambition }));
             }
 
             var ev = new SocialEvent(
@@ -492,14 +502,12 @@ namespace SkyHorizont.Infrastructure.Social
             if (actor.Ambition == CharacterAmbition.SeekAdventure) baseChance += 0.1;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
-            var meritChange = success ? (actor.Ambition == CharacterAmbition.GainPower ? 10 : 5) : -5;
             var secrets = new List<Guid>();
-
+            var meritChange = _merit.Compute(MeritAction.Defect, new MeritContext { Success = success, Ambition = actor.Ambition });
             if (success)
             {
                 _factions.MoveCharacterToFaction(actor.Id, intent.TargetFactionId.Value);
-                actor.GainMerit(meritChange);
-                _chars.Save(actor);
+                AwardMerit(actor, meritChange);
                 if (myLeader.HasValue)
                     _opinions.AdjustOpinion(actor.Id, myLeader.Value, -20, "Defected from faction");
                 _diplomacy.AdjustRelations(myFaction, intent.TargetFactionId.Value, -10);
@@ -512,6 +520,7 @@ namespace SkyHorizont.Infrastructure.Social
                     50 + _rng.NextInt(0, 20), currentYear, currentMonth);
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
+                AwardMerit(actor, meritChange);
                 if (myLeader.HasValue)
                     _opinions.AdjustOpinion(actor.Id, myLeader.Value, -10, "Suspected defection");
                 _diplomacy.AdjustRelations(myFaction, intent.TargetFactionId.Value, -5);
@@ -546,18 +555,16 @@ namespace SkyHorizont.Infrastructure.Social
 
             var atWar = _factions.IsAtWar(myFaction, intent.TargetFactionId.Value);
             var success = _rng.NextDouble() < Clamp01(baseChance);
-            var meritChange = success ? (actor.Ambition == CharacterAmbition.BuildWealth ? 8 : 4) : -2;
-
+            var meritChange = _merit.Compute(MeritAction.Negotiate, new MeritContext { Success = success, Ambition = actor.Ambition, AtWar = atWar});
             if (success)
             {
-                var treatyType = ChooseTreatyType(actor, myFaction, intent.TargetFactionId.Value, atWar);
-                _diplomacy.ProposeTreaty(myFaction, intent.TargetFactionId.Value, treatyType);
-                actor.GainMerit(meritChange);
-                _chars.Save(actor);
+                _factions.MoveCharacterToFaction(actor.Id, intent.TargetFactionId.Value);
+                AwardMerit(actor, meritChange);
             }
             else
             {
                 _diplomacy.AdjustRelations(myFaction, intent.TargetFactionId.Value, -5);
+                AwardMerit(actor, meritChange);
             }
 
             var ev = new SocialEvent(
@@ -633,8 +640,7 @@ namespace SkyHorizont.Infrastructure.Social
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var secrets = new List<Guid>();
-            var meritChange = success ? (actor.Ambition == CharacterAmbition.GainPower ? 15 : 10) : -10;
-
+            var meritChange = _merit.Compute(MeritAction.Assassinate, new MeritContext { Success = success, Ambition = actor.Ambition});
             if (!success)
             {
                 var secret = new Secret(
@@ -643,6 +649,7 @@ namespace SkyHorizont.Infrastructure.Social
                     70 + _rng.NextInt(0, 20), currentYear, currentMonth);
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
+                AwardMerit(actor, meritChange);
                 _opinions.AdjustOpinion(target.Id, actor.Id, -10, "Suspected assassination attempt");
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -10);
             }
@@ -650,8 +657,7 @@ namespace SkyHorizont.Infrastructure.Social
             {
                 target.MarkDead();
                 _chars.Save(target);
-                actor.GainMerit(meritChange);
-                _chars.Save(actor);
+                AwardMerit(actor, meritChange);
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -20);
             }
 
@@ -689,7 +695,6 @@ namespace SkyHorizont.Infrastructure.Social
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var secrets = new List<Guid>();
-            var meritChange = success ? 5 : -8;
             string notes;
 
             if (success)
@@ -704,8 +709,7 @@ namespace SkyHorizont.Infrastructure.Social
                 _opinions.AdjustOpinion(actor.Id, target.Id, -10, "Tortured prisoner");
                 _opinions.AdjustOpinion(target.Id, actor.Id, -20, "Victim of torture");
                 target.ApplyTrauma(TraumaType.Torture);
-                actor.GainMerit(meritChange);
-                _chars.Save(actor);
+                AwardMerit(actor, _merit.Compute(MeritAction.Torture, new MeritContext { Success = success, Ambition = actor.Ambition, ProducedIntel = true, IntelSeverity = secret.Severity}));
                 _chars.Save(target);
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -15);
             }
@@ -718,6 +722,7 @@ namespace SkyHorizont.Infrastructure.Social
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
                 notes = "Torture attempt failed; rumors spread.";
+                AwardMerit(actor, _merit.Compute(MeritAction.Torture, new MeritContext { Success = success, Ambition = actor.Ambition, ProducedIntel = false}));
                 _opinions.AdjustOpinion(target.Id, actor.Id, -10, "Failed torture attempt");
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -5);
             }
@@ -754,7 +759,6 @@ namespace SkyHorizont.Infrastructure.Social
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var secrets = new List<Guid>();
-            var meritChange = success ? -20 : -10;
             string notes;
 
             if (success)
@@ -767,15 +771,9 @@ namespace SkyHorizont.Infrastructure.Social
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
                 notes = "Act committed; grave consequences loom.";
-                _opinions.AdjustOpinion(actor.Id, target.Id, -15, "Committed rape");
+                _opinions.AdjustOpinion(actor.Id, target.Id, 5, "Committed rape");
                 _opinions.AdjustOpinion(target.Id, actor.Id, -30, "Victim of rape");
                 target.ApplyTrauma(TraumaType.Rape);
-                if (target.Sex == Sex.Female && target.Age >= 14 && target.Age <= 45)
-                {
-                    target.StartPregnancy(actor.Id, currentYear, currentMonth);
-                    _events.Publish(new DomainEventLog("NonConsensualConception", target.Id, $"perpetrator={actor.Id}; year={currentYear}; month={currentMonth}"));
-                }
-                actor.GainMerit(meritChange);
                 _chars.Save(actor);
                 _chars.Save(target);
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -30);
@@ -792,6 +790,7 @@ namespace SkyHorizont.Infrastructure.Social
                 _opinions.AdjustOpinion(target.Id, actor.Id, -15, "Failed assault attempt");
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -10);
             }
+            AwardMerit(actor, _merit.Compute(MeritAction.Rape, new MeritContext { Success = success, Ambition = actor.Ambition}));
 
             var ev = new SocialEvent(
                 Guid.NewGuid(), currentYear, currentMonth, SocialEventType.RapeAttempt,
@@ -819,7 +818,6 @@ namespace SkyHorizont.Infrastructure.Social
 
             var actorFactionId = _factions.GetFactionIdForCharacter(actor.Id);
 
-            // same success model you had, just executing a fleet-level plan on success
             var baseChance = 0.8;
             var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
             foreach (var (traitName, intensity) in traits["Extraversion"].Concat(traits["Openness"]))
@@ -840,7 +838,6 @@ namespace SkyHorizont.Infrastructure.Social
 
             if (success)
             {
-                // CHANGED: plan travel for a FLEET, adding the actor as a passenger
                 var fleetId = GetAvailableFleet(actorFactionId);
                 if (fleetId == Guid.Empty)
                 {
@@ -1225,7 +1222,7 @@ namespace SkyHorizont.Infrastructure.Social
             var attackerWins = _rng.NextDouble() < p;
 
             var winner = attackerWins ? attacker : defender;
-            var loser  = attackerWins ? defender : attacker;
+            var loser = attackerWins ? defender : attacker;
 
             var loot = (int)Math.Round(def * (attackerWins ? 3.0 : 1.0));
             var merit = attackerWins ? 8 : -4;
@@ -1243,6 +1240,14 @@ namespace SkyHorizont.Infrastructure.Social
                 planetCaptureBonus: 0,
                 occupationDurationHours: 0
             );
+        }
+        
+        private void AwardMerit(Character actor, int amount)
+        {
+            if (amount == 0)
+                return;
+            actor.GainMerit(amount);
+            _chars.Save(actor);
         }
         #endregion
     }
