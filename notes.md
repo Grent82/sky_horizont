@@ -2,8 +2,6 @@
 
 ## Features
 
-Awesome—here’s a clean, **complete-ish menu of useful intents** you can expose to AI actors in a sci‑fi grand‑strategy / character sim. I grouped them so you can toggle whole categories on/off and it’s easier to balance and script events later. Each line has a tight “why it fits.”
-
 ### Social & Personal
 
 [x] **Court** – grow romance arcs and inter‑faction ties.
