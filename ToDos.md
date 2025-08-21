@@ -13,6 +13,5 @@
 * refine combat-to-economy mapping further
 * have your planner inject a travel/assignment intent first (mission chain). That requires a movement/assignment system
 * Consider adding a caching layer for frequently accessed data (e.g., planets/fleets per faction) if performance becomes an issue.
-* the TorturePrisoner and RapePrisoner intents are implemented with rarity constraints (e.g., low weights, penalties for low rank). Consider adding game mechanics to penalize these actions (e.g., opinion penalties, stability loss) to balance their impact.
-  * add a PlannerConfig option to disable the  intents for players who prefer to avoid sensitive themes.
 * eventbus
+* UI Integration: Use GetActiveTraits to display a character’s personality profile in-game.
