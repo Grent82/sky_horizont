@@ -804,7 +804,8 @@ namespace SkyHorizont.Infrastructure.Social
 
         private Character? PickRapeTarget(List<Character> captives, Func<Guid, int> opin)
         {
-            if (captives.Count == 0) return null;
+            if (captives.Count == 0)
+                return null;
             var pool = captives
                 .Select(c => new
                 {
@@ -824,10 +825,10 @@ namespace SkyHorizont.Infrastructure.Social
             var scored = knownPeopleRaw.Select(c =>
             {
                 var relSet = actor.Relationships.Count == 0
-                    ? (HashSet<Guid>?)null
+                    ? null
                     : actor.Relationships.Select(r => r.TargetCharacterId).ToHashSet();
                 var familySet = actor.FamilyLinkIds.Count == 0
-                    ? (HashSet<Guid>?)null
+                    ? null
                     : actor.FamilyLinkIds.ToHashSet();
                 int op = opin(c.Id);
                 bool related = relSet != null && relSet.Contains(c.Id);

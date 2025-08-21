@@ -18,6 +18,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly ISkillInheritanceService _skillInherit;
         private readonly ILocationService _loc;
         private readonly IEventBus _events;
+        private readonly IIntimacyLog _intimacy;
 
         public CharacterLifecycleService(
             ICharacterRepository characters,
@@ -30,19 +31,21 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IPregnancyPolicy pregPolicy,
             ISkillInheritanceService skillInherit,
             ILocationService loc,
-            IEventBus events)
+            IEventBus events,
+            IIntimacyLog intimacy)
         {
-            _characters = characters;
-            _lineage = lineage;
-            _clock = clock;
-            _rng = rng;
-            _mortality = mortality;
-            _names = names;
-            _inherit = inherit;
-            _pregPolicy = pregPolicy;
-            _skillInherit = skillInherit;
-            _loc = loc;
-            _events = events;
+            _characters = characters ?? throw new ArgumentNullException(nameof(characters));
+            _lineage = lineage ?? throw new ArgumentNullException(nameof(lineage));
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _rng = rng ?? throw new ArgumentNullException(nameof(rng));
+            _mortality = mortality ?? throw new ArgumentNullException(nameof(mortality));
+            _names = names ?? throw new ArgumentNullException(nameof(names));
+            _inherit = inherit ?? throw new ArgumentNullException(nameof(inherit));
+            _pregPolicy = pregPolicy ?? throw new ArgumentNullException(nameof(pregPolicy));
+            _skillInherit = skillInherit ?? throw new ArgumentNullException(nameof(skillInherit));
+            _loc = loc ?? throw new ArgumentNullException(nameof(loc));
+            _events = events ?? throw new ArgumentNullException(nameof(events));
+            _intimacy = intimacy ?? throw new ArgumentNullException(nameof(intimacy));
         }
 
         public void ProcessLifecycleTurn()
@@ -71,6 +74,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 _characters.Save(character);
             }
         }
+
+        private static (int y, int m) PreviousMonth(int y, int m) => m == 1 ? (y - 1, 12) : (y, m - 1);
         
         private void HandleConception(Character potentialMother, IReadOnlyDictionary<Guid, Character> byId)
         {
@@ -81,17 +86,13 @@ namespace SkyHorizont.Infrastructure.DomainServices
             if (_pregPolicy.IsPostpartumProtected(potentialMother, _clock.CurrentYear, _clock.CurrentMonth))
                 return;
 
-            // Find consensual partners: Lovers/Spouse links
-            var partnerIds = potentialMother.Relationships
-                .Where(r => r.Type == RelationshipType.Lover || r.Type == RelationshipType.Spouse)
-                .Select(r => r.TargetCharacterId)
-                .Distinct()
-                .ToList();
+            var (yPrev, mPrev) = PreviousMonth(_clock.CurrentYear, _clock.CurrentMonth);
 
-            if (partnerIds.Count == 0)
+            var partners = _intimacy.GetPartnersForMother(potentialMother.Id, yPrev, mPrev);
+            if (partners.Count == 0)
                 return;
 
-            foreach (var pid in partnerIds)
+            foreach (var pid in partners)
             {
                 byId.TryGetValue(pid, out var partner);
                 if (partner is null)

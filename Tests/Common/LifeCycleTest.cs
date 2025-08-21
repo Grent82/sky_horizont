@@ -52,15 +52,16 @@ namespace SkyHorizont.Tests.Common
             var moral = new MoraleService(characters);
             var battle = new BattleOutcomeService(fund, factionFunds, tax, characters, moral);
             var affection = new AffectionService(characters, planets, fleets, affections);
+            var intimacy = new InMemoryIntimacyLog();
             
             var bus = new InMemoryEventBus();
             var planner = new IntentPlanner(characters, opinions, faction, rng, planets, fleets, travel, piracy);
             var diplomacy = new DiplomacyService(diplomacies, faction, clock, opinions);
-            var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy, travel, piracy, planets, fleets, events, battle);
+            var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy, travel, piracy, planets, fleets, events, battle, intimacy);
 
             var lifecycle = new CharacterLifecycleService(
                 characters, lineage, clock, rng, mortality, nameGen,
-                inherit, pregPolicy, skillInh, loc, bus);
+                inherit, pregPolicy, skillInh, loc, bus, intimacy);
 
             var runner = new LifecycleSimulationRunner(characters, lineage, planets, lifecycle, planner, resolver, socialLog, clock, affection);
 

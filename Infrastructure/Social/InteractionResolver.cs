@@ -27,6 +27,7 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly IFleetRepository _fleets;
         private readonly IEventBus _events;
         private readonly IBattleOutcomeService _battleOutcomeService;
+        private readonly IIntimacyLog _intimacy;
         private readonly InteractionConfig _cfg;
         private readonly Dictionary<Guid, FactionStatus> _factionStatusCache;
         private readonly Dictionary<Guid, SystemSecurity> _systemSecurityCache;
@@ -44,6 +45,7 @@ namespace SkyHorizont.Infrastructure.Social
             IFleetRepository fleets,
             IEventBus events,
             IBattleOutcomeService battleOutcomeService,
+            IIntimacyLog intimacy,
             InteractionConfig? config = null)
         {
             _chars = characters ?? throw new ArgumentNullException(nameof(characters));
@@ -58,6 +60,7 @@ namespace SkyHorizont.Infrastructure.Social
             _fleets = fleets ?? throw new ArgumentNullException(nameof(fleets));
             _events = events ?? throw new ArgumentNullException(nameof(events));
             _battleOutcomeService = battleOutcomeService ?? throw new ArgumentNullException(nameof(battleOutcomeService));
+            _intimacy = intimacy ?? throw new ArgumentNullException(nameof(intimacy));
             _cfg = config ?? InteractionConfig.Default;
             _factionStatusCache = new Dictionary<Guid, FactionStatus>();
             _systemSecurityCache = new Dictionary<Guid, SystemSecurity>();
@@ -143,7 +146,6 @@ namespace SkyHorizont.Infrastructure.Social
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Charmed" : "Turned down");
             if (success)
             {
-                actor.GainMerit(meritChange);
                 if (!actor.Relationships.Any(r => r.TargetCharacterId == target.Id))
                     actor.AddRelationship(target.Id, RelationshipType.Lover);
                 _chars.Save(actor);
@@ -174,19 +176,26 @@ namespace SkyHorizont.Infrastructure.Social
             var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
             foreach (var (traitName, intensity) in traits["Agreeableness"])
                 baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
-            if (factionStatus.HasUnrest) baseChance += 0.1;
-            if (actor.Ambition == CharacterAmbition.EnsureFamilyLegacy) baseChance += 0.15;
+            if (factionStatus.HasUnrest)
+                baseChance += 0.1;
+            if (actor.Ambition == CharacterAmbition.EnsureFamilyLegacy)
+                baseChance += 0.15;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var delta = success ? 6 : 2;
-            var meritChange = success ? (actor.Ambition == CharacterAmbition.EnsureFamilyLegacy ? 8 : 4) : 0;
 
             _opinions.AdjustOpinion(actor.Id, relative.Id, delta, "Family time");
             _opinions.AdjustOpinion(relative.Id, actor.Id, delta, "Family time");
             if (success)
             {
-                actor.GainMerit(meritChange);
-                _chars.Save(actor);
+                var lover = _chars.GetById(intent.TargetCharacterId.Value);
+                if (lover == null || !lover.IsAlive)
+                    return Array.Empty<ISocialEvent>();
+
+                var isRomantic = actor.Relationships.Any(r => r.TargetCharacterId == lover.Id &&
+                    (r.Type == RelationshipType.Lover || r.Type == RelationshipType.Spouse));
+                if (isRomantic)
+                    _intimacy.RecordIntimacyEncounter(actor.Id, lover.Id, currentYear, currentMonth);
             }
 
             var ev = new SocialEvent(
@@ -200,7 +209,7 @@ namespace SkyHorizont.Infrastructure.Social
         }
         #endregion
 
-        #region 
+        #region Visit Lover
         private IEnumerable<ISocialEvent> ResolveVisitLover(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
         {
             if (!intent.TargetCharacterId.HasValue)
@@ -284,20 +293,7 @@ namespace SkyHorizont.Infrastructure.Social
 
             if (success)
             {
-                actor.GainMerit(4);
-                _chars.Save(actor);
-
-                var conceptionChance = 0.50;
-                if (lover.Sex == Sex.Female && lover.Age >= 14 && lover.Age <= 45 && _rng.NextDouble() < conceptionChance)
-                {
-                    lover.StartPregnancy(actor.Id, currentYear, currentMonth);
-                    _events.Publish(new DomainEventLog("ConsensualConception", lover.Id, $"partner={actor.Id}; year={currentYear}; month={currentMonth}"));
-                }
-                else if (actor.Sex == Sex.Female && actor.Age >= 14 && actor.Age <= 45 && _rng.NextDouble() < conceptionChance)
-                {
-                    actor.StartPregnancy(lover.Id, currentYear, currentMonth);
-                    _events.Publish(new DomainEventLog("ConsensualConception", actor.Id, $"partner={lover.Id}; year={currentYear}; month={currentMonth}"));
-                }
+                _intimacy.RecordIntimacyEncounter(actor.Id, lover.Id, currentYear, currentMonth);
             }
 
             var ev = new SocialEvent(
@@ -763,6 +759,7 @@ namespace SkyHorizont.Infrastructure.Social
 
             if (success)
             {
+                _intimacy.RecordIntimacyEncounter(actor.Id, target.Id, currentYear, currentMonth);
                 var secret = new Secret(
                     Guid.NewGuid(), SecretType.RapeIncident,
                     $"{actor.Name} committed a heinous act against {target.Name}.",

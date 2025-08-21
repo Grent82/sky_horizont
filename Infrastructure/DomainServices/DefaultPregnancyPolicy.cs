@@ -92,24 +92,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
             if (!_loc.AreCoLocated(potentialMother.Id, partner.Id))
                 return false;
 
-            bool motherIsPrisonerOfPartner = _loc.IsPrisonerOf(potentialMother.Id, partner.Id);
-            if (motherIsPrisonerOfPartner)
-            {
-                if (!_allowCoercion)
-                    return false;
-
-                // "Dark path" gate — only under certain personalities and with low likelihood.
-                // High Assertiveness/Neuroticism + low Agreeableness → higher risk.
-                double harsh = 0.0;
-                harsh += (partner.Personality.Extraversion > 70 && PersonalityTraits.Assertive(partner.Personality)) ? 0.3 : 0.0;
-                harsh += PersonalityTraits.EasilyAngered(partner.Personality) ? 0.3 : 0.0;
-                harsh += PersonalityTraits.Impulsive(partner.Personality) ? 0.4 : 0.0;
-                harsh += (50 - partner.Personality.Agreeableness) * 0.002;
-                harsh = Math.Clamp(harsh, 0.1, 1.0);
-
-                return _rng.NextDouble() < harsh;
-            }
-
             int m2p = _opinions.GetOpinion(potentialMother.Id, partner.Id);
             int p2m = _opinions.GetOpinion(partner.Id, potentialMother.Id);
             if (m2p < OpinionThreshold || p2m < OpinionThreshold)
