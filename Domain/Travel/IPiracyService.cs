@@ -8,5 +8,6 @@ namespace SkyHorizont.Domain.Travel
         bool BecomePirate(Guid characterId);
         bool RegisterAmbush(Guid pirateActorId, Guid systemId, int year, int month);
         Guid GetPirateFactionId();
+        void RegisterPirateFaction(Guid id);
     }
 }

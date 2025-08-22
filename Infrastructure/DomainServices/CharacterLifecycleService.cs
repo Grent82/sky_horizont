@@ -1,7 +1,9 @@
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Entity.Lineage;
+using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Shared;
+using SkyHorizont.Infrastructure.Persistence.Interfaces;
 
 namespace SkyHorizont.Infrastructure.DomainServices
 {
@@ -19,6 +21,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly ILocationService _loc;
         private readonly IEventBus _events;
         private readonly IIntimacyLog _intimacy;
+        private readonly IFactionService _factions;
 
         public CharacterLifecycleService(
             ICharacterRepository characters,
@@ -32,7 +35,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
             ISkillInheritanceService skillInherit,
             ILocationService loc,
             IEventBus events,
-            IIntimacyLog intimacy)
+            IIntimacyLog intimacy,
+            IFactionService factions)
         {
             _characters = characters ?? throw new ArgumentNullException(nameof(characters));
             _lineage = lineage ?? throw new ArgumentNullException(nameof(lineage));
@@ -46,6 +50,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _loc = loc ?? throw new ArgumentNullException(nameof(loc));
             _events = events ?? throw new ArgumentNullException(nameof(events));
             _intimacy = intimacy ?? throw new ArgumentNullException(nameof(intimacy));
+            _factions = factions ?? throw new ArgumentNullException(nameof(factions));
         }
 
         public void ProcessLifecycleTurn()
@@ -58,7 +63,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 if (!character.IsAlive)
                     continue;
 
-                // Birthday month → increment age
                 if (character.BirthMonth == _clock.CurrentMonth && _clock.CurrentYear > character.BirthYear)
                 {
                     character.IncreaseAge();
@@ -120,7 +124,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             else if (mother.Age <= 16) chance += 0.04;
             else if (mother.Age <= 20) chance += 0.02;
             else if (mother.Age <= 28) chance += 0.01;
-            else if (mother.Age <= 34) chance += 0.00;   // baseline
+            else if (mother.Age <= 34) chance += 0.00;
             else if (mother.Age <= 40) chance -= 0.03;
             else if (mother.Age <= 45) chance -= 0.06;
             else chance -= 0.10;
@@ -238,6 +242,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
                         break;
                 }
             }
+
+            var motherFaction =_factions.GetFaction(mother.Id);
+            _factions.MoveCharacterToFaction(babyId, motherFaction.Id);
 
             return baby;
         }

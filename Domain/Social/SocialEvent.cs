@@ -16,7 +16,11 @@ namespace SkyHorizont.Domain.Social
         RapeAttempt,
         TravelBooked,
         PirateDefection,
-        RaidPlanned
+        RaidPlanned,
+        FoundGreatHouse,
+        FoundPirateClan,
+        ClaimPlanet,
+        ExpelFromHouse
     }
 
     public interface ISocialEvent

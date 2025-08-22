@@ -25,6 +25,8 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public double Research { get; private set; }
         public int Credits { get; private set; }
         public double BaseTaxRate { get; private set; }
+        public Guid? SeatFactionId { get; private set; }
+
         public IList<Guid> Prisoners { get; } = new List<Guid>();
         public IList<Guid> Citizens { get; } = new List<Guid>();
         private readonly List<Fleet> _stationedFleets = new();
@@ -62,7 +64,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             Population = Math.Max(0, population);
             Research = Math.Clamp(research, 0.0, 1000.0);
             Credits = Math.Max(0, credits);
-            BaseTaxRate = Math.Clamp(baseTaxRate, 0.0, 2.0); // ToDo: make configure able
+            BaseTaxRate = Math.Clamp(baseTaxRate, 0.0, 2.0); // ToDo: make configureable
             BaseAttack = baseAtk;
             BaseDefense = baseDef;
             StationedTroops = troops;
@@ -303,5 +305,12 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         {
             StationedTroops = troopsToStation;
         }
+
+        public void SetSeatPlanet(Guid factionId)
+        {
+            SeatFactionId = factionId;
+        }
+
+        public bool IsSeatOf(Guid factionId) => SeatFactionId.HasValue && SeatFactionId.Value == factionId;
     }
 }

@@ -29,7 +29,10 @@ namespace SkyHorizont.Domain.Services
         RaidConvoy,
         BattleSmallWin,
         BattleMajorWin,
-        Legendary
+        Legendary,
+        HouseFoundedMajor,
+        PirateClanFounded,
+        PlanetClaimed
     }
 
     public sealed class MeritContext

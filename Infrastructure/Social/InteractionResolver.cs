@@ -117,9 +117,18 @@ namespace SkyHorizont.Infrastructure.Social
                 case IntentType.TravelToPlanet:
                     return ResolveTravelToPlanet(actor, intent, currentYear, currentMonth, factionStatus, systemSecurity);
                 case IntentType.BecomePirate:
-                    return ResolveBecomePirate(actor, intent, currentYear, currentMonth, factionStatus, systemSecurity);
+                    return ResolveBecomePirate(actor, intent, currentYear, currentMonth, factionStatus);
                 case IntentType.RaidConvoy:
                     return ResolveRaidConvoy(actor, intent, currentYear, currentMonth, factionStatus, systemSecurity);
+                case IntentType.FoundHouse:
+                    return ResolveFoundGreatHouse(actor, intent, currentYear, currentMonth);
+                case IntentType.FoundPirateClan:
+                    return ResolveFoundPirateClan(actor, intent, currentYear, currentMonth, actorSystemId);
+                case IntentType.ExpelFromHouse:
+                    return ResolveExpelFromHouse(actor, intent, currentYear, currentMonth);
+                case IntentType.ClaimPlanetSeat:
+                    return ResolveClaimPlanetSeat(actor, intent, currentYear, currentMonth);
+
                 default:
                     return Array.Empty<ISocialEvent>();
             }
@@ -447,12 +456,20 @@ namespace SkyHorizont.Infrastructure.Social
             if (target == null || !target.IsAlive)
                 return Array.Empty<ISocialEvent>();
 
+            var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
+            if (myFaction == Guid.Empty)
+                return Array.Empty<ISocialEvent>();
+
             var baseChance = 0.25 + (actor.Personality.Agreeableness - 50) * 0.002 + (actor.Personality.Extraversion - 50) * 0.002 + (int)actor.Rank * 0.02;
             var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
             foreach (var (traitName, intensity) in traits["Extraversion"].Concat(traits["Agreeableness"]))
                 baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
-            if (factionStatus.HasUnrest) baseChance += 0.1;
-            if (actor.Ambition == CharacterAmbition.GainPower) baseChance += 0.1;
+            if (factionStatus.HasUnrest)
+                baseChance += 0.1;
+            if (actor.Ambition == CharacterAmbition.GainPower)
+                baseChance += 0.1;
+
+            baseChance += Math.Clamp(_opinions.GetOpinion(target.Id, actor.Id), -50, 50) / 100.0;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var deltaActorToTarget = success ? 5 : -2;
@@ -460,16 +477,20 @@ namespace SkyHorizont.Infrastructure.Social
 
             _opinions.AdjustOpinion(actor.Id, target.Id, deltaActorToTarget, success ? "Effective recruitment talk" : "Rejected recruitment");
             _opinions.AdjustOpinion(target.Id, actor.Id, deltaTargetToActor, success ? "Motivated by recruiter" : "Annoyed by recruiter");
+
             if (success)
             {
-                AwardMerit(actor, _merit.Compute(MeritAction.Recruit, new MeritContext { Success = success, Ambition = actor.Ambition }));
                 _factions.MoveCharacterToFaction(target.Id, actorFactionId);
                 _chars.Save(target);
-                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), 5);
+
+                var oldFactionId = _factions.GetFactionIdForCharacter(target.Id);
+                if (oldFactionId != Guid.Empty && oldFactionId != actorFactionId)
+                    _diplomacy.AdjustRelations(actorFactionId, oldFactionId, -5);
+
+                AwardMerit(actor, _merit.Compute(MeritAction.Recruit, new MeritContext { Success = success, Ambition = actor.Ambition }));
             }
             else
             {
-                _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -5);
                 AwardMerit(actor, _merit.Compute(MeritAction.Recruit, new MeritContext { Success = success, Ambition = actor.Ambition }));
             }
 
@@ -540,44 +561,62 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         #region Negotiate
-        private IEnumerable<ISocialEvent> ResolveNegotiate(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
+        private IEnumerable<ISocialEvent> ResolveNegotiate(
+            Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
         {
             if (!intent.TargetFactionId.HasValue)
                 return Array.Empty<ISocialEvent>();
+
             var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
             if (myFaction == Guid.Empty)
                 return Array.Empty<ISocialEvent>();
 
-            var baseChance = 0.2 + (actor.Personality.Agreeableness - 50) * 0.003 + (actor.Personality.Extraversion - 50) * 0.002 + (int)actor.Rank * 0.02;
+            var atWar = _factions.IsAtWar(myFaction, intent.TargetFactionId.Value);
+
+            // chance: personality + rank + economy nudge + ambition
+            var baseChance = 0.2
+                + (actor.Personality.Agreeableness - 50) * 0.003
+                + (actor.Personality.Extraversion - 50) * 0.002
+                + (int)actor.Rank * 0.02;
             var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
             foreach (var (traitName, intensity) in traits["Agreeableness"].Concat(traits["Extraversion"]))
                 baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
             if (factionStatus.EconomyWeak) baseChance += 0.15;
             if (actor.Ambition == CharacterAmbition.BuildWealth) baseChance += 0.1;
+            if (atWar) baseChance += 0.05;
 
-            var atWar = _factions.IsAtWar(myFaction, intent.TargetFactionId.Value);
             var success = _rng.NextDouble() < Clamp01(baseChance);
-            var meritChange = _merit.Compute(MeritAction.Negotiate, new MeritContext { Success = success, Ambition = actor.Ambition, AtWar = atWar});
+
+            var treaty = ChooseTreatyType(actor, myFaction, intent.TargetFactionId.Value, atWar);
+            int relationDeltaIfSuccess = treaty switch
+            {
+                TreatyType.Ceasefire => 15,
+                TreatyType.Alliance => 20,
+                TreatyType.Trade => 10,
+                TreatyType.ResearchPact => 10,
+                TreatyType.NonAggression => 8,
+                _ => 10
+            };
+
             if (success)
-            {
-                _factions.MoveCharacterToFaction(actor.Id, intent.TargetFactionId.Value);
-                AwardMerit(actor, meritChange);
-            }
+                _diplomacy.AdjustRelations(myFaction, intent.TargetFactionId.Value, relationDeltaIfSuccess);
             else
-            {
                 _diplomacy.AdjustRelations(myFaction, intent.TargetFactionId.Value, -5);
-                AwardMerit(actor, meritChange);
-            }
+
+            // merit
+            AwardMerit(actor, _merit.Compute(MeritAction.Negotiate,
+                new MeritContext { Success = success, Ambition = actor.Ambition, AtWar = atWar }));
 
             var ev = new SocialEvent(
                 Guid.NewGuid(), currentYear, currentMonth, SocialEventType.Negotiation,
                 actor.Id, null, intent.TargetFactionId, null, success,
                 0, 0, Array.Empty<Guid>(),
-                success ? "Talks progressed with treaty proposed." : "Talks stalled."
+                success ? $"Talks progressed ({treaty})." : "Talks stalled."
             );
             _events.Publish(ev);
             return new[] { ev };
         }
+
         #endregion
 
         #region Quarrel
@@ -642,7 +681,7 @@ namespace SkyHorizont.Infrastructure.Social
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var secrets = new List<Guid>();
-            var meritChange = _merit.Compute(MeritAction.Assassinate, new MeritContext { Success = success, Ambition = actor.Ambition});
+            var meritChange = _merit.Compute(MeritAction.Assassinate, new MeritContext { Success = success, Ambition = actor.Ambition });
             if (!success)
             {
                 var secret = new Secret(
@@ -711,7 +750,7 @@ namespace SkyHorizont.Infrastructure.Social
                 _opinions.AdjustOpinion(actor.Id, target.Id, -10, "Tortured prisoner");
                 _opinions.AdjustOpinion(target.Id, actor.Id, -20, "Victim of torture");
                 target.ApplyTrauma(TraumaType.Torture);
-                AwardMerit(actor, _merit.Compute(MeritAction.Torture, new MeritContext { Success = success, Ambition = actor.Ambition, ProducedIntel = true, IntelSeverity = secret.Severity}));
+                AwardMerit(actor, _merit.Compute(MeritAction.Torture, new MeritContext { Success = success, Ambition = actor.Ambition, ProducedIntel = true, IntelSeverity = secret.Severity }));
                 _chars.Save(target);
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -15);
             }
@@ -724,7 +763,7 @@ namespace SkyHorizont.Infrastructure.Social
                 _secrets.Add(secret);
                 secrets.Add(secret.Id);
                 notes = "Torture attempt failed; rumors spread.";
-                AwardMerit(actor, _merit.Compute(MeritAction.Torture, new MeritContext { Success = success, Ambition = actor.Ambition, ProducedIntel = false}));
+                AwardMerit(actor, _merit.Compute(MeritAction.Torture, new MeritContext { Success = success, Ambition = actor.Ambition, ProducedIntel = false }));
                 _opinions.AdjustOpinion(target.Id, actor.Id, -10, "Failed torture attempt");
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -5);
             }
@@ -792,7 +831,7 @@ namespace SkyHorizont.Infrastructure.Social
                 _opinions.AdjustOpinion(target.Id, actor.Id, -15, "Failed assault attempt");
                 _diplomacy.AdjustRelations(actorFactionId, _factions.GetFactionIdForCharacter(target.Id), -10);
             }
-            AwardMerit(actor, _merit.Compute(MeritAction.Rape, new MeritContext { Success = success, Ambition = actor.Ambition}));
+            AwardMerit(actor, _merit.Compute(MeritAction.Rape, new MeritContext { Success = success, Ambition = actor.Ambition }));
 
             var ev = new SocialEvent(
                 Guid.NewGuid(), currentYear, currentMonth, SocialEventType.RapeAttempt,
@@ -904,72 +943,84 @@ namespace SkyHorizont.Infrastructure.Social
         #endregion
 
         #region BecomePirate
-        private IEnumerable<ISocialEvent> ResolveBecomePirate(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus, SystemSecurity? systemSecurity)
+        private IEnumerable<ISocialEvent> ResolveBecomePirate(Character actor, CharacterIntent intent, int currentYear, int currentMonth, FactionStatus factionStatus)
         {
             var actorFactionId = _factions.GetFactionIdForCharacter(actor.Id);
             if (_piracy.IsPirateFaction(actorFactionId))
                 return Array.Empty<ISocialEvent>();
 
-            var baseChance = 0.3 + (50 - actor.Personality.Conscientiousness) * 0.003 + (50 - actor.Personality.Agreeableness) * 0.003;
-            var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
-            foreach (var (traitName, intensity) in traits["Extraversion"].Concat(traits["Neuroticism"]))
-                baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
-            baseChance += PersonalityTraits.GetTraitCombinationEffect("ImpulsiveAnger", actor.Personality) / 100.0;
-            if (systemSecurity != null)
-                baseChance += systemSecurity.PirateActivity / 500.0;
-            if (factionStatus.HasUnrest)
-                baseChance += 0.15;
-            if (actor.Ambition == CharacterAmbition.SeekAdventure)
-                baseChance += 0.15;
+            double baseChance = 0.3
+                + (50 - actor.Personality.Conscientiousness) * 0.003
+                + (50 - actor.Personality.Agreeableness) * 0.003
+                + PersonalityTraits.GetTraitCombinationEffect("ImpulsiveAnger", actor.Personality) / 100.0;
+
+            if (factionStatus.HasUnrest) baseChance += 0.15;
+            if (actor.Ambition == CharacterAmbition.SeekAdventure) baseChance += 0.15;
+
+            var actorSystemId = FindSystemOfCharacter(actor.Id);
+            if (actorSystemId.HasValue)
+            {
+                var sec = GetSystemSecurity(actorSystemId.Value);
+                baseChance += sec.PirateActivity / 500.0;
+                baseChance -= sec.PatrolStrength / 1200.0;
+            }
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
-            var meritChange = success ? (actor.Ambition == CharacterAmbition.SeekAdventure ? 10 : 5) : -5;
             var secrets = new List<Guid>();
             string notes;
 
-            if (success)
+            var meritDelta = _merit.Compute(MeritAction.BecomePirate,
+                new MeritContext { Success = success, Ambition = actor.Ambition });
+
+            if (!success)
             {
-                var pirateFactionId = _piracy.GetPirateFactionId();
-                if (_piracy.BecomePirate(actor.Id))
-                {
-                    _factions.MoveCharacterToFaction(actor.Id, pirateFactionId);
-                    actor.GainMerit(meritChange);
-                    _chars.Save(actor);
-                    var leaderId = _factions.GetLeaderId(actorFactionId);
-                    if (leaderId.HasValue)
-                        _opinions.AdjustOpinion(actor.Id, leaderId.Value, -20, "Defected to pirates");
-                    _diplomacy.AdjustRelations(actorFactionId, pirateFactionId, -15);
-                    notes = "Joined pirates successfully.";
-                }
-                else
-                {
-                    notes = "Failed to join pirates.";
-                    success = false;
-                }
-            }
-            else
-            {
-                var secret = new Secret(
-                    Guid.NewGuid(), SecretType.DefectionPlot,
-                    $"{actor.Name} considered joining pirates.", actor.Id, null,
-                    50 + _rng.NextInt(0, 20), currentYear, currentMonth);
-                _secrets.Add(secret);
-                secrets.Add(secret.Id);
-                notes = "Attempt to join pirates failed.";
-                var leaderId = _factions.GetLeaderId(actorFactionId);
-                if (leaderId.HasValue)
-                    _opinions.AdjustOpinion(actor.Id, leaderId.Value, -10, "Suspected pirate defection");
-                _diplomacy.AdjustRelations(actorFactionId, _piracy.GetPirateFactionId(), -5);
+                notes = "Decided against piracy (for now).";
+                AwardMerit(actor, meritDelta);
+                var evFail = new SocialEvent(Guid.NewGuid(), currentYear, currentMonth, SocialEventType.PirateDefection,
+                    actor.Id, null, null, null, false, 0, 0, secrets, notes);
+                _events.Publish(evFail);
+                return new[] { evFail };
             }
 
-            var ev = new SocialEvent(
-                Guid.NewGuid(), currentYear, currentMonth, SocialEventType.PirateDefection,
-                actor.Id, null, null, null, success,
-                0, 0, secrets, notes
-            );
+            Guid? clanToJoin = actorSystemId.HasValue ? PickLocalPirateClan(actorSystemId.Value) : null;
+
+            if (!clanToJoin.HasValue)
+            {
+                var globalPirates = _piracy.GetPirateFactionId();
+                if (globalPirates != Guid.Empty && _piracy.IsPirateFaction(globalPirates))
+                    clanToJoin = globalPirates;
+            }
+
+            bool createdClan = false;
+            if (!clanToJoin.HasValue)
+            {
+                var clan = new Faction(Guid.NewGuid(), $"{actor.Name.Split(' ').First()}'s Cutthroats", actor.Id); // ToDo: random pirate clan names
+                _factions.Save(clan);
+                _piracy.RegisterPirateFaction(clan.Id);
+                clanToJoin = clan.Id;
+                createdClan = true;
+            }
+
+            var oldFactionId = actorFactionId;
+            _factions.MoveCharacterToFaction(actor.Id, clanToJoin.Value);
+
+            var oldLeader = _factions.GetLeaderId(oldFactionId);
+            if (oldLeader.HasValue)
+                _opinions.AdjustOpinion(actor.Id, oldLeader.Value, -20, "Defected to pirates");
+            _diplomacy.AdjustRelations(oldFactionId, clanToJoin.Value, -15);
+
+            AwardMerit(actor, meritDelta);
+
+            notes = createdClan
+                ? $"Founded a pirate clan and joined: {_factions.GetFaction(clanToJoin.Value)?.Name ?? "New Pirate Clan"}."
+                : $"Joined pirate clan: {_factions.GetFaction(clanToJoin.Value)?.Name ?? "Pirates"}.";
+
+            var ev = new SocialEvent(Guid.NewGuid(), currentYear, currentMonth, SocialEventType.PirateDefection,
+                actor.Id, null, clanToJoin, null, true, 0, 0, secrets, notes);
             _events.Publish(ev);
             return new[] { ev };
         }
+
         #endregion
 
         #region RaidConvoy
@@ -983,15 +1034,19 @@ namespace SkyHorizont.Infrastructure.Social
                 return Array.Empty<ISocialEvent>();
 
             var targetSystemId = intent.TargetFactionId!.Value;
+            var targetSec = GetSystemSecurity(targetSystemId);
 
             var baseChance = 0.3 + actor.Skills.Military / 200.0;
             var traits = PersonalityTraits.GetActiveTraits(actor.Personality);
             foreach (var (traitName, intensity) in traits["Extraversion"].Concat(traits["Neuroticism"]))
                 baseChance += PersonalityTraits.GetTraitEffect(traitName, actor.Personality) / 100.0;
             baseChance += PersonalityTraits.GetTraitCombinationEffect("ImpulsiveAnger", actor.Personality) / 100.0;
-            baseChance += systemSecurity.Traffic / 500.0;
-            baseChance -= systemSecurity.PatrolStrength / 500.0;
-            if (actor.Ambition == CharacterAmbition.SeekAdventure) baseChance += 0.15;
+
+            baseChance += targetSec.Traffic / 500.0;
+            baseChance -= targetSec.PatrolStrength / 500.0;
+
+            if (actor.Ambition == CharacterAmbition.SeekAdventure)
+                baseChance += 0.15;
 
             var success = _rng.NextDouble() < Clamp01(baseChance);
             var secrets = new List<Guid>();
@@ -1092,6 +1147,156 @@ namespace SkyHorizont.Infrastructure.Social
             );
             _events.Publish(ev);
             return new[] { ev };
+        }
+        #endregion
+
+        #region Found Great House
+        private IEnumerable<ISocialEvent> ResolveFoundGreatHouse(Character actor, CharacterIntent intent, int y, int m)
+        {
+            if (intent.TargetPlanetId == null) return Array.Empty<ISocialEvent>();
+            if (_factions.GetFactionIdForCharacter(actor.Id) != Guid.Empty) return Array.Empty<ISocialEvent>();
+
+            var planet = _planets.GetById(intent.TargetPlanetId.Value);
+            if (planet == null) return Array.Empty<ISocialEvent>();
+
+            int supporters = 0;
+            foreach (var id in planet.Citizens.Take(30))
+                if (id != actor.Id && _opinions.GetOpinion(actor.Id, id) >= 25) supporters++;
+
+            double chance =
+                0.35
+                + (int)actor.Rank * 0.03
+                + Math.Clamp(actor.Balance, 0, 2000) / 8000.0
+                + supporters * 0.01;
+
+            var success = _rng.NextDouble() < Math.Clamp(chance, 0.05, 0.9);
+
+            if (!success)
+            {
+                var failEv = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.FoundGreatHouse,
+                    actor.Id, null, null, intent.TargetPlanetId, false, 0, 0, Array.Empty<Guid>(),
+                    "Founding a House failed to gather enough support.");
+                _events.Publish(failEv);
+                return new[] { failEv };
+            }
+
+            var newFaction = new Faction(Guid.NewGuid(), $"{actor.Name.Split(' ').First()} House", actor.Id);
+            _factions.Save(newFaction);
+            _factions.MoveCharacterToFaction(actor.Id, newFaction.Id);
+
+            planet.SetSeatPlanet(newFaction.Id);
+            _planets.Save(planet);
+
+            AwardMerit(actor, _merit.Compute(MeritAction.HouseFoundedMajor, new MeritContext { Success = success, Ambition = actor.Ambition }));
+
+            var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.FoundGreatHouse,
+                actor.Id, null, newFaction.Id, planet.Id, true, 0, 0, Array.Empty<Guid>(),
+                $"Founded Great House '{newFaction.Name}'. Seat established on planet.");
+            _events.Publish(ev);
+            return new[] { ev };
+        }
+        #endregion
+
+        #region Found Pirate clan
+        private IEnumerable<ISocialEvent> ResolveFoundPirateClan(Character actor, CharacterIntent intent, int y, int m, Guid? actorSystemId)
+        {
+            if (actorSystemId == null) return Array.Empty<ISocialEvent>();
+            var currentFaction = _factions.GetFactionIdForCharacter(actor.Id);
+            if (currentFaction != Guid.Empty && _piracy.IsPirateFaction(currentFaction))
+                return Array.Empty<ISocialEvent>(); // already a pirate
+
+            var sec = GetSystemSecurity(actorSystemId.Value);
+            double chance =
+                0.4
+                + (actor.Skills.Military - 50) * 0.006
+                + (50 - actor.Personality.Conscientiousness) * 0.004
+                + PersonalityTraits.GetTraitEffect("ThrillSeeker", actor.Personality) / 80.0
+                + sec.PirateActivity / 300.0
+                - sec.PatrolStrength / 1200.0;
+
+            var success = _rng.NextDouble() < Math.Clamp(chance, 0.05, 0.9);
+            if (!success)
+            {
+                var failEv = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.FoundPirateClan,
+                    actor.Id, null, null, null, false, 0, 0, Array.Empty<Guid>(),
+                    "Failed to organize a pirate clan.");
+                _events.Publish(failEv);
+                return new[] { failEv };
+            }
+
+            var clan = new Faction(Guid.NewGuid(), $"{actor.Name.Split(' ').First()}'s Corsairs", actor.Id);
+            _factions.Save(clan);
+            _factions.MoveCharacterToFaction(actor.Id, clan.Id);
+
+            _piracy.RegisterPirateFaction(clan.Id);
+
+            AwardMerit(actor, _merit.Compute(MeritAction.PirateClanFounded, new MeritContext { Success = success, Ambition = actor.Ambition }));
+
+            var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.FoundPirateClan,
+                actor.Id, null, clan.Id, null, true, 0, 0, Array.Empty<Guid>(),
+                $"Founded pirate clan '{clan.Name}'.");
+            _events.Publish(ev);
+            return new[] { ev };
+        }
+        #endregion
+
+        #region Expel From House
+        private IEnumerable<ISocialEvent> ResolveExpelFromHouse(Character actor, CharacterIntent intent, int y, int m)
+        {
+            if (!intent.TargetCharacterId.HasValue) return Array.Empty<ISocialEvent>();
+            var target = _chars.GetById(intent.TargetCharacterId.Value);
+            if (target == null || !target.IsAlive) return Array.Empty<ISocialEvent>();
+
+            var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
+            if (myFaction == Guid.Empty) return Array.Empty<ISocialEvent>();
+            if (_factions.GetFactionIdForCharacter(target.Id) != myFaction) return Array.Empty<ISocialEvent>();
+
+            if ((int)actor.Rank < (int)Rank.Captain) return Array.Empty<ISocialEvent>();
+
+            _factions.MoveCharacterToFaction(target.Id, Guid.Empty);
+            _opinions.AdjustOpinion(target.Id, actor.Id, -10, "Expelled from House");
+            _opinions.AdjustOpinion(actor.Id, target.Id, -3, "Expelled a problematic member");
+
+            var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.ExpelFromHouse,
+                actor.Id, target.Id, myFaction, null, true, -3, -10, Array.Empty<Guid>(), "Member expelled from House.");
+            _events.Publish(ev);
+            return new[] { ev };
+        }
+        #endregion
+
+        #region Claim Planet Seat
+        private IEnumerable<ISocialEvent> ResolveClaimPlanetSeat(Character actor, CharacterIntent intent, int y, int m)
+        {
+            if (!intent.TargetPlanetId.HasValue) return Array.Empty<ISocialEvent>();
+            var planet = _planets.GetById(intent.TargetPlanetId.Value);
+            if (planet == null) return Array.Empty<ISocialEvent>();
+
+            var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
+            if (myFaction == Guid.Empty) return Array.Empty<ISocialEvent>();
+
+            double chance = 0.5;
+            if (planet.FactionId == myFaction) chance += 0.25;
+            chance += planet.InfrastructureLevel / 400.0;
+            chance += (int)actor.Rank * 0.03;
+
+            var success = _rng.NextDouble() < Math.Clamp(chance, 0.1, 0.95);
+            if (!success)
+            {
+                var failEv = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.ClaimPlanet,
+                    actor.Id, null, myFaction, planet.Id, false, 0, 0, Array.Empty<Guid>(),
+                    "Failed to secure a House Seat on this world.");
+                _events.Publish(failEv);
+                return new[] { failEv };
+            }
+
+            planet.SetSeatPlanet(myFaction);
+
+            AwardMerit(actor, _merit.Compute(MeritAction.PlanetClaimed, new MeritContext { Success = success, Ambition = actor.Ambition }));
+
+            var ev2 = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.ClaimPlanet,
+                actor.Id, null, myFaction, planet.Id, true, 0, 0, Array.Empty<Guid>(), "Planet claimed as House Seat.");
+            _events.Publish(ev2);
+            return new[] { ev2 };
         }
         #endregion
 
@@ -1259,7 +1464,7 @@ namespace SkyHorizont.Infrastructure.Social
                 occupationDurationHours: 0
             );
         }
-        
+
         private void AwardMerit(Character actor, int amount)
         {
             if (amount == 0)

@@ -130,6 +130,15 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
                 case MeritAction.Legendary:
                     return ctx.Success ? 30 : 0;
+                
+                case MeritAction.HouseFoundedMajor:
+                    return ctx.Success ? 20 : 0;
+                
+                case MeritAction.PirateClanFounded:
+                    return ctx.Success ? 15 : 0;
+                
+                case MeritAction.PlanetClaimed:
+                    return ctx.Success ? 20 : 0;
 
                 default:
                     return 0;
