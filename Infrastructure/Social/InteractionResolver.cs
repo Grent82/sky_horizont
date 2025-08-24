@@ -32,6 +32,7 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly InteractionConfig _cfg;
         private readonly Dictionary<Guid, FactionStatus> _factionStatusCache;
         private readonly Dictionary<Guid, SystemSecurity> _systemSecurityCache;
+        private readonly Dictionary<Guid, (Guid? PlanetId, Guid? SystemId)> _characterLocationCache;
 
         public InteractionResolver(
             ICharacterRepository characters,
@@ -67,6 +68,7 @@ namespace SkyHorizont.Infrastructure.Social
             _cfg = config ?? InteractionConfig.Default;
             _factionStatusCache = new Dictionary<Guid, FactionStatus>();
             _systemSecurityCache = new Dictionary<Guid, SystemSecurity>();
+            _characterLocationCache = new Dictionary<Guid, (Guid? PlanetId, Guid? SystemId)>();
         }
 
         public IEnumerable<ISocialEvent> Resolve(CharacterIntent intent, int currentYear, int currentMonth)
@@ -83,7 +85,7 @@ namespace SkyHorizont.Infrastructure.Social
 
             var actorFactionId = _factions.GetFactionIdForCharacter(actor.Id);
             var factionStatus = GetFactionStatus(actorFactionId);
-            var actorSystemId = FindSystemOfCharacter(actor.Id);
+            var actorSystemId = GetSystemOfCharacter(actor.Id);
             var systemSecurity = actorSystemId.HasValue ? GetSystemSecurity(actorSystemId.Value) : null;
 
             switch (intent.Type)
@@ -233,8 +235,8 @@ namespace SkyHorizont.Infrastructure.Social
             if (!isRomantic)
                 return Array.Empty<ISocialEvent>();
 
-            var originPlanetId = FindPlanetOfCharacter(actor.Id);
-            var loverPlanetId = FindPlanetOfCharacter(lover.Id);
+            var originPlanetId = GetPlanetOfCharacter(actor.Id);
+            var loverPlanetId = GetPlanetOfCharacter(lover.Id);
 
             var travelSucceeded = true;
             if (originPlanetId.HasValue && loverPlanetId.HasValue && originPlanetId.Value != loverPlanetId.Value)
@@ -808,7 +810,7 @@ namespace SkyHorizont.Infrastructure.Social
             if (!intent.TargetPlanetId.HasValue)
                 return Array.Empty<ISocialEvent>();
 
-            var originPlanetId = FindPlanetOfCharacter(actor.Id);
+            var originPlanetId = GetPlanetOfCharacter(actor.Id);
             if (!originPlanetId.HasValue)
                 return Array.Empty<ISocialEvent>();
 
@@ -1133,23 +1135,39 @@ namespace SkyHorizont.Infrastructure.Social
             return best;
         }
 
-        private Guid? FindPlanetOfCharacter(Guid characterId)
-        {
-            foreach (var p in _planets.GetAll())
-                if (p.Citizens.Contains(characterId) || p.Prisoners.Contains(characterId))
-                    return p.Id;
-            return null;
-        }
+        private Guid? GetPlanetOfCharacter(Guid characterId)
+            => GetCharacterLocation(characterId).PlanetId;
 
-        private Guid? FindSystemOfCharacter(Guid characterId)
+        private Guid? GetSystemOfCharacter(Guid characterId)
+            => GetCharacterLocation(characterId).SystemId;
+
+        private (Guid? PlanetId, Guid? SystemId) GetCharacterLocation(Guid characterId)
         {
+            if (_characterLocationCache.TryGetValue(characterId, out var loc))
+                return loc;
+
             foreach (var p in _planets.GetAll())
+            {
                 if (p.Citizens.Contains(characterId) || p.Prisoners.Contains(characterId))
-                    return p.SystemId;
+                {
+                    loc = (p.Id, p.SystemId);
+                    _characterLocationCache[characterId] = loc;
+                    return loc;
+                }
+            }
             foreach (var f in _fleets.GetAll())
+            {
                 if (f.AssignedCharacterId == characterId || f.Prisoners.Contains(characterId))
-                    return f.CurrentSystemId;
-            return null;
+                {
+                    loc = (null, f.CurrentSystemId);
+                    _characterLocationCache[characterId] = loc;
+                    return loc;
+                }
+            }
+
+            loc = (null, null);
+            _characterLocationCache[characterId] = loc;
+            return loc;
         }
 
         private FactionStatus GetFactionStatus(Guid factionId)
@@ -1253,6 +1271,7 @@ namespace SkyHorizont.Infrastructure.Social
         {
             _factionStatusCache.Clear();
             _systemSecurityCache.Clear();
+            _characterLocationCache.Clear();
         }
         #endregion
     }
