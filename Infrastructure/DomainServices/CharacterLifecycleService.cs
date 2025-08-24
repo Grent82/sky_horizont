@@ -184,8 +184,10 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             var babyId = Guid.NewGuid();
             var sex = _rng.NextDouble() < 0.5 ? Sex.Male : Sex.Female;
-            var father = fatherId.HasValue ? _characters.GetById(fatherId.Value) : null;
-            string childSurname = father != null ? ExtractSurname(father.Name) : ExtractSurname(mother.Name); // ToDo: if mother singel then get mother name
+            var father = fatherId.HasValue && fatherId.Value != Guid.Empty
+                ? _characters.GetById(fatherId.Value)
+                : null;
+            string childSurname = DetermineChildSurname(mother, father);
             string given = _names.GenerateFirstName(sex); // ToDo: By Faction/Clan/House
             string full = $"{given} {childSurname}";
 
@@ -232,6 +234,28 @@ namespace SkyHorizont.Infrastructure.DomainServices
             }
 
             return baby;
+        }
+
+        private string DetermineChildSurname(Character mother, Character? father)
+        {
+            if (father != null && AreSpouses(mother, father))
+            {
+                var surname = ExtractSurname(father.Name);
+                if (!string.IsNullOrWhiteSpace(surname))
+                    return surname;
+            }
+
+            var motherSurname = ExtractSurname(mother.Name);
+            if (!string.IsNullOrWhiteSpace(motherSurname))
+                return motherSurname;
+
+            return _names.GenerateSurname();
+        }
+
+        private static bool AreSpouses(Character mother, Character father)
+        {
+            return mother.Relationships.Any(r => r.TargetCharacterId == father.Id && r.Type == RelationshipType.Spouse)
+                || father.Relationships.Any(r => r.TargetCharacterId == mother.Id && r.Type == RelationshipType.Spouse);
         }
 
         private void WireLineage(Character child, Character mother, Guid? fatherId)
