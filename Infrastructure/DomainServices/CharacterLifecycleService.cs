@@ -184,8 +184,10 @@ namespace SkyHorizont.Infrastructure.DomainServices
         {
             var babyId = Guid.NewGuid();
             var sex = _rng.NextDouble() < 0.5 ? Sex.Male : Sex.Female;
-            var father = fatherId.HasValue ? _characters.GetById(fatherId.Value) : null;
-            string childSurname = father != null ? ExtractSurname(father.Name) : ExtractSurname(mother.Name); // ToDo: if mother singel then get mother name
+            var father = fatherId.HasValue && fatherId.Value != Guid.Empty
+                ? _characters.GetById(fatherId.Value)
+                : null;
+            string childSurname = DetermineChildSurname(mother, father);
             string given = _names.GenerateFirstName(sex); // ToDo: By Faction/Clan/House
             string full = $"{given} {childSurname}";
 
@@ -195,6 +197,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 : _inherit.Inherit(mother.Personality, mother.Personality);
 
             var babySkills = _skillInherit.Inherit(mother.Skills, father?.Skills, _rng);
+
+            var loc = _loc.GetCharacterLocation(mother.Id);
+            (babyPersonality, babySkills) = ApplyBirthVariance(babyPersonality, babySkills, loc);
 
             var baby = new Character(
                 babyId,
@@ -217,7 +222,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
             }
             _characters.Save(mother);
 
-            var loc = _loc.GetCharacterLocation(mother.Id);
             switch (loc!.Kind)
             {
                 case LocationKind.Planet:
@@ -232,6 +236,66 @@ namespace SkyHorizont.Infrastructure.DomainServices
             }
 
             return baby;
+        }
+
+        private (Personality, SkillSet) ApplyBirthVariance(Personality p, SkillSet s, CharacterLocation? loc)
+        {
+            int Clamp(int v) => v < 0 ? 0 : (v > 100 ? 100 : v);
+            int Jitter() => _rng.NextInt(-2, 3);
+
+            var p2 = new Personality(
+                Clamp(p.Openness + Jitter()),
+                Clamp(p.Conscientiousness + Jitter()),
+                Clamp(p.Extraversion + Jitter()),
+                Clamp(p.Agreeableness + Jitter()),
+                Clamp(p.Neuroticism + Jitter())
+            );
+
+            var s2 = new SkillSet(
+                Clamp(s.Research + Jitter()),
+                Clamp(s.Economy + Jitter()),
+                Clamp(s.Intelligence + Jitter()),
+                Clamp(s.Military + Jitter())
+            );
+
+            if (loc != null)
+            {
+                switch (loc.Kind)
+                {
+                    case LocationKind.Planet:
+                        s2 = s2 with { Economy = Clamp(s2.Economy + _rng.NextInt(1, 4)) };
+                        p2 = p2 with { Agreeableness = Clamp(p2.Agreeableness + _rng.NextInt(1, 3)) };
+                        break;
+                    case LocationKind.Fleet:
+                        s2 = s2 with { Military = Clamp(s2.Military + _rng.NextInt(1, 4)) };
+                        p2 = p2 with { Conscientiousness = Clamp(p2.Conscientiousness + _rng.NextInt(1, 3)) };
+                        break;
+                }
+            }
+
+            return (p2, s2);
+        }
+
+        private string DetermineChildSurname(Character mother, Character? father)
+        {
+            if (father != null && AreSpouses(mother, father))
+            {
+                var surname = ExtractSurname(father.Name);
+                if (!string.IsNullOrWhiteSpace(surname))
+                    return surname;
+            }
+
+            var motherSurname = ExtractSurname(mother.Name);
+            if (!string.IsNullOrWhiteSpace(motherSurname))
+                return motherSurname;
+
+            return _names.GenerateSurname();
+        }
+
+        private static bool AreSpouses(Character mother, Character father)
+        {
+            return mother.Relationships.Any(r => r.TargetCharacterId == father.Id && r.Type == RelationshipType.Spouse)
+                || father.Relationships.Any(r => r.TargetCharacterId == mother.Id && r.Type == RelationshipType.Spouse);
         }
 
         private void WireLineage(Character child, Character mother, Guid? fatherId)
