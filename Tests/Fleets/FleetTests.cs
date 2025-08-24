@@ -15,13 +15,17 @@ using TaskStatus = SkyHorizont.Domain.Entity.Task.TaskStatus;
 using System.Data.Common;
 using SkyHorizont.Domain.Travel;
 using SkyHorizont.Infrastructure.DomainServices;
+using SkyHorizont.Domain.Galaxy.Planet;
 
 namespace SkyHorizont.Tests.Fleets
 {
     public class FleetTests
     {
         private static Fleet NewFleet(Guid? id = null, Guid? faction = null, Guid? system = null, IPiracyService? pirates = null)
-            => new Fleet(id ?? Guid.NewGuid(), faction ?? Guid.NewGuid(), system ?? Guid.NewGuid(), pirates ?? new PiracyService(null, null, Guid.NewGuid()));
+        {
+            pirates ??= new PiracyService(new Mock<IFactionService>().Object, new RandomService(0), Guid.NewGuid());
+            return new Fleet(id ?? Guid.NewGuid(), faction ?? Guid.NewGuid(), system ?? Guid.NewGuid(), pirates);
+        }
 
         private static Ship MkShip(double atk, double def, double speed = 1, double cargo = 0)
             => new Ship(Guid.NewGuid(), ShipClass.Scout, atk, def, cargoCapacity: cargo, speed: speed, cost: 0);
@@ -30,7 +34,7 @@ namespace SkyHorizont.Tests.Fleets
         [Fact]
         public void Ctor_EmptyId_Throws()
         {
-            Action act = () => new Fleet(Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), new PiracyService(null, null, Guid.NewGuid()));
+            Action act = () => new Fleet(Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), new PiracyService(new Mock<IFactionService>().Object, new RandomService(0), Guid.NewGuid()));
             //act.Should().Throw<ArgumentException>().Where(e => e.ParamName == "id");
         }
 
@@ -41,7 +45,7 @@ namespace SkyHorizont.Tests.Fleets
             var fac = Guid.NewGuid();
             var sys = Guid.NewGuid();
 
-            var f = new Fleet(id, fac, sys, new PiracyService(null, null, Guid.NewGuid()));
+            var f = new Fleet(id, fac, sys, new PiracyService(new Mock<IFactionService>().Object, new RandomService(0), Guid.NewGuid()));
 
             f.Id.Should().Be(id);
             f.FactionId.Should().Be(fac);
@@ -119,6 +123,45 @@ namespace SkyHorizont.Tests.Fleets
             lost.Should().HaveCount(3);
             // first taken should be the lowest defense
             lost.First().Should().Be(low.Id);
+        }
+
+        [Fact]
+        public void ComputeLostShips_Retreat_LosesFortyPercentRoundedDown()
+        {
+            var f = NewFleet();
+            for (int i = 0; i < 5; i++)
+                f.AddShip(MkShip(1, def: i));
+
+            var lost = f.ComputeLostShips(remainingPower: 0, retreat: true).ToList();
+
+            lost.Should().HaveCount(2); // floor(5 * 0.4)
+        }
+
+        [Fact]
+        public void EnqueueOrder_NonPending_Throws()
+        {
+            var f = NewFleet();
+            var order = new DummyOrder(TaskStatus.Active);
+            Action act = () => f.EnqueueOrder(order);
+            act.Should().Throw<DomainException>().WithMessage("Order already scheduled.");
+        }
+
+        private sealed class DummyOrder : FleetOrder
+        {
+            public DummyOrder(TaskStatus status) : base(Guid.NewGuid()) => Status = status;
+            public override void Execute(Fleet fleet, double delta) { }
+        }
+
+        [Fact]
+        public void AddCargo_ExceedCapacity_Throws()
+        {
+            var f = NewFleet();
+            f.AddShip(MkShip(0, 0, cargo: 5));
+            f.AddShip(MkShip(0, 0, cargo: 5));
+
+            var cargo = new Resources(6, 5, 0); // total 11 > capacity 10
+            Action act = () => f.AddCargo(cargo);
+            act.Should().Throw<DomainException>().WithMessage("Cargo exceeds fleet capacity.");
         }
 
         // ---------------- HirePrivateers ----------------

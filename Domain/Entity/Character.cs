@@ -186,6 +186,8 @@ namespace SkyHorizont.Domain.Entity
         {
             if (otherCharacterId == Guid.Empty)
                 throw new ArgumentException("Other character ID cannot be empty.", nameof(otherCharacterId));
+            if (otherCharacterId == Id)
+                throw new ArgumentException("Cannot create relationship with self.", nameof(otherCharacterId));
             if (!Relationships.Any(r => r.TargetCharacterId == otherCharacterId))
                 Relationships.Add(new CharacterRelationship(otherCharacterId, type));
         }

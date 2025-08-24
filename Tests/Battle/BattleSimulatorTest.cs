@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -6,6 +9,7 @@ using SkyHorizont.Domain.Battle;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Fleets;
 using SkyHorizont.Domain.Galaxy.Planet;
+using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Shared;
 using SkyHorizont.Infrastructure.DomainServices;
@@ -21,7 +25,8 @@ namespace SkyHorizont.Tests.Battle
         // --- helpers wired for most tests ---
         private static Fleet MakeFleet(Guid faction, Guid system, int ships, double atkPerShip, double defPerShip, bool withCharacter = false, Character? character = null)
         {
-            var f = new Fleet(Guid.NewGuid(), faction, system, new PiracyService(null, null, Guid.NewGuid()));
+            var piracy = new PiracyService(new Mock<IFactionService>().Object, new RandomService(0), Guid.NewGuid());
+            var f = new Fleet(Guid.NewGuid(), faction, system, piracy);
             for (int i = 0; i < ships; i++)
                 f.AddShip(ShipFactory.Create(atkPerShip, defPerShip));
             if (withCharacter && character != null)
@@ -31,7 +36,9 @@ namespace SkyHorizont.Tests.Battle
 
         private static Planet MakePlanet(Guid system, Guid faction, double baseDef = 0, int troops = 0)
         {
-            return new Planet(Guid.NewGuid(), "Gaia", system, faction, new Resources(100,100,100), null, null,
+            var chrRepo = new Mock<ICharacterRepository>().Object;
+            var planetRepo = new Mock<IPlanetRepository>().Object;
+            return new Planet(Guid.NewGuid(), "Gaia", system, faction, new Resources(100,100,100), chrRepo, planetRepo,
                 initialStability: 1.0, infrastructureLevel: 10, baseAtk: 0, baseDef: baseDef, troops: troops);
         }
 
@@ -213,6 +220,30 @@ namespace SkyHorizont.Tests.Battle
             result.WinningFactionId.Should().Be(_attackerFaction);
             result.WinnerFleet.Should().Be(attacker);
             result.LoserFleet.Should().Be(defendingFleet);
+        }
+
+        [Fact]
+        public void RetreatChance_AdditiveModifiers_ClampedToOne()
+        {
+            var repo = new Mock<ICharacterRepository>(MockBehavior.Strict);
+            var defenders = new List<Fleet>();
+
+            for (int i = 0; i < 2; i++)
+            {
+                var ch = new Character(
+                    Guid.NewGuid(), $"Cmd{i}", 30, 2970, 1, Sex.Male,
+                    new Personality(0,0,-500,0,0),
+                    new SkillSet(0,0,0,0));
+                repo.Setup(r => r.GetById(ch.Id)).Returns(ch);
+                var f = MakeFleet(_defenderFaction, _system, ships: 1, atkPerShip: 1, defPerShip: 1, withCharacter: true, character: ch);
+                defenders.Add(f);
+            }
+
+            var sim = new BattleSimulator(repo.Object, new StubRandomService(always: 0.0));
+            var mi = typeof(BattleSimulator).GetMethod("RetreatChance", BindingFlags.NonPublic | BindingFlags.Instance);
+            mi.Should().NotBeNull();
+            var chance = (double)mi!.Invoke(sim, new object[] { defenders, 1.0, 1.0 });
+            chance.Should().Be(1.0);
         }
     }
 
