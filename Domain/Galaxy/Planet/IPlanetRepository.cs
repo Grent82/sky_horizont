@@ -4,6 +4,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
     {
         Planet? GetById(Guid planetId);
         IEnumerable<Planet> GetAll();
+        IEnumerable<Planet> GetBySystem(Guid systemId);
         void Save(Planet planet);
         IEnumerable<Planet> GetPlanetsControlledByFaction(Guid factionId);
     }

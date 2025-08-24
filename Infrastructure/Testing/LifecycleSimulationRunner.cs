@@ -92,11 +92,11 @@ namespace SkyHorizont.Infrastructure.Testing
             int turns = years * _clock.MonthsPerYear;
             for (int i = 0; i < turns; i++)
             {
-                ProcessAllTurnEvents(turns);
+                ProcessAllTurnEvents();
             }
         }
 
-        public void ProcessAllTurnEvents(int turnNumber)
+        public void ProcessAllTurnEvents()
         {
             // 1) Advance game time (month → year rollover if needed)
             SafeRun("Clock.AdvanceTurn", () => _clock.AdvanceTurn());
@@ -107,7 +107,9 @@ namespace SkyHorizont.Infrastructure.Testing
             // 3) Social layer: plan intents per living character and resolve them
             SafeRun("Social.Intents", () =>
             {
-                foreach (var actor in _characters.GetAll().Where(c => c.IsAlive))
+                _planner.ClearCaches();
+                _resolver.ClearCaches();
+                foreach (var actor in _characters.GetLiving())
                 {
                     var intents = _planner.PlanMonthlyIntents(actor);
                     foreach (var intent in intents)
@@ -121,6 +123,7 @@ namespace SkyHorizont.Infrastructure.Testing
                         catch (Exception ex)
                         {
                             Console.WriteLine($"[TurnProcessor] Error resolving intent {intent.Type} for {actor.Id}: {ex}");
+                            throw;
                         }
                     }
                 }
@@ -136,6 +139,7 @@ namespace SkyHorizont.Infrastructure.Testing
             catch (Exception ex)
             {
                 Console.WriteLine($"[TurnProcessor] {label} failed: {ex.Message}");
+                throw;
             }
         }
     }

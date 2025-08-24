@@ -1249,6 +1249,11 @@ namespace SkyHorizont.Infrastructure.Social
             actor.GainMerit(amount);
             _chars.Save(actor);
         }
+        public void ClearCaches()
+        {
+            _factionStatusCache.Clear();
+            _systemSecurityCache.Clear();
+        }
         #endregion
     }
 

@@ -222,17 +222,21 @@ namespace SkyHorizont.Infrastructure.DomainServices
             }
             _characters.Save(mother);
 
-            switch (loc!.Kind)
+            var loc = _loc.GetCharacterLocation(mother.Id);
+            if (loc != null)
             {
-                case LocationKind.Planet:
-                    _loc.AddCitizenToPlanet(baby.Id, loc.HostId);
-                    break;
-                case LocationKind.Fleet:
-                    _loc.AddPassengerToFleet(baby.Id, loc.HostId);
-                    break;
-                default:
-                    _loc.StageAtHolding(baby.Id, loc.HostId);
-                    break;
+                switch (loc.Kind)
+                {
+                    case LocationKind.Planet:
+                        _loc.AddCitizenToPlanet(baby.Id, loc.HostId);
+                        break;
+                    case LocationKind.Fleet:
+                        _loc.AddPassengerToFleet(baby.Id, loc.HostId);
+                        break;
+                    default:
+                        _loc.StageAtHolding(baby.Id, loc.HostId);
+                        break;
+                }
             }
 
             return baby;

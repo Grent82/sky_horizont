@@ -1,5 +1,7 @@
 using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Shared;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace SkyHorizont.Domain.Factions
 {
@@ -46,13 +48,12 @@ namespace SkyHorizont.Domain.Factions
 
         public Guid GetFactionIdForSystem(Guid systemId)
         {
-            var planets = _planetRepository.GetAll().Where(p => p.SystemId == systemId).ToList();
-            if (!planets.Any()) return Guid.Empty;
+            var planets = _planetRepository.GetBySystem(systemId);
             var factionCounts = planets.GroupBy(p => p.FactionId)
                                       .Select(g => new { FactionId = g.Key, Count = g.Count() })
                                       .OrderByDescending(g => g.Count)
-                                      .First();
-            return factionCounts.FactionId;
+                                      .FirstOrDefault();
+            return factionCounts?.FactionId ?? Guid.Empty;
         }
 
         public int GetEconomicStrength(Guid factionId)
@@ -94,9 +95,12 @@ namespace SkyHorizont.Domain.Factions
             _factionRepository.Save(faction);
         }
 
-        public Faction? GetFaction(Guid factionId)
+        public Faction GetFaction(Guid factionId)
         {
-            return _factionRepository.GetFaction(factionId);
+            var faction = _factionRepository.GetFaction(factionId);
+            if (faction == null)
+                throw new KeyNotFoundException($"Faction {factionId} not found");
+            return faction;
         }
     }
 }

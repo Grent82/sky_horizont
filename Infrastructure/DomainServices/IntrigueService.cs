@@ -298,7 +298,10 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private void MaybeCreateExposurePlot(Guid actorId, Guid targetId, Secret secret)
         {
-            // Very small chance to spin a counter-exposure mini-plot
+            const int MaxExposurePlotsPerActor = 3;
+            if (_plots.GetAll().Count(p => p.LeaderId == actorId && p.Goal.Contains("Expose")) >= MaxExposurePlotsPerActor)
+                return;
+
             if (_rng.NextDouble() < 0.15)
             {
                 _plots.Create(

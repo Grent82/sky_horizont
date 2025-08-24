@@ -280,5 +280,11 @@ namespace SkyHorizont.Infrastructure.Social
 
             return kept;
         }
+
+        public void ClearCaches()
+        {
+            _factionStatusCache.Clear();
+            _systemSecurityCache.Clear();
+        }
     }
 }

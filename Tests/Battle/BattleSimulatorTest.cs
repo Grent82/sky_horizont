@@ -4,6 +4,7 @@ using System.Reflection;
 using FluentAssertions;
 using Moq;
 using Xunit;
+using System.Collections.Generic;
 
 using SkyHorizont.Domain.Battle;
 using SkyHorizont.Domain.Entity;
@@ -49,6 +50,7 @@ namespace SkyHorizont.Tests.Battle
             // Arrange
             var rand = new StubRandomService(always: 0.0);
             var characterRepo = new Mock<ICharacterRepository>(MockBehavior.Strict);
+            characterRepo.Setup(r => r.GetLiving()).Returns(new List<Character>());
             var sim = new BattleSimulator(characterRepo.Object, rand);
 
             var attacker = MakeFleet(_attackerFaction, _system, ships: 2, atkPerShip: 10, defPerShip: 10);
@@ -75,6 +77,7 @@ namespace SkyHorizont.Tests.Battle
             // Arrange
             var rand = new StubRandomService(always: 0.99); // retreat check won't matter if attacker wins
             var characterRepo = new Mock<ICharacterRepository>(MockBehavior.Strict);
+            characterRepo.Setup(r => r.GetLiving()).Returns(new List<Character>());
             var sim = new BattleSimulator(characterRepo.Object, rand);
 
             var attacker = MakeFleet(_attackerFaction, _system, ships: 3, atkPerShip: 30, defPerShip: 20);
@@ -101,6 +104,7 @@ namespace SkyHorizont.Tests.Battle
             // Arrange: attacker weaker
             var rand = new StubRandomService(always: 0.99); // high -> fails any retreat chance
             var characterRepo = new Mock<ICharacterRepository>(MockBehavior.Strict);
+            characterRepo.Setup(r => r.GetLiving()).Returns(new List<Character>());
             var sim = new BattleSimulator(characterRepo.Object, rand);
 
             var attacker = MakeFleet(_attackerFaction, _system, ships: 2, atkPerShip: 5, defPerShip: 5);
@@ -128,6 +132,7 @@ namespace SkyHorizont.Tests.Battle
         {
             // Arrange: commander gives +0.5 attack, +0.5 defense (via Character methods)
             var repo = new Mock<ICharacterRepository>(MockBehavior.Strict);
+            repo.Setup(r => r.GetLiving()).Returns(new List<Character>());
             var commanderAtk = CharacterFactory.Create(retreatModifier: 0.0, attackBonus: 0.5, defenseBonus: 0.0);
             var commanderDef = CharacterFactory.Create(retreatModifier: 0.0, attackBonus: 0.0, defenseBonus: 0.5);
 
@@ -155,6 +160,7 @@ namespace SkyHorizont.Tests.Battle
         {
             var rand = new StubRandomService(always: 0.5);
             var repo = new Mock<ICharacterRepository>(MockBehavior.Strict);
+            repo.Setup(r => r.GetLiving()).Returns(new List<Character>());
             var sim = new BattleSimulator(repo.Object, rand);
 
             var attacker = MakeFleet(_attackerFaction, _system, ships: 3, atkPerShip: 30, defPerShip: 10);
@@ -177,6 +183,7 @@ namespace SkyHorizont.Tests.Battle
         {
             var rand = new StubRandomService(always: 0.5);
             var repo = new Mock<ICharacterRepository>(MockBehavior.Strict);
+            repo.Setup(r => r.GetLiving()).Returns(new List<Character>());
             var sim = new BattleSimulator(repo.Object, rand);
 
             var attacker = MakeFleet(_attackerFaction, _system, ships: 1, atkPerShip: 5, defPerShip: 5);
@@ -200,6 +207,7 @@ namespace SkyHorizont.Tests.Battle
             // Arrange: make fleet battle end with defender retreat (like in the earlier test)
             var sequenceRandom = new SequenceRandomService(0.0); // ensure retreat when chance > 0
             var repo = new Mock<ICharacterRepository>(MockBehavior.Strict);
+            repo.Setup(r => r.GetLiving()).Returns(new List<Character>());
             var commander = CharacterFactory.Create(retreatModifier: 0.6, attackBonus: 0.0, defenseBonus: 0.0);
             repo.Setup(r => r.GetById(commander.Id)).Returns(commander);
 

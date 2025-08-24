@@ -9,5 +9,6 @@ namespace SkyHorizont.Domain.Social
     public interface IInteractionResolver
     {
         IEnumerable<ISocialEvent> Resolve(CharacterIntent intent, int currentYear, int currentMonth);
+        void ClearCaches();
     }
 }

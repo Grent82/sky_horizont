@@ -1,5 +1,6 @@
 using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Infrastructure.Persistence.Interfaces;
+using System.Linq;
 
 namespace SkyHorizont.Infrastructure.Persistence
 {
@@ -14,7 +15,12 @@ namespace SkyHorizont.Infrastructure.Persistence
 
         public IEnumerable<Planet> GetAll()
         {
-            return _context.Planets.Values.ToList();
+            return _context.Planets.Values;
+        }
+
+        public IEnumerable<Planet> GetBySystem(Guid systemId)
+        {
+            return _context.Planets.Values.Where(p => p.SystemId == systemId);
         }
 
         public Planet? GetById(Guid planetId)
