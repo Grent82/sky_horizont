@@ -7,7 +7,7 @@ namespace SkyHorizont.Application
 {
     public interface ITurnProcessor
     {
-        void ProcessAllTurnEvents(int turnNumber);
+        void ProcessAllTurnEvents();
     }
 
     /// <summary>
@@ -57,7 +57,7 @@ namespace SkyHorizont.Application
             _economy   = economy;
         }
 
-        public void ProcessAllTurnEvents(int turnNumber)
+        public void ProcessAllTurnEvents()
         {
             // 1) Advance game time (month → year rollover if needed)
             SafeRun("Clock.AdvanceTurn", () => _clock.AdvanceTurn());
@@ -68,7 +68,9 @@ namespace SkyHorizont.Application
             // 3) Social layer: plan intents per living character and resolve them
             SafeRun("Social.Intents", () =>
             {
-                foreach (var actor in _characters.GetAll().Where(c => c.IsAlive))
+                _planner.ClearCaches();
+                _resolver.ClearCaches();
+                foreach (var actor in _characters.GetLiving())
                 {
                     var intents = _planner.PlanMonthlyIntents(actor);
                     foreach (var intent in intents)
@@ -82,6 +84,7 @@ namespace SkyHorizont.Application
                         catch (Exception ex)
                         {
                             Console.WriteLine($"[TurnProcessor] Error resolving intent {intent.Type} for {actor.Id}: {ex}");
+                            throw;
                         }
                     }
                 }
@@ -109,6 +112,7 @@ namespace SkyHorizont.Application
             catch (Exception ex)
             {
                 Console.WriteLine($"[TurnProcessor] {label} failed: {ex.Message}");
+                throw;
             }
         }
     }

@@ -1,4 +1,5 @@
 using SkyHorizont.Domain.Social;
+using System.Collections.Concurrent;
 
 namespace SkyHorizont.Infrastructure.Social
 {
@@ -7,12 +8,15 @@ namespace SkyHorizont.Infrastructure.Social
     /// </summary>
     public class InMemorySocialEventLog : ISocialEventLog
     {
-        private readonly List<ISocialEvent> _events = new();
+        private readonly ConcurrentQueue<ISocialEvent> _events = new();
 
-        public void Append(ISocialEvent ev) => _events.Add(ev);
+        public void Append(ISocialEvent ev) => _events.Enqueue(ev);
 
-        public IReadOnlyList<ISocialEvent> GetAll() => _events.AsReadOnly();
+        public IReadOnlyList<ISocialEvent> GetAll() => _events.ToArray();
 
-        public void Clear() => _events.Clear();
+        public void Clear()
+        {
+            while (_events.TryDequeue(out _)) { }
+        }
     }
 }

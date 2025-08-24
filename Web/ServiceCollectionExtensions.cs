@@ -90,26 +90,26 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<ITravelService, TravelService>();
 
 
-            services.AddSingleton<IIntentRule, CourtshipIntentRule>();
-            services.AddSingleton<IIntentRule, VisitFamilyIntentRule>();
-            services.AddSingleton<IIntentRule, VisitLoverIntentRule>();
-            services.AddSingleton<IIntentRule, SpyIntentRule>();
-            services.AddSingleton<IIntentRule, BribeIntentRule>();
-            services.AddSingleton<IIntentRule, RecruitIntentRule>();
-            services.AddSingleton<IIntentRule, DefectIntentRule>();
-            services.AddSingleton<IIntentRule, NegotiateIntentRule>();
-            services.AddSingleton<IIntentRule, QuarrelIntentRule>();
-            services.AddSingleton<IIntentRule, AssassinateIntentRule>();
-            services.AddSingleton<IIntentRule, TorturePrisonerIntentRule>();
-            services.AddSingleton<IIntentRule, RapePrisonerIntentRule>();
-            services.AddSingleton<IIntentRule, TravelIntentRule>();
-            services.AddSingleton<IIntentRule, BecomePirateIntentRule>();
-            services.AddSingleton<IIntentRule, RaidConvoyIntentRule>();
-            services.AddSingleton<IIntentPlanner, IntentPlanner>();
-            services.AddSingleton<IInteractionResolver, InteractionResolver>();
+            services.AddScoped<IIntentRule, CourtshipIntentRule>();
+            services.AddScoped<IIntentRule, VisitFamilyIntentRule>();
+            services.AddScoped<IIntentRule, VisitLoverIntentRule>();
+            services.AddScoped<IIntentRule, SpyIntentRule>();
+            services.AddScoped<IIntentRule, BribeIntentRule>();
+            services.AddScoped<IIntentRule, RecruitIntentRule>();
+            services.AddScoped<IIntentRule, DefectIntentRule>();
+            services.AddScoped<IIntentRule, NegotiateIntentRule>();
+            services.AddScoped<IIntentRule, QuarrelIntentRule>();
+            services.AddScoped<IIntentRule, AssassinateIntentRule>();
+            services.AddScoped<IIntentRule, TorturePrisonerIntentRule>();
+            services.AddScoped<IIntentRule, RapePrisonerIntentRule>();
+            services.AddScoped<IIntentRule, TravelIntentRule>();
+            services.AddScoped<IIntentRule, BecomePirateIntentRule>();
+            services.AddScoped<IIntentRule, RaidConvoyIntentRule>();
+            services.AddScoped<IIntentPlanner, IntentPlanner>();
+            services.AddScoped<IInteractionResolver, InteractionResolver>();
 
             services.AddSingleton<IGameClockService, GameClockService>();
-            services.AddSingleton<ITurnProcessor, TurnProcessor>();
+            services.AddScoped<ITurnProcessor, TurnProcessor>();
             services.AddSingleton<IRandomService>(_ => new RandomService(rngSeed));
             services.AddSingleton<INameGenerator, NameGenerator>();
             services.AddSingleton<IPersonalityInheritanceService, SimplePersonalityInheritanceService>();

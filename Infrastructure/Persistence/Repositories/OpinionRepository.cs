@@ -1,10 +1,14 @@
 using SkyHorizont.Domain.Social;
 using SkyHorizont.Infrastructure.Persistence.Interfaces;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace SkyHorizont.Infrastructure.Persistence
 {
     public class OpinionRepository : IOpinionRepository
     {
+        private const int MaxReasons = 20;
         private readonly IOpinionsDbContext _context;
 
         public OpinionRepository(IOpinionsDbContext context)
@@ -31,6 +35,8 @@ namespace SkyHorizont.Infrastructure.Persistence
                 _context.OpinionReasons[key] = list;
             }
             list.Add($"{DateTime.UtcNow:o} | Δ{delta:+#;-#;0} | {reason}");
+            if (list.Count > MaxReasons)
+                list.RemoveAt(0);
 
             _context.SaveChanges();
         }

@@ -27,7 +27,7 @@ namespace SkyHorizont.Domain.Entity
         {
             { Rank.Civilian, 0 },
             { Rank.Courtesan, 100 },
-            { Rank.Lieutenant, 100 },
+            { Rank.Lieutenant, 200 },
             { Rank.Captain, 300 },
             { Rank.Major, 700 },
             { Rank.Colonel, 1500 },
@@ -124,7 +124,7 @@ namespace SkyHorizont.Domain.Entity
         {
             if (Rank == Rank.Leader)
                 return;
-            Rank = Rank + 1;
+            Rank = (Rank)((int)Rank + 1);
             // TODO: better promotion logic and Publish promotion event?
         }
 

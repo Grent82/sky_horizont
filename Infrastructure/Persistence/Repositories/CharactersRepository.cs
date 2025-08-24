@@ -1,5 +1,6 @@
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Infrastructure.Persistence.Interfaces;
+using System.Linq;
 
 namespace SkyHorizont.Infrastructure.Persistence
 {
@@ -14,7 +15,12 @@ namespace SkyHorizont.Infrastructure.Persistence
 
         public IEnumerable<Character> GetAll()
         {
-            return _context.Characters.Values.ToList();
+            return _context.Characters.Values;
+        }
+
+        public IEnumerable<Character> GetLiving()
+        {
+            return _context.Characters.Values.Where(c => c.IsAlive);
         }
 
         public Character? GetById(Guid characterId)

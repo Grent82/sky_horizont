@@ -3,6 +3,7 @@ using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Entity.Task;
 using SkyHorizont.Domain.Fleets;
 using SkyHorizont.Domain.Shared;
+using SkyHorizont.Domain.Services;
 
 namespace SkyHorizont.Domain.Galaxy.Planet
 {
@@ -105,6 +106,8 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         {
             if (points < 0)
                 throw new DomainException("Investment points must be positive.");
+            if (creditsCost < 0)
+                throw new DomainException("Credits cost must be non-negative.");
             if (creditsCost > Credits)
                 throw new DomainException($"Insufficient credits: {creditsCost} required, {Credits} available.");
 
@@ -136,7 +139,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         {
             var governor = GovernorId.HasValue ? _characterRepository.GetById(GovernorId.Value) : null;
             var governorBonus = governor?.Skills.Military * 0.01 ?? 0.0;
-            return BaseDefense * (1 + researchAttackBonusPct) * (1 + governorBonus) +
+            return BaseAttack * (1 + researchAttackBonusPct) * (1 + governorBonus) +
                    _stationedFleets.Sum(f => f.CalculateStrength().MilitaryPower);
         }
 
@@ -171,10 +174,10 @@ namespace SkyHorizont.Domain.Galaxy.Planet
 
         public IReadOnlyList<Fleet> GetStationedFleets() => _stationedFleets.AsReadOnly();
 
-        public bool Revolt(double chanceThreshold = 0.3)
+        public bool Revolt(IRandomService rng, double chanceThreshold = 0.3)
         {
             var revoltChance = (100 - Satisfaction) / 100.0 * (UnrestLevel / 100.0);
-            if (Stability > chanceThreshold || new Random().NextDouble() > revoltChance)
+            if (Stability > chanceThreshold || rng.NextDouble() > revoltChance)
                 return false;
 
             GovernorId = null;
