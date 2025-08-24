@@ -15,4 +15,12 @@ namespace SkyHorizont.Domain.Social
         Guid? TargetFactionId = null,
         Guid? TargetPlanetId = null
     );
+
+    /// <summary>Internal scoring container before conflict resolution.</summary>
+    public sealed record ScoredIntent(
+        IntentType Type,
+        double Score,
+        Guid? TargetCharacterId,
+        Guid? TargetFactionId,
+        Guid? TargetPlanetId);
 }

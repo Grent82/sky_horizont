@@ -21,6 +21,7 @@ using SkyHorizont.Infrastructure.Persistence.Interfaces;
 using SkyHorizont.Infrastructure.Persistence.Intrigue;
 using SkyHorizont.Infrastructure.Repository;
 using SkyHorizont.Infrastructure.Social;
+using SkyHorizont.Infrastructure.Social.IntentRules;
 
 namespace SkyHorizont.Infrastructure.Configuration
 {
@@ -89,6 +90,21 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<ITravelService, TravelService>();
 
 
+            services.AddSingleton<IIntentRule, CourtshipIntentRule>();
+            services.AddSingleton<IIntentRule, VisitFamilyIntentRule>();
+            services.AddSingleton<IIntentRule, VisitLoverIntentRule>();
+            services.AddSingleton<IIntentRule, SpyIntentRule>();
+            services.AddSingleton<IIntentRule, BribeIntentRule>();
+            services.AddSingleton<IIntentRule, RecruitIntentRule>();
+            services.AddSingleton<IIntentRule, DefectIntentRule>();
+            services.AddSingleton<IIntentRule, NegotiateIntentRule>();
+            services.AddSingleton<IIntentRule, QuarrelIntentRule>();
+            services.AddSingleton<IIntentRule, AssassinateIntentRule>();
+            services.AddSingleton<IIntentRule, TorturePrisonerIntentRule>();
+            services.AddSingleton<IIntentRule, RapePrisonerIntentRule>();
+            services.AddSingleton<IIntentRule, TravelIntentRule>();
+            services.AddSingleton<IIntentRule, BecomePirateIntentRule>();
+            services.AddSingleton<IIntentRule, RaidConvoyIntentRule>();
             services.AddSingleton<IIntentPlanner, IntentPlanner>();
             services.AddSingleton<IInteractionResolver, InteractionResolver>();
 

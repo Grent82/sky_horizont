@@ -2,12 +2,14 @@ using FluentAssertions;
 using Infrastructure.Persistence.Repositories;
 using SkyHorizont.Application.Turns;
 using SkyHorizont.Domain.Factions;
+using SkyHorizont.Domain.Social;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Infrastructure.DomainServices;
 using SkyHorizont.Infrastructure.Persistence;
 using SkyHorizont.Infrastructure.Persistence.Diplomacy;
 using SkyHorizont.Infrastructure.Repository;
 using SkyHorizont.Infrastructure.Social;
+using SkyHorizont.Infrastructure.Social.IntentRules;
 using SkyHorizont.Infrastructure.Testing;
 using Xunit;
 
@@ -56,7 +58,12 @@ namespace SkyHorizont.Tests.Common
             var merit = new MeritPolicy();
             
             var bus = new InMemoryEventBus();
-            var planner = new IntentPlanner(characters, opinions, faction, rng, planets, fleets, travel, piracy);
+            var rules = new IIntentRule[]
+            {
+                new CourtshipIntentRule(rng),
+                new VisitFamilyIntentRule(rng)
+            };
+            var planner = new IntentPlanner(characters, opinions, faction, rng, planets, fleets, piracy, rules);
             var diplomacy = new DiplomacyService(diplomacies, faction, clock, opinions);
             var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy, travel, piracy, planets, fleets, events, battle, intimacy, merit);
 
