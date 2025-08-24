@@ -291,10 +291,7 @@ namespace SkyHorizont.Tests.Entity
         protected override TaskEffect? CreateEffect(Character chr, bool success, IGameClockService clock, IRandomService rng)
         {
             if (_effectMode == EffectMode.Null) return null;
-
-            // Create a non-null TaskEffect instance even if TaskEffect has no public ctor.
-            var obj = FormatterServices.GetUninitializedObject(typeof(TaskEffect));
-            return (TaskEffect)obj;
+            return new DummyEffect(Guid.NewGuid(), chr.Id, clock.CurrentYear, clock.CurrentMonth);
         }
 
         protected override void OnAssigned(Character chr) => HookAssignedCount++;
@@ -307,4 +304,7 @@ namespace SkyHorizont.Tests.Entity
         public double ExposeBaseSpeed(IRandomService rng) => base.SpeedFactor(rng);
         public double ExposeEffectiveSpeed(IRandomService rng) => SpeedFactor(rng);
     }
+
+    internal sealed record DummyEffect(Guid TaskId, Guid CharacterId, int CompletedYear, int CompletedMonth)
+        : TaskEffect(TaskId, CharacterId, CompletedYear, CompletedMonth);
 }
