@@ -4,6 +4,7 @@ using SkyHorizont.Domain.Entity.Task;
 using SkyHorizont.Domain.Fleets;
 using SkyHorizont.Domain.Shared;
 using SkyHorizont.Domain.Services;
+using SkyHorizont.Domain.Economy;
 
 namespace SkyHorizont.Domain.Galaxy.Planet
 {
@@ -23,7 +24,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public double Satisfaction { get; private set; }
         public int Population { get; private set; }
         public double Research { get; private set; }
-        public int Credits { get; private set; }
+        public int Credits => _economy.GetPlanetBudget(Id);
         public double BaseTaxRate { get; private set; }
         public Guid? SeatFactionId { get; private set; }
 
@@ -35,6 +36,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
 
         private readonly ICharacterRepository _characterRepository;
         private readonly IPlanetRepository _planetRepository;
+        private readonly IPlanetEconomyRepository _economy;
 
         public Planet(
             Guid id,
@@ -44,6 +46,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             Resources initialResources,
             ICharacterRepository characterRepository,
             IPlanetRepository planetRepository,
+            IPlanetEconomyRepository economyRepository,
             double initialStability = 1.0,
             int infrastructureLevel = 10,
             double satisfaction = 50.0,
@@ -63,13 +66,16 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             Satisfaction = Math.Clamp(satisfaction, 0.0, 100.0);
             Population = Math.Max(0, population);
             Research = Math.Clamp(research, 0.0, 1000.0);
-            Credits = Math.Max(0, credits);
             BaseTaxRate = Math.Clamp(baseTaxRate, 0.0, 2.0); // ToDo: make configureable
             BaseAttack = baseAtk;
             BaseDefense = baseDef;
             StationedTroops = troops;
             _characterRepository = characterRepository ?? throw new ArgumentNullException(nameof(characterRepository));
             _planetRepository = planetRepository ?? throw new ArgumentNullException(nameof(planetRepository));
+            _economy = economyRepository ?? throw new ArgumentNullException(nameof(economyRepository));
+            var startCredits = Math.Max(0, credits);
+            if (startCredits > 0)
+                _economy.AddBudget(Id, startCredits);
         }
 
         public void AssignGovernor(Guid? characterId)
@@ -110,10 +116,9 @@ namespace SkyHorizont.Domain.Galaxy.Planet
                 throw new DomainException("Investment points must be positive.");
             if (creditsCost < 0)
                 throw new DomainException("Credits cost must be non-negative.");
-            if (creditsCost > Credits)
+            if (!_economy.TryDebitBudget(Id, creditsCost))
                 throw new DomainException($"Insufficient credits: {creditsCost} required, {Credits} available.");
 
-            Credits -= creditsCost;
             InfrastructureLevel = Math.Min(100, InfrastructureLevel + points);
             Stability = Math.Min(1.0, Stability + 0.01 * points);
             BaseDefense += points * 0.5;
@@ -130,7 +135,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public int CollectTaxes()
         {
             var taxIncome = (int)(Population * BaseTaxRate * (Satisfaction / 100.0));
-            Credits += taxIncome;
+            _economy.AddBudget(Id, taxIncome);
             Satisfaction = Math.Clamp(Satisfaction - (BaseTaxRate * 5.0), 0, 100);
             AdjustStabilityBasedOnSatisfaction();
             _planetRepository.Save(this);
@@ -186,7 +191,8 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             Stability = Math.Clamp(Stability - 0.2, 0, 1.0);
             Satisfaction = Math.Clamp(Satisfaction - 10.0, 0, 100.0);
             Population = (int)(Population * 0.9);
-            Credits = (int)(Credits * 0.8); 
+            var loss = (int)(Credits * 0.2);
+            _economy.TryDebitBudget(Id, loss);
             _planetRepository.Save(this);
             return true;
         }
@@ -197,7 +203,8 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             Stability = Math.Clamp(Stability - 0.3, 0, 1.0);
             Satisfaction = Math.Clamp(Satisfaction - 15.0, 0, 100.0);
             Population = (int)(Population * 0.95);
-            Credits = (int)(Credits * 0.9);
+            var loss = (int)(Credits * 0.1);
+            _economy.TryDebitBudget(Id, loss);
             GovernorId = null;
             _stationedFleets.Clear();
             BaseDefense = Math.Max(0, BaseDefense * 0.5);
@@ -208,7 +215,8 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         {
             ChangeControl(newFaction);
             outcomeService.ProcessPlanetConquest(this, result.WinnerFleet!, result);
-            Credits += result.PlanetCaptureBonus;
+            if (result.PlanetCaptureBonus > 0)
+                _economy.AddBudget(Id, result.PlanetCaptureBonus);
             Population = (int)(Population * 0.9);
             Satisfaction = Math.Clamp(Satisfaction - 20.0, 0, 100.0);
             _planetRepository.Save(this);
