@@ -56,6 +56,9 @@
 [ ] **BuildShip/RefitFleet** – capacity growth; unlocks hull techs.
 [ ] **UpgradeDefenseGrid** – anti‑raid/anti‑bombard resilience.
 
+- Trade value now scales with distance between systems.
+- Smuggling payouts credit the nearest pirate faction.
+
 ### Exploration & Science
 
 [ ] **SurveyPlanet** – reveals resources/habitability hooks.
