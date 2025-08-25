@@ -10,7 +10,8 @@ namespace SkyHorizont.Domain.Social
         FoundHouse,
         FoundPirateClan,
         ExpelFromHouse,
-        ClaimPlanetSeat
+        ClaimPlanetSeat,
+        BuildFleet
     }
 
     /// <summary> Planned monthly action for one actor. </summary>

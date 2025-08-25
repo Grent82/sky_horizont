@@ -22,6 +22,7 @@ public sealed record AmbitionBias
     public double FoundPirateClan { get; init; } = 1.0;
     public double ExpelFromHouse { get; init; } = 1.0;
     public double ClaimPlanetSeat { get; init; } = 1.0;
+    public double BuildFleet { get; init; } = 1.0;
 
     public double this[IntentType intent] => intent switch
     {
@@ -45,6 +46,7 @@ public sealed record AmbitionBias
         IntentType.FoundPirateClan => FoundPirateClan,
         IntentType.ExpelFromHouse => ExpelFromHouse,
         IntentType.ClaimPlanetSeat => ClaimPlanetSeat,
+        IntentType.BuildFleet => BuildFleet,
         _ => 1.0
     };
 }
