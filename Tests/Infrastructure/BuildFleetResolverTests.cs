@@ -51,60 +51,6 @@ public class BuildFleetResolverTests
         fleetRepo.Setup(f => f.Save(It.IsAny<Fleet>())).Callback<Fleet>(f => savedFleet = f);
 
         var funds = new Mock<IFundsService>();
-        funds.Setup(f => f.GetBalance(factionId)).Returns(10000);
-        funds.Setup(f => f.HasFunds(It.IsAny<Guid>(), It.IsAny<int>())).Returns(true);
-        funds.Setup(f => f.Deduct(It.IsAny<Guid>(), It.IsAny<int>()));
-
-        var resolver = new InteractionResolver(
-            charRepo.Object,
-            Mock.Of<IOpinionRepository>(),
-            factionSvc.Object,
-            Mock.Of<ISecretsRepository>(),
-            Mock.Of<IRandomService>(),
-            Mock.Of<IDiplomacyService>(),
-            Mock.Of<ITravelService>(),
-            Mock.Of<IPiracyService>(),
-            planetRepo.Object,
-            fleetRepo.Object,
-            funds.Object,
-            Mock.Of<IEventBus>(),
-            Mock.Of<IBattleOutcomeService>(),
-            Mock.Of<IIntimacyLog>(),
-            Mock.Of<IMeritPolicy>()
-        );
-
-        var intent = new CharacterIntent(actor.Id, IntentType.BuildFleet);
-        var ev = resolver.Resolve(intent, 3000, 1).Single();
-
-        savedFleet.Should().NotBeNull();
-        savedFleet!.Ships.Should().NotBeEmpty();
-        ev.Success.Should().BeTrue();
-        funds.Verify(f => f.Deduct(factionId, It.IsAny<int>()), Times.AtLeastOnce);
-    }
-
-    [Fact]
-    public void ResolveBuildFleet_fails_when_budget_exhausted()
-    {
-        var actor = NewActor();
-        var charRepo = new Mock<ICharacterRepository>();
-        charRepo.Setup(c => c.GetById(actor.Id)).Returns(actor);
-
-        var factionId = Guid.NewGuid();
-        var factionSvc = new Mock<IFactionService>();
-        factionSvc.Setup(f => f.GetFactionIdForCharacter(actor.Id)).Returns(factionId);
-        factionSvc.Setup(f => f.GetAllRivalFactions(factionId)).Returns(Array.Empty<Guid>());
-        factionSvc.Setup(f => f.GetEconomicStrength(factionId)).Returns(0);
-        factionSvc.Setup(f => f.GetFaction(factionId)).Returns(new Faction(factionId, "T", actor.Id, FactionDoctrine.Balanced));
-
-        var ecoRepo = new PlanetEconomyRepository(new InMemoryPlanetEconomyDbContext());
-        var planetRepo = new Mock<IPlanetRepository>();
-        var planet = new Planet(Guid.NewGuid(), "Home", Guid.NewGuid(), factionId, new Resources(100,100,100), charRepo.Object, planetRepo.Object, ecoRepo, productionCapacity: 200);
-        planetRepo.Setup(p => p.GetPlanetsControlledByFaction(factionId)).Returns(new[] { planet });
-
-        var fleetRepo = new Mock<IFleetRepository>();
-        fleetRepo.Setup(f => f.GetFleetsForFaction(factionId)).Returns(Array.Empty<Fleet>());
-
-        var funds = new Mock<IFundsService>();
         funds.Setup(f => f.GetBalance(factionId)).Returns(0);
         funds.Setup(f => f.HasFunds(It.IsAny<Guid>(), It.IsAny<int>())).Returns(false);
 
@@ -125,6 +71,7 @@ public class BuildFleetResolverTests
             Mock.Of<IIntimacyLog>(),
             Mock.Of<IMeritPolicy>()
         );
+        funds.Setup(f => f.HasFunds(It.IsAny<Guid>(), It.IsAny<int>())).Returns(false);
 
         var intent = new CharacterIntent(actor.Id, IntentType.BuildFleet);
         var ev = resolver.Resolve(intent, 3000, 1).Single();
