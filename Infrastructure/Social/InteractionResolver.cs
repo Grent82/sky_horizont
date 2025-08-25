@@ -128,6 +128,8 @@ namespace SkyHorizont.Infrastructure.Social
                     return ResolveExpelFromHouse(actor, intent, currentYear, currentMonth);
                 case IntentType.ClaimPlanetSeat:
                     return ResolveClaimPlanetSeat(actor, intent, currentYear, currentMonth);
+                case IntentType.BuildInfrastructure:
+                    return ResolveBuildInfrastructure(actor, intent, currentYear, currentMonth);
 
                 default:
                     return Array.Empty<ISocialEvent>();
@@ -1322,6 +1324,38 @@ namespace SkyHorizont.Infrastructure.Social
             _events.Publish(ev);
             return new[] { ev };
         }
+
+        #endregion
+
+        #region BuildInfrastructure
+        private IEnumerable<ISocialEvent> ResolveBuildInfrastructure(Character actor, CharacterIntent intent, int y, int m)
+        {
+            if (!intent.TargetPlanetId.HasValue)
+                return Array.Empty<ISocialEvent>();
+            var planet = _planets.GetById(intent.TargetPlanetId.Value);
+            if (planet == null)
+                return Array.Empty<ISocialEvent>();
+
+            const int cost = 200;
+            const int points = 10;
+            if (planet.Credits < cost)
+            {
+                var failEv = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.Custom,
+                    actor.Id, null, null, planet.Id, false, 0, 0, Array.Empty<Guid>(),
+                    "Insufficient credits for infrastructure investment.");
+                _events.Publish(failEv);
+                return new[] { failEv };
+            }
+
+            planet.InvestInfrastructure(points, cost);
+
+            var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.Custom,
+                actor.Id, null, null, planet.Id, true, 0, 0, Array.Empty<Guid>(),
+                $"Invested {cost} credits into infrastructure.");
+            _events.Publish(ev);
+            return new[] { ev };
+        }
+
         #endregion
 
         #region Helpers

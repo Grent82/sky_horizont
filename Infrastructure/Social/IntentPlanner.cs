@@ -235,7 +235,8 @@ namespace SkyHorizont.Infrastructure.Social
                     RapePrisoner = 0.9,
                     TravelToPlanet = 0.8,
                     BecomePirate = 0.9,
-                    RaidConvoy = 0.8
+                    RaidConvoy = 0.8,
+                    BuildInfrastructure = 0.9
                 },
                 CharacterAmbition.BuildWealth => bias with
                 {
@@ -252,7 +253,8 @@ namespace SkyHorizont.Infrastructure.Social
                     RapePrisoner = 0.6,
                     TravelToPlanet = 1.0,
                     BecomePirate = 1.2,
-                    RaidConvoy = 1.3
+                    RaidConvoy = 1.3,
+                    BuildInfrastructure = 1.3
                 },
                 CharacterAmbition.EnsureFamilyLegacy => bias with
                 {
@@ -269,7 +271,8 @@ namespace SkyHorizont.Infrastructure.Social
                     RapePrisoner = 0.5,
                     TravelToPlanet = 1.1,
                     BecomePirate = 0.7,
-                    RaidConvoy = 0.6
+                    RaidConvoy = 0.6,
+                    BuildInfrastructure = 1.2
                 },
                 CharacterAmbition.SeekAdventure => bias with
                 {
@@ -286,7 +289,8 @@ namespace SkyHorizont.Infrastructure.Social
                     RapePrisoner = 0.7,
                     TravelToPlanet = 1.3,
                     BecomePirate = 1.2,
-                    RaidConvoy = 1.2
+                    RaidConvoy = 1.2,
+                    BuildInfrastructure = 0.8
                 },
                 _ => bias
             };
@@ -324,7 +328,8 @@ namespace SkyHorizont.Infrastructure.Social
                         conflict = true;
                 }
 
-                if (si.Type == IntentType.TravelToPlanet || si.Type == IntentType.ClaimPlanetSeat)
+                if (si.Type == IntentType.TravelToPlanet || si.Type == IntentType.ClaimPlanetSeat ||
+                    si.Type == IntentType.BuildInfrastructure)
                 {
                     if (tp.HasValue && chosenPlanetTargets.Contains(tp.Value))
                         conflict = true;

@@ -51,7 +51,8 @@ public class AmbitionBiasTests
                 { IntentType.RapePrisoner, 0.9 },
                 { IntentType.TravelToPlanet, 0.8 },
                 { IntentType.BecomePirate, 0.9 },
-                { IntentType.RaidConvoy, 0.8 }
+                { IntentType.RaidConvoy, 0.8 },
+                { IntentType.BuildInfrastructure, 0.9 }
             }
         };
 
@@ -73,7 +74,8 @@ public class AmbitionBiasTests
                 { IntentType.RapePrisoner, 0.6 },
                 { IntentType.TravelToPlanet, 1.0 },
                 { IntentType.BecomePirate, 1.2 },
-                { IntentType.RaidConvoy, 1.3 }
+                { IntentType.RaidConvoy, 1.3 },
+                { IntentType.BuildInfrastructure, 1.3 }
             }
         };
 
@@ -95,7 +97,8 @@ public class AmbitionBiasTests
                 { IntentType.RapePrisoner, 0.5 },
                 { IntentType.TravelToPlanet, 1.1 },
                 { IntentType.BecomePirate, 0.7 },
-                { IntentType.RaidConvoy, 0.6 }
+                { IntentType.RaidConvoy, 0.6 },
+                { IntentType.BuildInfrastructure, 1.2 }
             }
         };
 
@@ -117,7 +120,8 @@ public class AmbitionBiasTests
                 { IntentType.RapePrisoner, 0.7 },
                 { IntentType.TravelToPlanet, 1.3 },
                 { IntentType.BecomePirate, 1.2 },
-                { IntentType.RaidConvoy, 1.2 }
+                { IntentType.RaidConvoy, 1.2 },
+                { IntentType.BuildInfrastructure, 0.8 }
             }
         };
     }
