@@ -30,8 +30,20 @@ public class BuildInfrastructureResolverTests
         charRepo.Setup(r => r.GetById(actorId)).Returns(actor);
 
         var planetRepo = new Mock<IPlanetRepository>();
-        var ecoRepo = Mock.Of<IPlanetEconomyRepository>();
-        var planet = new Planet(Guid.NewGuid(), "Home", systemId, factionId, new Resources(0,0,0), charRepo.Object, planetRepo.Object, ecoRepo, infrastructureLevel: 10, credits: 500);
+        var ecoRepo = new Mock<IPlanetEconomyRepository>();
+        var budget = 0;
+        ecoRepo.Setup(e => e.GetPlanetBudget(It.IsAny<Guid>())).Returns(() => budget);
+        ecoRepo.Setup(e => e.AddBudget(It.IsAny<Guid>(), It.IsAny<int>())).Callback<Guid, int>((_, amt) => budget += amt);
+        ecoRepo.Setup(e => e.TryDebitBudget(It.IsAny<Guid>(), It.IsAny<int>())).Returns<Guid, int>((_, amt) =>
+        {
+            if (budget >= amt)
+            {
+                budget -= amt;
+                return true;
+            }
+            return false;
+        });
+        var planet = new Planet(Guid.NewGuid(), "Home", systemId, factionId, new Resources(0,0,0), charRepo.Object, planetRepo.Object, ecoRepo.Object, infrastructureLevel: 10, credits: 500);
         planet.Citizens.Add(actorId);
         planetRepo.Setup(r => r.GetById(planet.Id)).Returns(planet);
         planetRepo.Setup(r => r.GetAll()).Returns(new[] { planet });
