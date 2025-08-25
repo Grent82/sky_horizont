@@ -9,6 +9,7 @@ using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Shared;
 using SkyHorizont.Domain.Social;
 using SkyHorizont.Domain.Travel;
+using System.Linq;
 using TaskStatus = SkyHorizont.Domain.Entity.Task.TaskStatus;
 
 namespace SkyHorizont.Infrastructure.Social
@@ -34,6 +35,17 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly Dictionary<Guid, FactionStatus> _factionStatusCache;
         private readonly Dictionary<Guid, SystemSecurity> _systemSecurityCache;
         private readonly Dictionary<Guid, (Guid? PlanetId, Guid? SystemId)> _characterLocationCache;
+
+        private record ShipSpec(int Cost, double Attack, double Defense, double Cargo, double Speed, int ProductionRequired, Resources ResourceCost);
+        private static readonly Dictionary<ShipClass, ShipSpec> ShipSpecs = new()
+        {
+            { ShipClass.Corvette, new ShipSpec(800, 10, 10, 10, 2.0, 50, new Resources(10,20,5)) },
+            { ShipClass.Frigate, new ShipSpec(1500, 20, 20, 20, 1.5, 70, new Resources(20,40,10)) },
+            { ShipClass.Destroyer, new ShipSpec(2500, 30, 25, 15, 1.3, 90, new Resources(30,60,15)) },
+            { ShipClass.Freighter, new ShipSpec(1200, 5, 8, 100, 1.5, 60, new Resources(10,30,5)) },
+            { ShipClass.Scout, new ShipSpec(500, 5, 5, 10, 3.0, 40, new Resources(5,10,5)) },
+            { ShipClass.Carrier, new ShipSpec(5000, 40, 40, 20, 1.0, 120, new Resources(50,80,20)) }
+        };
 
         public InteractionResolver(
             ICharacterRepository characters,
@@ -1414,7 +1426,53 @@ namespace SkyHorizont.Infrastructure.Social
 
             if (!_funds.HasFunds(actorFactionId, totalCost))
             {
-                notes = "Insufficient funds to build fleet.";
+                foreach (var fleet in existingFleets)
+                {
+                    if (!fleet.DesiredComposition.Any())
+                    {
+                        var currentTemplate = fleet.Ships
+                            .GroupBy(s => s.Class)
+                            .ToDictionary(g => g.Key, g => g.Count());
+                        fleet.SetDesiredComposition(currentTemplate);
+                    }
+
+                    foreach (var kv in fleet.DesiredComposition)
+                    {
+                        if (!ShipSpecs.TryGetValue(kv.Key, out var spec))
+                            continue;
+                        int current = fleet.Ships.Count(s => s.Class == kv.Key);
+                        int deficit = kv.Value - current;
+                        for (int i = 0; i < deficit; i++)
+                        {
+                            int maintenanceCost = (int)Math.Ceiling(spec.Cost * 0.1);
+                            int totalCost = spec.Cost + maintenanceCost;
+                            if (available < totalCost)
+                                break;
+                            if (planet.ProductionCapacity < spec.ProductionRequired)
+                                break;
+                            if (planet.Resources.Organics < spec.ResourceCost.Organics || planet.Resources.Ore < spec.ResourceCost.Ore || planet.Resources.Volatiles < spec.ResourceCost.Volatiles)
+                                break;
+                            if (!_funds.HasFunds(actorFactionId, totalCost))
+                                break;
+
+                            _funds.Deduct(actorFactionId, totalCost);
+                            planet.Resources = planet.Resources - spec.ResourceCost;
+                            _planets.Save(planet);
+                            fleet.AddShip(new Ship(Guid.NewGuid(), kv.Key, spec.Attack, spec.Defense, spec.Cargo, spec.Speed, spec.Cost));
+                            builtOverall.Add(kv.Key.ToString());
+                            available -= totalCost;
+                        }
+                    }
+
+                    if (builtOverall.Any())
+                        _fleets.Save(fleet);
+                }
+
+                bool successRepl = builtOverall.Any();
+                string notesRepl = successRepl ? $"Replenished {string.Join(", ", builtOverall)}" : "No ships built.";
+                var evRepl = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.BuildFleet, actor.Id, null, null, null, successRepl, 0, 0, Array.Empty<Guid>(), notesRepl);
+                _events.Publish(evRepl);
+                return new[] { evRepl };
             }
             else
             {
@@ -1426,9 +1484,45 @@ namespace SkyHorizont.Infrastructure.Social
                 notes = $"New {chosenClass} commissioned (maintenance {maintenance}).";
             }
 
-            var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.BuildFleet, actor.Id, null, null, null, success, 0, 0, Array.Empty<Guid>(), notes);
-            _events.Publish(ev);
-            return new[] { ev };
+                foreach (var (cls, ratio) in ratios)
+                {
+                    if (!ShipSpecs.TryGetValue(cls, out var spec))
+                        continue;
+                    int maintenanceCost = (int)Math.Ceiling(spec.Cost * 0.1);
+                    int totalCost = spec.Cost + maintenanceCost;
+                    int alloc = (int)(available * ratio);
+                    while (alloc >= totalCost && available >= totalCost)
+                    {
+                        if (planet.ProductionCapacity < spec.ProductionRequired)
+                            break;
+                        if (planet.Resources.Organics < spec.ResourceCost.Organics || planet.Resources.Ore < spec.ResourceCost.Ore || planet.Resources.Volatiles < spec.ResourceCost.Volatiles)
+                            break;
+                        if (!_funds.HasFunds(actorFactionId, totalCost))
+                            break;
+
+                        _funds.Deduct(actorFactionId, totalCost);
+                        planet.Resources = planet.Resources - spec.ResourceCost;
+                        _planets.Save(planet);
+                        fleet.AddShip(new Ship(Guid.NewGuid(), cls, spec.Attack, spec.Defense, spec.Cargo, spec.Speed, spec.Cost));
+                        if (!built.TryGetValue(cls, out var count)) count = 0;
+                        built[cls] = count + 1;
+                        alloc -= totalCost;
+                        available -= totalCost;
+                    }
+                }
+
+                bool success = fleet.Ships.Any();
+                string notes = success ? $"Built {string.Join(", ", built.Select(kv => $"{kv.Value} {kv.Key}"))}" : "No ships built.";
+                if (success)
+                {
+                    fleet.SetDesiredComposition(built);
+                    _fleets.Save(fleet);
+                }
+
+                var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.BuildFleet, actor.Id, null, null, null, success, 0, 0, Array.Empty<Guid>(), notes);
+                _events.Publish(ev);
+                return new[] { ev };
+            }
         }
         #endregion
 

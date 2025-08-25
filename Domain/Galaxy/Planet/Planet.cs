@@ -21,6 +21,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public double BaseAttack { get; private set; }
         public double BaseDefense { get; private set; }
         public int StationedTroops { get; private set; }
+        public int ProductionCapacity { get; private set; }
         public double Satisfaction { get; private set; }
         public int Population { get; private set; }
         public double Research { get; private set; }
@@ -54,7 +55,8 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             double research = 0.0,
             int credits = 1000,
             double baseTaxRate = 1.0,
-            double baseAtk = 0, double baseDef = 0, int troops = 0)
+            double baseAtk = 0, double baseDef = 0, int troops = 0,
+            int productionCapacity = 100)
         {
             Id = id != Guid.Empty ? id : throw new ArgumentNullException(nameof(id));
             Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -70,6 +72,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             BaseAttack = baseAtk;
             BaseDefense = baseDef;
             StationedTroops = troops;
+            ProductionCapacity = productionCapacity;
             _characterRepository = characterRepository ?? throw new ArgumentNullException(nameof(characterRepository));
             _planetRepository = planetRepository ?? throw new ArgumentNullException(nameof(planetRepository));
             _economy = economyRepository ?? throw new ArgumentNullException(nameof(economyRepository));
