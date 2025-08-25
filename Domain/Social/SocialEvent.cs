@@ -17,6 +17,7 @@ namespace SkyHorizont.Domain.Social
         TravelBooked,
         PirateDefection,
         RaidPlanned,
+        BuildFleet,
         FoundGreatHouse,
         FoundPirateClan,
         ClaimPlanet,

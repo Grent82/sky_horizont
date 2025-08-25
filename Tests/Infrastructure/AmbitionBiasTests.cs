@@ -37,23 +37,24 @@ public class AmbitionBiasTests
         {
             CharacterAmbition.GainPower,
             new Dictionary<IntentType, double>
-            {
-                { IntentType.Court, 0.8 },
-                { IntentType.VisitFamily, 0.7 },
-                { IntentType.Spy, 1.2 },
-                { IntentType.Bribe, 1.1 },
-                { IntentType.Recruit, 1.2 },
-                { IntentType.Defect, 1.3 },
-                { IntentType.Negotiate, 1.0 },
-                { IntentType.Quarrel, 1.0 },
-                { IntentType.Assassinate, 1.3 },
-                { IntentType.TorturePrisoner, 1.0 },
-                { IntentType.RapePrisoner, 0.9 },
-                { IntentType.TravelToPlanet, 0.8 },
-                { IntentType.BecomePirate, 0.9 },
-                { IntentType.RaidConvoy, 0.8 }
-            }
-        };
+                {
+                    { IntentType.Court, 0.8 },
+                    { IntentType.VisitFamily, 0.7 },
+                    { IntentType.Spy, 1.2 },
+                    { IntentType.Bribe, 1.1 },
+                    { IntentType.Recruit, 1.2 },
+                    { IntentType.Defect, 1.3 },
+                    { IntentType.Negotiate, 1.0 },
+                    { IntentType.Quarrel, 1.0 },
+                    { IntentType.Assassinate, 1.3 },
+                    { IntentType.TorturePrisoner, 1.0 },
+                    { IntentType.RapePrisoner, 0.9 },
+                    { IntentType.TravelToPlanet, 0.8 },
+                    { IntentType.BecomePirate, 0.9 },
+                    { IntentType.RaidConvoy, 0.8 },
+                    { IntentType.BuildFleet, 1.3 }
+                }
+            };
 
         yield return new object[]
         {
@@ -70,12 +71,13 @@ public class AmbitionBiasTests
                 { IntentType.Quarrel, 0.7 },
                 { IntentType.Assassinate, 0.8 },
                 { IntentType.TorturePrisoner, 0.7 },
-                { IntentType.RapePrisoner, 0.6 },
-                { IntentType.TravelToPlanet, 1.0 },
-                { IntentType.BecomePirate, 1.2 },
-                { IntentType.RaidConvoy, 1.3 }
-            }
-        };
+                    { IntentType.RapePrisoner, 0.6 },
+                    { IntentType.TravelToPlanet, 1.0 },
+                    { IntentType.BecomePirate, 1.2 },
+                    { IntentType.RaidConvoy, 1.3 },
+                    { IntentType.BuildFleet, 0.8 }
+                }
+            };
 
         yield return new object[]
         {
@@ -92,12 +94,13 @@ public class AmbitionBiasTests
                 { IntentType.Quarrel, 0.8 },
                 { IntentType.Assassinate, 0.7 },
                 { IntentType.TorturePrisoner, 0.6 },
-                { IntentType.RapePrisoner, 0.5 },
-                { IntentType.TravelToPlanet, 1.1 },
-                { IntentType.BecomePirate, 0.7 },
-                { IntentType.RaidConvoy, 0.6 }
-            }
-        };
+                    { IntentType.RapePrisoner, 0.5 },
+                    { IntentType.TravelToPlanet, 1.1 },
+                    { IntentType.BecomePirate, 0.7 },
+                    { IntentType.RaidConvoy, 0.6 },
+                    { IntentType.BuildFleet, 0.7 }
+                }
+            };
 
         yield return new object[]
         {
@@ -114,12 +117,13 @@ public class AmbitionBiasTests
                 { IntentType.Quarrel, 1.0 },
                 { IntentType.Assassinate, 1.0 },
                 { IntentType.TorturePrisoner, 0.8 },
-                { IntentType.RapePrisoner, 0.7 },
-                { IntentType.TravelToPlanet, 1.3 },
-                { IntentType.BecomePirate, 1.2 },
-                { IntentType.RaidConvoy, 1.2 }
-            }
-        };
+                    { IntentType.RapePrisoner, 0.7 },
+                    { IntentType.TravelToPlanet, 1.3 },
+                    { IntentType.BecomePirate, 1.2 },
+                    { IntentType.RaidConvoy, 1.2 },
+                    { IntentType.BuildFleet, 1.2 }
+                }
+            };
     }
 
     [Theory]

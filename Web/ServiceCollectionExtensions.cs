@@ -109,6 +109,7 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<IIntentRule, FoundPirateClanIntentRule>();
             services.AddScoped<IIntentRule, ExpelFromHouseIntentRule>();
             services.AddScoped<IIntentRule, ClaimPlanetSeatIntentRule>();
+            services.AddScoped<IIntentRule, BuildFleetIntentRule>();
             services.AddScoped<IIntentPlanner, IntentPlanner>();
             services.AddScoped<IInteractionResolver, InteractionResolver>();
 

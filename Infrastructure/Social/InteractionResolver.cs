@@ -25,6 +25,7 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly IPiracyService _piracy;
         private readonly IPlanetRepository _planets;
         private readonly IFleetRepository _fleets;
+        private readonly IFundsService _funds;
         private readonly IEventBus _events;
         private readonly IBattleOutcomeService _battleOutcomeService;
         private readonly IIntimacyLog _intimacy;
@@ -45,6 +46,7 @@ namespace SkyHorizont.Infrastructure.Social
             IPiracyService piracy,
             IPlanetRepository planets,
             IFleetRepository fleets,
+            IFundsService funds,
             IEventBus events,
             IBattleOutcomeService battleOutcomeService,
             IIntimacyLog intimacy,
@@ -61,6 +63,7 @@ namespace SkyHorizont.Infrastructure.Social
             _piracy = piracy ?? throw new ArgumentNullException(nameof(piracy));
             _planets = planets ?? throw new ArgumentNullException(nameof(planets));
             _fleets = fleets ?? throw new ArgumentNullException(nameof(fleets));
+            _funds = funds ?? throw new ArgumentNullException(nameof(funds));
             _events = events ?? throw new ArgumentNullException(nameof(events));
             _battleOutcomeService = battleOutcomeService ?? throw new ArgumentNullException(nameof(battleOutcomeService));
             _intimacy = intimacy ?? throw new ArgumentNullException(nameof(intimacy));
@@ -128,6 +131,8 @@ namespace SkyHorizont.Infrastructure.Social
                     return ResolveExpelFromHouse(actor, intent, currentYear, currentMonth);
                 case IntentType.ClaimPlanetSeat:
                     return ResolveClaimPlanetSeat(actor, intent, currentYear, currentMonth);
+                case IntentType.BuildFleet:
+                    return ResolveBuildFleet(actor, intent, currentYear, currentMonth, actorFactionId, actorSystemId);
 
                 default:
                     return Array.Empty<ISocialEvent>();
@@ -1319,6 +1324,32 @@ namespace SkyHorizont.Infrastructure.Social
             var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.ClaimPlanet,
                 actor.Id, null, myFaction, planet.Id, true, 0, 0, Array.Empty<Guid>(),
                 "Planet claimed as House Seat.");
+            _events.Publish(ev);
+            return new[] { ev };
+        }
+
+        private IEnumerable<ISocialEvent> ResolveBuildFleet(Character actor, CharacterIntent intent, int y, int m, Guid actorFactionId, Guid? actorSystemId)
+        {
+            const int cost = 1000;
+            bool success = false;
+            string notes;
+
+            if (!_funds.HasFunds(actorFactionId, cost))
+            {
+                notes = "Insufficient funds to build fleet.";
+            }
+            else
+            {
+                _funds.Deduct(actorFactionId, cost);
+                var system = actorSystemId ?? Guid.Empty;
+                var fleet = new Fleet(Guid.NewGuid(), actorFactionId, system, _piracy);
+                fleet.AddShip(new Ship(Guid.NewGuid(), ShipClass.Corvette, 10, 10, 10, 2, 0));
+                _fleets.Save(fleet);
+                success = true;
+                notes = "New fleet commissioned.";
+            }
+
+            var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.BuildFleet, actor.Id, null, null, null, success, 0, 0, Array.Empty<Guid>(), notes);
             _events.Publish(ev);
             return new[] { ev };
         }

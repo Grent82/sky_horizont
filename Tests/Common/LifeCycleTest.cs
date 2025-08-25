@@ -51,6 +51,7 @@ namespace SkyHorizont.Tests.Common
             var travel = new TravelService(planets, fleets, rng, travels, piracy, clock);
             var fund = new CharacterFundsService(funds);
             var tax = new FactionTaxService(factionFunds, funds, planets, eco, faction, characters, clock);
+            var factionFundsSvc = new FundsService(factionFunds);
             var moral = new MoraleService(characters);
             var battle = new BattleOutcomeService(fund, factionFunds, tax, characters, moral);
             var affection = new AffectionService(characters, planets, fleets, affections);
@@ -65,7 +66,7 @@ namespace SkyHorizont.Tests.Common
             };
             var planner = new IntentPlanner(characters, opinions, faction, rng, planets, fleets, piracy, rules);
             var diplomacy = new DiplomacyService(diplomacies, faction, clock, opinions);
-            var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy, travel, piracy, planets, fleets, events, battle, intimacy, merit);
+            var resolver = new InteractionResolver(characters, opinions, faction, secrets, rng, diplomacy, travel, piracy, planets, fleets, factionFundsSvc, events, battle, intimacy, merit);
 
             var lifecycle = new CharacterLifecycleService(
                 characters, lineage, clock, rng, mortality, nameGen,
