@@ -10,10 +10,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IRandomService _rng;
         private Guid _pirateFactionId;
 
-        // simple in-memory state
-        private readonly Dictionary<Guid, int> _pirateActivityBySystem = new(); // 0..100
-        private readonly Dictionary<Guid, int> _trafficBySystem = new();        // 0..100
-        private readonly HashSet<string> _ambushKeys = new(); // $"{actor}:{system}:{year}:{month}"
+        private readonly Dictionary<Guid, int> _pirateActivityBySystem = new();
+        private readonly Dictionary<Guid, int> _trafficBySystem = new();
+        private readonly HashSet<string> _ambushKeys = new();
 
         // ToDo: multiple pirate faction
         public PiracyService(IFactionService factions, IRandomService rng, Guid pirateFactionId)
@@ -78,6 +77,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         public void RegisterPirateFaction(Guid id)
         {
+            // current implementation supports only a single pirate faction
+            // additional factions can be registered in future enhancements
             if (id == Guid.Empty) return;
             _pirateFactionId = id;
         }

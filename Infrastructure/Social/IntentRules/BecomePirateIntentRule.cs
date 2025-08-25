@@ -23,7 +23,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (_piracy.IsPirateFaction(ctx.ActorFactionId))
                 yield break;
 
-            var score = ScoreBecomePirate(ctx.Actor, ctx.ActorFactionId, ctx.ActorLeaderId, ctx.SystemSecurity, ctx.OpinionOf, ctx.FactionStatus, ctx.Config) * ctx.AmbitionBias.BecomePirate;
+            var score = ScoreBecomePirate(ctx.Actor, ctx.ActorFactionId, ctx.ActorLeaderId, ctx.SystemSecurity, ctx.OpinionOf, ctx.FactionStatus, ctx.Config) * ctx.AmbitionBias[IntentType.BecomePirate];
             if (score > 0)
                 yield return new ScoredIntent(IntentType.BecomePirate, score, null, null, null);
         }

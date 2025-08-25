@@ -26,7 +26,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (!dest.HasValue)
                 yield break;
 
-            var score = ScoreTravel(ctx.Actor, dest.Value, ctx.FactionStatus, ctx.SystemSecurity, ctx.Config) * ctx.AmbitionBias.Travel;
+            var score = ScoreTravel(ctx.Actor, dest.Value, ctx.FactionStatus, ctx.SystemSecurity, ctx.Config) * ctx.AmbitionBias[IntentType.TravelToPlanet];
             if (score > 0)
                 yield return new ScoredIntent(IntentType.TravelToPlanet, score, null, null, dest.Value);
         }

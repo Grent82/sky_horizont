@@ -21,7 +21,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (target == null)
                 yield break;
 
-            var score = ScoreCourtship(ctx.Actor, target, ctx.FactionStatus, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias.Court;
+            var score = ScoreCourtship(ctx.Actor, target, ctx.FactionStatus, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias[IntentType.Court];
             if (score > 0)
                 yield return new ScoredIntent(IntentType.Court, score, target.Id, null, null);
         }
