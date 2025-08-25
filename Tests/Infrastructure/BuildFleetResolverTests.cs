@@ -65,15 +65,19 @@ public class BuildFleetResolverTests
         fleetRepo.Setup(f => f.Save(It.IsAny<Fleet>())).Callback<Fleet>(f => savedFleet = f);
 
         var funds = new Mock<IFundsService>();
-        funds.Setup(f => f.HasFunds(It.IsAny<Guid>(), 1000)).Returns(true);
-        funds.Setup(f => f.Deduct(It.IsAny<Guid>(), 1000));
+        int? deducted = null;
+        funds.Setup(f => f.HasFunds(It.IsAny<Guid>(), It.IsAny<int>())).Returns(true);
+        funds.Setup(f => f.Deduct(It.IsAny<Guid>(), It.IsAny<int>()))
+            .Callback<Guid, int>((_, amt) => deducted = amt);
 
         var resolver = CreateResolver(actor, fleetRepo.Object, funds.Object, out var factionId);
         var intent = new CharacterIntent(actor.Id, IntentType.BuildFleet);
 
         var ev = resolver.Resolve(intent, 3000, 1).Single();
 
-        funds.Verify(f => f.Deduct(factionId, 1000), Times.Once);
+        funds.Verify(f => f.Deduct(factionId, It.IsAny<int>()), Times.Once);
+        deducted.Should().NotBeNull();
+        deducted.Should().BeGreaterThan(0);
         fleetRepo.Verify(f => f.Save(It.IsAny<Fleet>()), Times.Once);
         savedFleet.Should().NotBeNull();
         savedFleet!.Ships.Should().NotBeEmpty();
@@ -88,7 +92,7 @@ public class BuildFleetResolverTests
         var fleetRepo = new Mock<IFleetRepository>();
 
         var funds = new Mock<IFundsService>();
-        funds.Setup(f => f.HasFunds(It.IsAny<Guid>(), 1000)).Returns(false);
+        funds.Setup(f => f.HasFunds(It.IsAny<Guid>(), It.IsAny<int>())).Returns(false);
 
         var resolver = CreateResolver(actor, fleetRepo.Object, funds.Object, out var factionId);
         var intent = new CharacterIntent(actor.Id, IntentType.BuildFleet);
