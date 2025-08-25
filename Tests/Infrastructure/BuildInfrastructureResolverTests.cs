@@ -76,7 +76,7 @@ public class BuildInfrastructureResolverTests
             piracy.Object,
             planetRepo.Object,
             fleetRepo.Object,
-            Mock.Of<IFundsService>(),
+            ecoRepo.Object,
             eventBus.Object,
             Mock.Of<IBattleOutcomeService>(),
             Mock.Of<IIntimacyLog>(),

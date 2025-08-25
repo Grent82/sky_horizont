@@ -9,6 +9,7 @@ using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Shared;
 using SkyHorizont.Domain.Social;
 using SkyHorizont.Domain.Travel;
+using SkyHorizont.Domain.Economy;
 using System.Linq;
 using TaskStatus = SkyHorizont.Domain.Entity.Task.TaskStatus;
 
@@ -26,7 +27,7 @@ namespace SkyHorizont.Infrastructure.Social
         private readonly IPiracyService _piracy;
         private readonly IPlanetRepository _planets;
         private readonly IFleetRepository _fleets;
-        private readonly IFundsService _funds;
+        private readonly IPlanetEconomyRepository _economy;
         private readonly IEventBus _events;
         private readonly IBattleOutcomeService _battleOutcomeService;
         private readonly IIntimacyLog _intimacy;
@@ -58,7 +59,7 @@ namespace SkyHorizont.Infrastructure.Social
             IPiracyService piracy,
             IPlanetRepository planets,
             IFleetRepository fleets,
-            IFundsService funds,
+            IPlanetEconomyRepository economy,
             IEventBus events,
             IBattleOutcomeService battleOutcomeService,
             IIntimacyLog intimacy,
@@ -75,7 +76,7 @@ namespace SkyHorizont.Infrastructure.Social
             _piracy = piracy ?? throw new ArgumentNullException(nameof(piracy));
             _planets = planets ?? throw new ArgumentNullException(nameof(planets));
             _fleets = fleets ?? throw new ArgumentNullException(nameof(fleets));
-            _funds = funds ?? throw new ArgumentNullException(nameof(funds));
+            _economy = economy ?? throw new ArgumentNullException(nameof(economy));
             _events = events ?? throw new ArgumentNullException(nameof(events));
             _battleOutcomeService = battleOutcomeService ?? throw new ArgumentNullException(nameof(battleOutcomeService));
             _intimacy = intimacy ?? throw new ArgumentNullException(nameof(intimacy));
@@ -1389,7 +1390,7 @@ namespace SkyHorizont.Infrastructure.Social
             var security = actorSystemId.HasValue ? GetSystemSecurity(actorSystemId.Value) : null;
             var faction = _factions.GetFaction(actorFactionId);
 
-            int funds = _funds.GetBalance(actorFactionId);
+            int funds = planet.Credits;
             int econStrength = _factions.GetEconomicStrength(actorFactionId);
             int budget = Math.Min(funds, (int)(econStrength * 0.5));
             if (budget < ShipSpecs.Values.Min(s => s.Cost))
@@ -1427,7 +1428,8 @@ namespace SkyHorizont.Infrastructure.Social
                 count = Math.Min(count, ResourceLimit(planet.Resources, spec.ResourceCost));
                 if (count <= 0) return 0;
 
-                _funds.Deduct(actorFactionId, spec.Cost * count);
+                if (!_economy.TryDebitBudget(planet.Id, spec.Cost * count))
+                    return 0;
                 remainingBudget -= spec.Cost * count;
                 planet.Resources = planet.Resources - spec.ResourceCost.Scale(count);
                 for (int i = 0; i < count; i++)
