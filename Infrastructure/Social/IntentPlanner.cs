@@ -237,6 +237,7 @@ namespace SkyHorizont.Infrastructure.Social
                     BecomePirate = 0.9,
                     RaidConvoy = 0.8,
                     BuildInfrastructure = 0.9
+                    BuildFleet = 1.3
                 },
                 CharacterAmbition.BuildWealth => bias with
                 {
@@ -255,6 +256,7 @@ namespace SkyHorizont.Infrastructure.Social
                     BecomePirate = 1.2,
                     RaidConvoy = 1.3,
                     BuildInfrastructure = 1.3
+                    BuildFleet = 0.8
                 },
                 CharacterAmbition.EnsureFamilyLegacy => bias with
                 {
@@ -273,6 +275,7 @@ namespace SkyHorizont.Infrastructure.Social
                     BecomePirate = 0.7,
                     RaidConvoy = 0.6,
                     BuildInfrastructure = 1.2
+                    BuildFleet = 0.7
                 },
                 CharacterAmbition.SeekAdventure => bias with
                 {
@@ -291,6 +294,7 @@ namespace SkyHorizont.Infrastructure.Social
                     BecomePirate = 1.2,
                     RaidConvoy = 1.2,
                     BuildInfrastructure = 0.8
+                    BuildFleet = 1.2
                 },
                 _ => bias
             };
@@ -302,6 +306,7 @@ namespace SkyHorizont.Infrastructure.Social
             var chosenCharTargets = new HashSet<Guid>();
             var chosenFactionTargets = new HashSet<Guid>();
             var chosenPlanetTargets = new HashSet<Guid>();
+            bool buildFleetChosen = false;
 
             foreach (var si in candidates)
             {
@@ -341,12 +346,19 @@ namespace SkyHorizont.Infrastructure.Social
                         conflict = true;
                 }
 
+                if (si.Type == IntentType.BuildFleet)
+                {
+                    if (buildFleetChosen)
+                        conflict = true;
+                }
+
                 if (!conflict)
                 {
                     kept.Add(si);
                     if (tc.HasValue) chosenCharTargets.Add(tc.Value);
                     if (tf.HasValue) chosenFactionTargets.Add(tf.Value);
                     if (tp.HasValue) chosenPlanetTargets.Add(tp.Value);
+                    if (si.Type == IntentType.BuildFleet) buildFleetChosen = true;
                 }
             }
 

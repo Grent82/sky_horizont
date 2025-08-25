@@ -52,7 +52,8 @@ public class AmbitionBiasTests
                 { IntentType.TravelToPlanet, 0.8 },
                 { IntentType.BecomePirate, 0.9 },
                 { IntentType.RaidConvoy, 0.8 },
-                { IntentType.BuildInfrastructure, 0.9 }
+                { IntentType.BuildInfrastructure, 0.9 },
+                { IntentType.BuildFleet, 1.3 }
             }
         };
 
@@ -75,7 +76,8 @@ public class AmbitionBiasTests
                 { IntentType.TravelToPlanet, 1.0 },
                 { IntentType.BecomePirate, 1.2 },
                 { IntentType.RaidConvoy, 1.3 },
-                { IntentType.BuildInfrastructure, 1.3 }
+                { IntentType.BuildInfrastructure, 1.3 },
+                { IntentType.BuildFleet, 0.8 }
             }
         };
 
@@ -98,7 +100,8 @@ public class AmbitionBiasTests
                 { IntentType.TravelToPlanet, 1.1 },
                 { IntentType.BecomePirate, 0.7 },
                 { IntentType.RaidConvoy, 0.6 },
-                { IntentType.BuildInfrastructure, 1.2 }
+                { IntentType.BuildInfrastructure, 1.2 },
+                { IntentType.BuildFleet, 0.7 }
             }
         };
 
@@ -121,7 +124,8 @@ public class AmbitionBiasTests
                 { IntentType.TravelToPlanet, 1.3 },
                 { IntentType.BecomePirate, 1.2 },
                 { IntentType.RaidConvoy, 1.2 },
-                { IntentType.BuildInfrastructure, 0.8 }
+                { IntentType.BuildInfrastructure, 0.8 },
+                { IntentType.BuildFleet, 1.2 }
             }
         };
     }

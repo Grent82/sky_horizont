@@ -12,6 +12,7 @@ namespace SkyHorizont.Domain.Social
         ExpelFromHouse,
         ClaimPlanetSeat,
         BuildInfrastructure
+        BuildFleet
     }
 
     /// <summary> Planned monthly action for one actor. </summary>
