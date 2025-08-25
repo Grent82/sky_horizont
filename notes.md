@@ -1,5 +1,9 @@
 # Notes
 
+## Ledger Consolidation
+
+Planet credit balances now live in `IPlanetEconomyRepository`, replacing direct `Planet.Credits` mutations for a single, consistent ledger.
+
 ## Features
 
 ### Social & Personal

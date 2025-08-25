@@ -4,6 +4,8 @@ using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Infrastructure.DomainServices;
 using SkyHorizont.Infrastructure.Social;
+using Infrastructure.Persistence.Repositories;
+using SkyHorizont.Infrastructure.Persistence;
 
 namespace SkyHorizont.Infrastructure.Testing
 {
@@ -47,6 +49,7 @@ namespace SkyHorizont.Infrastructure.Testing
         public void SeedCoupleOnPlanet(Guid systemId)
         {
             // Create planet
+            var eco = new PlanetEconomyRepository(new InMemoryPlanetEconomyDbContext());
             var planet = new Planet(
                 id: Guid.NewGuid(),
                 name: "Testia Prime",
@@ -55,6 +58,7 @@ namespace SkyHorizont.Infrastructure.Testing
                 initialResources: new Resources(10_000, 10_000, 10_000),
                 characterRepository: _characters,
                 planetRepository: _planets,
+                economyRepository: eco,
                 initialStability: 1.0,
                 infrastructureLevel: 50,
                 baseTaxRate: 15.0

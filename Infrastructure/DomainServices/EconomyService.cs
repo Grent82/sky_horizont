@@ -119,7 +119,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             // Debit planet (if possible)
             _eco.TryDebitBudget(planet.Id, leakage + piratesTake);
-            _planets.Save(planet);
 
             // Credit pirates (faction funds)
             _factionFunds.AddBalance(counterpartyFactionId, piratesTake);
@@ -233,7 +232,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 }
                 else
                 {
-                    _planets.Save(planet);
                     _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,
                         "UpkeepPlanet", planet.Id, -infraUpkeep, $"Infra upkeep {infraUpkeep} (adj)"));
                 }
@@ -314,7 +312,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             if (_eco.TryDebitBudget(planet.Id, tax))
             {
-                _planets.Save(planet);
                 _factionFunds.AddBalance(planet.FactionId, tax);
 
                 _eco.AddEventLog(new EconomyEvent(_clock.CurrentYear, _clock.CurrentMonth,

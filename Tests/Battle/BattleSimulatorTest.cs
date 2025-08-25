@@ -14,6 +14,7 @@ using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Shared;
 using SkyHorizont.Infrastructure.DomainServices;
+using SkyHorizont.Domain.Economy;
 
 namespace SkyHorizont.Tests.Battle
 {
@@ -39,7 +40,8 @@ namespace SkyHorizont.Tests.Battle
         {
             var chrRepo = new Mock<ICharacterRepository>().Object;
             var planetRepo = new Mock<IPlanetRepository>().Object;
-            return new Planet(Guid.NewGuid(), "Gaia", system, faction, new Resources(100,100,100), chrRepo, planetRepo,
+            var eco = new Mock<IPlanetEconomyRepository>().Object;
+            return new Planet(Guid.NewGuid(), "Gaia", system, faction, new Resources(100,100,100), chrRepo, planetRepo, eco,
                 initialStability: 1.0, infrastructureLevel: 10, baseAtk: 0, baseDef: baseDef, troops: troops);
         }
 
