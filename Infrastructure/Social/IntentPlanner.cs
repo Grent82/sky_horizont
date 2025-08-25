@@ -214,15 +214,15 @@ namespace SkyHorizont.Infrastructure.Social
             return security;
         }
 
-        private (double Court, double Family, double Spy, double Bribe, double Recruit, double Defect, double Negotiate, double Quarrel, double Assassinate, double Torture, double Rape, double Travel, double BecomePirate, double RaidConvoy) GetAmbitionBias(CharacterAmbition ambition)
+        private (double Court, double Family, double Spy, double Bribe, double Recruit, double Defect, double Negotiate, double Quarrel, double Assassinate, double Torture, double Rape, double Travel, double BecomePirate, double RaidConvoy, double FoundHouse, double FoundPirateClan, double ExpelFromHouse, double ClaimPlanet) GetAmbitionBias(CharacterAmbition ambition)
         {
             return ambition switch
             {
-                CharacterAmbition.GainPower => (0.8, 0.7, 1.2, 1.1, 1.2, 1.3, 1.0, 1.0, 1.3, 1.0, 0.9, 0.8, 0.9, 0.8),
-                CharacterAmbition.BuildWealth => (0.9, 0.8, 1.1, 1.3, 1.1, 0.8, 1.2, 0.7, 0.8, 0.7, 0.6, 1.0, 1.2, 1.3),
-                CharacterAmbition.EnsureFamilyLegacy => (1.2, 1.3, 0.8, 0.9, 0.9, 0.7, 0.9, 0.8, 0.7, 0.6, 0.5, 1.1, 0.7, 0.6),
-                CharacterAmbition.SeekAdventure => (0.9, 0.8, 1.2, 0.9, 0.9, 1.0, 0.9, 1.0, 1.0, 0.8, 0.7, 1.3, 1.2, 1.2),
-                _ => (1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+                CharacterAmbition.GainPower => (0.8, 0.7, 1.2, 1.1, 1.2, 1.3, 1.0, 1.0, 1.3, 1.0, 0.9, 0.8, 0.9, 0.8, 1.3, 1.1, 1.2, 1.4),
+                CharacterAmbition.BuildWealth => (0.9, 0.8, 1.1, 1.3, 1.1, 0.8, 1.2, 0.7, 0.8, 0.7, 0.6, 1.0, 1.2, 1.3, 1.1, 1.0, 0.9, 1.2),
+                CharacterAmbition.EnsureFamilyLegacy => (1.2, 1.3, 0.8, 0.9, 0.9, 0.7, 0.9, 0.8, 0.7, 0.6, 0.5, 1.1, 0.7, 0.6, 1.4, 0.8, 0.9, 1.3),
+                CharacterAmbition.SeekAdventure => (0.9, 0.8, 1.2, 0.9, 0.9, 1.0, 0.9, 1.0, 1.0, 0.8, 0.7, 1.3, 1.2, 1.2, 0.9, 1.4, 0.8, 0.9),
+                _ => (1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
             };
         }
 
@@ -245,7 +245,8 @@ namespace SkyHorizont.Infrastructure.Social
                 if (si.Type == IntentType.Bribe || si.Type == IntentType.Recruit ||
                     si.Type == IntentType.Court || si.Type == IntentType.Assassinate ||
                     si.Type == IntentType.Quarrel || si.Type == IntentType.TorturePrisoner ||
-                    si.Type == IntentType.RapePrisoner || si.Type == IntentType.VisitLover)
+                    si.Type == IntentType.RapePrisoner || si.Type == IntentType.VisitLover ||
+                    si.Type == IntentType.ExpelFromHouse)
                 {
                     if (tc.HasValue && chosenCharTargets.Contains(tc.Value))
                         conflict = true;
@@ -257,7 +258,7 @@ namespace SkyHorizont.Infrastructure.Social
                         conflict = true;
                 }
 
-                if (si.Type == IntentType.TravelToPlanet)
+                if (si.Type == IntentType.TravelToPlanet || si.Type == IntentType.ClaimPlanetSeat)
                 {
                     if (tp.HasValue && chosenPlanetTargets.Contains(tp.Value))
                         conflict = true;

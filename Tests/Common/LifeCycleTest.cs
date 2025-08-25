@@ -69,7 +69,7 @@ namespace SkyHorizont.Tests.Common
 
             var lifecycle = new CharacterLifecycleService(
                 characters, lineage, clock, rng, mortality, nameGen,
-                inherit, pregPolicy, skillInh, loc, bus, intimacy);
+                inherit, pregPolicy, skillInh, loc, bus, intimacy, faction);
 
             var runner = new LifecycleSimulationRunner(characters, lineage, planets, lifecycle, planner, resolver, socialLog, clock, affection);
 

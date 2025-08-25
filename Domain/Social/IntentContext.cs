@@ -18,7 +18,7 @@ namespace SkyHorizont.Domain.Social
         public IReadOnlyList<Character> OtherFactionCharacters { get; }
         public IReadOnlyList<Character> Captives { get; }
         public CharacterAmbition Ambition { get; }
-        public (double Court, double Family, double Spy, double Bribe, double Recruit, double Defect, double Negotiate, double Quarrel, double Assassinate, double Torture, double Rape, double Travel, double BecomePirate, double RaidConvoy) AmbitionBias { get; }
+        public (double Court, double Family, double Spy, double Bribe, double Recruit, double Defect, double Negotiate, double Quarrel, double Assassinate, double Torture, double Rape, double Travel, double BecomePirate, double RaidConvoy, double FoundHouse, double FoundPirateClan, double ExpelFromHouse, double ClaimPlanet) AmbitionBias { get; }
         public Func<Guid, int> OpinionOf { get; }
         public Func<Guid, Guid> FactionOf { get; }
         public PlannerConfig Config { get; }
@@ -34,7 +34,7 @@ namespace SkyHorizont.Domain.Social
             IReadOnlyList<Character> otherFactionCharacters,
             IReadOnlyList<Character> captives,
             CharacterAmbition ambition,
-            (double Court, double Family, double Spy, double Bribe, double Recruit, double Defect, double Negotiate, double Quarrel, double Assassinate, double Torture, double Rape, double Travel, double BecomePirate, double RaidConvoy) ambitionBias,
+            (double Court, double Family, double Spy, double Bribe, double Recruit, double Defect, double Negotiate, double Quarrel, double Assassinate, double Torture, double Rape, double Travel, double BecomePirate, double RaidConvoy, double FoundHouse, double FoundPirateClan, double ExpelFromHouse, double ClaimPlanet) ambitionBias,
             Func<Guid, int> opinionOf,
             Func<Guid, Guid> factionOf,
             PlannerConfig config)

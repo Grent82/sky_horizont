@@ -957,7 +957,7 @@ namespace SkyHorizont.Infrastructure.Social
             if (factionStatus.HasUnrest) baseChance += 0.15;
             if (actor.Ambition == CharacterAmbition.SeekAdventure) baseChance += 0.15;
 
-            var actorSystemId = FindSystemOfCharacter(actor.Id);
+            var actorSystemId = GetSystemOfCharacter(actor.Id);
             if (actorSystemId.HasValue)
             {
                 var sec = GetSystemSecurity(actorSystemId.Value);
@@ -1276,107 +1276,13 @@ namespace SkyHorizont.Infrastructure.Social
             var myFaction = _factions.GetFactionIdForCharacter(actor.Id);
             if (myFaction == Guid.Empty)
                 return Array.Empty<ISocialEvent>();
-                
-            planet.SetSeatPlanet(myFaction);
 
-            if (planet.FactionId == Guid.Empty)
-            {
-                planet.ChangeControl(myFaction);
+            double chance = 0.5
+                + (int)actor.Rank * 0.03
+                + planet.InfrastructureLevel / 400.0;
 
-                AwardMerit(actor, _merit.Compute(MeritAction.PlanetClaimed, new MeritContext { Success = true, Ambition = actor.Ambition }));
-                var evFull = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.Custom,
-                    actor.Id, null, myFaction, planet.Id, true, 0, 0, Array.Empty<Guid>(),
-                    "Planet was unowned; seat claimed and full control established.");
-                _events.Publish(evFull);
-                return new[] { evFull };
-            }
-
-            bool successFlip = false;
-            string note;
-
-            if (planet.SeatFactionId == myFaction && planet.FactionId != myFaction)
-            {
-            }
-
-            // ----- no
-                
-            double seatChance = 0.70
-                    + (int)actor.Rank * 0.03
-                    + planet.InfrastructureLevel / 400.0;
-
-            var seatSuccess = _rng.NextDouble() < Math.Clamp(seatChance, 0.3, 0.99);
-            if (seatSuccess)
-            {
-                planet.SetSeatPlanet(myFaction);
-
-                AwardMerit(actor, _merit.Compute(MeritAction.PlanetClaimed, new MeritContext { Success = true, Ambition = actor.Ambition }));
-                var evFull = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.Custom,
-                    actor.Id, null, myFaction, planet.Id, true, 0, 0, Array.Empty<Guid>(),
-                    "Planet was unowned; seat claimed and full control established.");
-                _events.Publish(evFull);
-            }
-
-            if (planet.FactionId == Guid.Empty)
-            {
-                var actorSystemId = planet.SystemId;
-                var support = ComputeLocalSupportScore(planet, myFaction, actor.Id);
-                var leverage = ComputeSystemLeverage(actorSystemId, myFaction);
-                double claimChance =
-                    0.25
-                    + (int)actor.Rank * 0.03
-                    + planet.InfrastructureLevel / 500.0
-                    + support / 300.0
-                    + leverage / 300.0;
-
-                if (planet.IsSeatOf(myFaction))
-                    claimChance += 0.15;
-                    
-                var takeControl = _rng.NextDouble() < Math.Clamp(claimChance, 0.1, 0.99);
-
-                if (takeControl)
-                {
-                    planet.ChangeControl(myFaction);
-
-                    if (CanAppointAsGovernorOnThisPlanet(actor, planet, myFaction))
-                        planet.AssignGovernor(actor.Id);
-
-                    AwardMerit(actor, _merit.Compute(MeritAction.PlanetClaimed,
-                        new MeritContext { Success = true, Ambition = actor.Ambition }));
-
-                    var eventFullControl = new SocialEvent(
-                        Guid.NewGuid(), y, m, SocialEventType.Custom,
-                        actor.Id, null, myFaction, planet.Id, true,
-                        0, 0, Array.Empty<Guid>(),
-                        planet.Citizens.Count == 0
-                            ? "Unowned world colonized; House takes control."
-                            : "Unowned world peacefully brought under House control."
-                    );
-                    _events.Publish(eventFullControl);
-                    return new[] { eventFullControl };
-                }
-                else
-                {
-                    var evFail = new SocialEvent(
-                        Guid.NewGuid(), y, m, SocialEventType.Custom,
-                        actor.Id, null, myFaction, planet.Id, seatSuccess,
-                        0, 0, Array.Empty<Guid>(),
-                        seatSuccess
-                            ? "Established House Seat, but lacked support to take full control."
-                            : "Failed to establish a House Seat on this world."
-                    );
-                    _events.Publish(evFail);
-                    return new[] { evFail };
-                }
-            }
-            else
-            {
-
-            }
-
-            double chance = 0.5;
-            if (planet.FactionId == myFaction) chance += 0.25;
-            chance += planet.InfrastructureLevel / 400.0;
-            chance += (int)actor.Rank * 0.03;
+            if (planet.FactionId == myFaction)
+                chance += 0.25;
 
             var success = _rng.NextDouble() < Math.Clamp(chance, 0.1, 0.95);
             if (!success)
@@ -1390,12 +1296,31 @@ namespace SkyHorizont.Infrastructure.Social
 
             planet.SetSeatPlanet(myFaction);
 
-            AwardMerit(actor, _merit.Compute(MeritAction.PlanetClaimed, new MeritContext { Success = success, Ambition = actor.Ambition }));
+            if (planet.FactionId == Guid.Empty)
+            {
+                planet.ChangeControl(myFaction);
 
-            var ev2 = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.ClaimPlanet,
-                actor.Id, null, myFaction, planet.Id, true, 0, 0, Array.Empty<Guid>(), "Planet claimed as House Seat.");
-            _events.Publish(ev2);
-            return new[] { ev2 };
+                if (CanAppointAsGovernorOnThisPlanet(actor, planet, myFaction))
+                    planet.AssignGovernor(actor.Id);
+
+                AwardMerit(actor, _merit.Compute(MeritAction.PlanetClaimed,
+                    new MeritContext { Success = true, Ambition = actor.Ambition }));
+
+                var evFull = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.ClaimPlanet,
+                    actor.Id, null, myFaction, planet.Id, true, 0, 0, Array.Empty<Guid>(),
+                    "Planet was unowned; seat claimed and full control established.");
+                _events.Publish(evFull);
+                return new[] { evFull };
+            }
+
+            AwardMerit(actor, _merit.Compute(MeritAction.PlanetClaimed,
+                new MeritContext { Success = true, Ambition = actor.Ambition }));
+
+            var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.ClaimPlanet,
+                actor.Id, null, myFaction, planet.Id, true, 0, 0, Array.Empty<Guid>(),
+                "Planet claimed as House Seat.");
+            _events.Publish(ev);
+            return new[] { ev };
         }
         #endregion
 
@@ -1444,6 +1369,13 @@ namespace SkyHorizont.Infrastructure.Social
 
         private Guid? GetSystemOfCharacter(Guid characterId)
             => GetCharacterLocation(characterId).SystemId;
+
+        private Guid? PickLocalPirateClan(Guid systemId)
+        {
+            // Currently no local pirate tracking; always prefer global faction
+            // or create a new one when none exists.
+            return null;
+        }
 
         private (Guid? PlanetId, Guid? SystemId) GetCharacterLocation(Guid characterId)
         {

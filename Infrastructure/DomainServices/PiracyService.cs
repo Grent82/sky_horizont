@@ -8,7 +8,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
     {
         private readonly IFactionService _factions;
         private readonly IRandomService _rng;
-        private readonly Guid _pirateFactionId;
+        private Guid _pirateFactionId;
 
         // simple in-memory state
         private readonly Dictionary<Guid, int> _pirateActivityBySystem = new(); // 0..100
@@ -75,5 +75,11 @@ namespace SkyHorizont.Infrastructure.DomainServices
         }
 
         public Guid GetPirateFactionId() => _pirateFactionId;
+
+        public void RegisterPirateFaction(Guid id)
+        {
+            if (id == Guid.Empty) return;
+            _pirateFactionId = id;
+        }
     }
 }
