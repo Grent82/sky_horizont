@@ -1364,23 +1364,66 @@ namespace SkyHorizont.Infrastructure.Social
         #region Build Fleet
         private IEnumerable<ISocialEvent> ResolveBuildFleet(Character actor, CharacterIntent intent, int y, int m, Guid actorFactionId, Guid? actorSystemId)
         {
-            const int cost = 1000;
+            var factionStatus = GetFactionStatus(actorFactionId);
+            var isPirateFaction = _piracy.IsPirateFaction(actorFactionId);
+            var system = actorSystemId ?? Guid.Empty;
+            var security = actorSystemId.HasValue ? GetSystemSecurity(actorSystemId.Value) : null;
+
+            // Determine ship type based on context
+            ShipClass chosenClass;
+            int buildCost;
+            double atk, def, cargo, speed;
+
+            if (isPirateFaction)
+            {
+                chosenClass = ShipClass.Corvette; // fast raiders
+                buildCost = 800;
+                atk = 10; def = 8; cargo = 5; speed = 2.5;
+            }
+            else if (factionStatus.IsAtWar || (security?.PirateActivity ?? 0) > 50)
+            {
+                // need combat ships
+                chosenClass = actor.Personality.Agreeableness < 40 ? ShipClass.Destroyer : ShipClass.Frigate;
+                if (chosenClass == ShipClass.Destroyer)
+                {
+                    buildCost = 2500; atk = 30; def = 25; cargo = 15; speed = 1.3;
+                }
+                else
+                {
+                    buildCost = 1500; atk = 20; def = 20; cargo = 20; speed = 1.5;
+                }
+            }
+            else if ((security?.Traffic ?? 0) > 80)
+            {
+                // trade hub
+                chosenClass = ShipClass.Freighter;
+                buildCost = 1200; atk = 5; def = 8; cargo = 100; speed = 1.5;
+            }
+            else
+            {
+                chosenClass = ShipClass.Corvette;
+                buildCost = 800; atk = 10; def = 10; cargo = 10; speed = 2;
+            }
+
+            // include initial maintenance charge
+            int maintenance = (int)Math.Ceiling(buildCost * 0.1);
+            int totalCost = buildCost + maintenance;
+
             bool success = false;
             string notes;
 
-            if (!_funds.HasFunds(actorFactionId, cost))
+            if (!_funds.HasFunds(actorFactionId, totalCost))
             {
                 notes = "Insufficient funds to build fleet.";
             }
             else
             {
-                _funds.Deduct(actorFactionId, cost);
-                var system = actorSystemId ?? Guid.Empty;
+                _funds.Deduct(actorFactionId, totalCost);
                 var fleet = new Fleet(Guid.NewGuid(), actorFactionId, system, _piracy);
-                fleet.AddShip(new Ship(Guid.NewGuid(), ShipClass.Corvette, 10, 10, 10, 2, 0));
+                fleet.AddShip(new Ship(Guid.NewGuid(), chosenClass, atk, def, cargo, speed, buildCost));
                 _fleets.Save(fleet);
                 success = true;
-                notes = "New fleet commissioned.";
+                notes = $"New {chosenClass} commissioned (maintenance {maintenance}).";
             }
 
             var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.BuildFleet, actor.Id, null, null, null, success, 0, 0, Array.Empty<Guid>(), notes);
