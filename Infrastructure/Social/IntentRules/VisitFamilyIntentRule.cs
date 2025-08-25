@@ -20,7 +20,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (!target.HasValue)
                 yield break;
 
-            var score = ScoreVisitFamily(ctx.Actor, target.Value, ctx.FactionStatus, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias.Family;
+            var score = ScoreVisitFamily(ctx.Actor, target.Value, ctx.FactionStatus, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias[IntentType.VisitFamily];
             if (score > 0)
                 yield return new ScoredIntent(IntentType.VisitFamily, score, target.Value, null, null);
         }

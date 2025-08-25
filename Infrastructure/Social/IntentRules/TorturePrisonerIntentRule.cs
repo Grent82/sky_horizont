@@ -22,7 +22,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (target == null)
                 yield break;
 
-            var score = ScoreTorture(ctx.Actor, target, ctx.ActorFactionId, ctx.FactionStatus, ctx.FactionOf, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias.Torture;
+            var score = ScoreTorture(ctx.Actor, target, ctx.ActorFactionId, ctx.FactionStatus, ctx.FactionOf, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias[IntentType.TorturePrisoner];
             if (score > 0)
                 yield return new ScoredIntent(IntentType.TorturePrisoner, score, target.Id, null, null);
         }

@@ -22,7 +22,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (target == null)
                 yield break;
 
-            var score = ScoreAssassinate(ctx.Actor, target, ctx.ActorFactionId, ctx.FactionStatus, ctx.FactionOf, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias.Assassinate;
+            var score = ScoreAssassinate(ctx.Actor, target, ctx.ActorFactionId, ctx.FactionStatus, ctx.FactionOf, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias[IntentType.Assassinate];
             if (score > 0)
                 yield return new ScoredIntent(IntentType.Assassinate, score, target.Id, null, null);
         }
