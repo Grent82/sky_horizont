@@ -14,6 +14,7 @@ using SkyHorizont.Domain.Intrigue;
 using SkyHorizont.Domain.Diplomacy;
 using SkyHorizont.Domain.Battle;
 using SkyHorizont.Infrastructure.Persistence.Repositories;
+using SkyHorizont.Domain.Economy;
 
 namespace SkyHorizont.Tests.Infrastructure;
 
@@ -27,9 +28,9 @@ public class BuildFleetResolverTests
         Character actor,
         Planet planet,
         IFleetRepository fleetRepo,
-        IFundsService funds,
         IFactionService factionSvc,
-        IPiracyService piracy)
+        IPiracyService piracy,
+        IPlanetEconomyRepository economy)
     {
         var charRepo = new Mock<ICharacterRepository>();
         charRepo.Setup(c => c.GetById(actor.Id)).Returns(actor);
@@ -50,7 +51,7 @@ public class BuildFleetResolverTests
             piracy,
             planetRepo.Object,
             fleetRepo,
-            funds,
+            economy,
             Mock.Of<IEventBus>(),
             Mock.Of<IBattleOutcomeService>(),
             Mock.Of<IIntimacyLog>(),
@@ -80,7 +81,7 @@ public class BuildFleetResolverTests
         var ecoRepo = new PlanetEconomyRepository(new InMemoryPlanetEconomyDbContext());
         var planet = new Planet(Guid.NewGuid(), "Home", Guid.NewGuid(), factionId,
             new Resources(500,500,500), Mock.Of<ICharacterRepository>(), Mock.Of<IPlanetRepository>(),
-            ecoRepo, productionCapacity: 500);
+            ecoRepo, credits: 20000, productionCapacity: 500);
         planet.Citizens.Add(actor.Id);
 
         var fleetRepo = new Mock<IFleetRepository>();
@@ -88,11 +89,7 @@ public class BuildFleetResolverTests
         Fleet? savedFleet = null;
         fleetRepo.Setup(f => f.Save(It.IsAny<Fleet>())).Callback<Fleet>(f => savedFleet = f);
 
-        var funds = new Mock<IFundsService>();
-        funds.Setup(f => f.GetBalance(factionId)).Returns(20000);
-        funds.Setup(f => f.Deduct(It.IsAny<Guid>(), It.IsAny<int>()));
-
-        var resolver = CreateResolver(actor, planet, fleetRepo.Object, funds.Object, factionSvc.Object, piracy.Object);
+        var resolver = CreateResolver(actor, planet, fleetRepo.Object, factionSvc.Object, piracy.Object, ecoRepo);
         var intent = new CharacterIntent(actor.Id, IntentType.BuildFleet);
 
         var ev = resolver.Resolve(intent, 3000, 1).Single();
@@ -125,7 +122,7 @@ public class BuildFleetResolverTests
         var ecoRepo = new PlanetEconomyRepository(new InMemoryPlanetEconomyDbContext());
         var planet = new Planet(Guid.NewGuid(), "Home", Guid.NewGuid(), factionId,
             new Resources(500,500,500), Mock.Of<ICharacterRepository>(), Mock.Of<IPlanetRepository>(),
-            ecoRepo, productionCapacity: 500);
+            ecoRepo, credits: 20000, productionCapacity: 500);
         planet.Citizens.Add(actor.Id);
 
         var fleetRepo = new Mock<IFleetRepository>();
@@ -133,11 +130,7 @@ public class BuildFleetResolverTests
         Fleet? savedFleet = null;
         fleetRepo.Setup(f => f.Save(It.IsAny<Fleet>())).Callback<Fleet>(f => savedFleet = f);
 
-        var funds = new Mock<IFundsService>();
-        funds.Setup(f => f.GetBalance(factionId)).Returns(20000);
-        funds.Setup(f => f.Deduct(It.IsAny<Guid>(), It.IsAny<int>()));
-
-        var resolver = CreateResolver(actor, planet, fleetRepo.Object, funds.Object, factionSvc.Object, piracy.Object);
+        var resolver = CreateResolver(actor, planet, fleetRepo.Object, factionSvc.Object, piracy.Object, ecoRepo);
         var intent = new CharacterIntent(actor.Id, IntentType.BuildFleet);
 
         var ev = resolver.Resolve(intent, 3000, 1).Single();
@@ -172,7 +165,7 @@ public class BuildFleetResolverTests
         var ecoRepo = new PlanetEconomyRepository(new InMemoryPlanetEconomyDbContext());
         var planet = new Planet(Guid.NewGuid(), "Home", Guid.NewGuid(), factionId,
             new Resources(1000,1000,1000), Mock.Of<ICharacterRepository>(), Mock.Of<IPlanetRepository>(),
-            ecoRepo, productionCapacity: 500);
+            ecoRepo, credits: 20000, productionCapacity: 500);
         planet.Citizens.Add(actor.Id);
 
         Fleet? savedFleet = null;
@@ -182,11 +175,7 @@ public class BuildFleetResolverTests
             .Returns(() => new[] { savedFleet! });
         fleetRepo.Setup(f => f.Save(It.IsAny<Fleet>())).Callback<Fleet>(f => savedFleet = f);
 
-        var funds = new Mock<IFundsService>();
-        funds.Setup(f => f.GetBalance(factionId)).Returns(20000);
-        funds.Setup(f => f.Deduct(It.IsAny<Guid>(), It.IsAny<int>()));
-
-        var resolver = CreateResolver(actor, planet, fleetRepo.Object, funds.Object, factionSvc.Object, piracy.Object);
+        var resolver = CreateResolver(actor, planet, fleetRepo.Object, factionSvc.Object, piracy.Object, ecoRepo);
         var intent = new CharacterIntent(actor.Id, IntentType.BuildFleet);
 
         resolver.Resolve(intent, 3000, 1); // initial build
