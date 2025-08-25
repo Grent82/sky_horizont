@@ -32,7 +32,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
                 yield break;
 
             var security = GetSystemSecurity(targetSystem.Value);
-            var score = ScoreRaidConvoy(ctx.Actor, targetSystem.Value, security, ctx.Config) * ctx.AmbitionBias[IntentType.RaidConvoy];
+            var score = ScoreRaidConvoy(ctx.Actor, targetSystem.Value, security, ctx.Config) * ctx.AmbitionBias.RaidConvoy;
             if (score > 0)
                 yield return new ScoredIntent(IntentType.RaidConvoy, score, null, targetSystem.Value, null);
         }

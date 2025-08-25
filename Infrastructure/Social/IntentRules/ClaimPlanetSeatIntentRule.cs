@@ -27,7 +27,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (planet.IsSeatOf(ctx.ActorFactionId))
                 yield break;
 
-            var score = ScoreClaimSeat(ctx.Actor, planet, ctx.Config) * ctx.AmbitionBias.ClaimPlanet;
+            var score = ScoreClaimSeat(ctx.Actor, planet, ctx.Config) * ctx.AmbitionBias.ClaimPlanetSeat;
             if (score > 0)
                 yield return new ScoredIntent(IntentType.ClaimPlanetSeat, score, null, null, planet.Id);
         }

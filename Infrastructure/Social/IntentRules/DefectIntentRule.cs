@@ -25,7 +25,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (targetFaction == Guid.Empty)
                 yield break;
 
-            var score = ScoreDefect(ctx.Actor, ctx.ActorLeaderId.Value, ctx.ActorFactionId, targetFaction, ctx.FactionStatus, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias[IntentType.Defect];
+            var score = ScoreDefect(ctx.Actor, ctx.ActorLeaderId.Value, ctx.ActorFactionId, targetFaction, ctx.FactionStatus, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias.Defect;
             if (score > 0)
                 yield return new ScoredIntent(IntentType.Defect, score, null, targetFaction, null);
         }

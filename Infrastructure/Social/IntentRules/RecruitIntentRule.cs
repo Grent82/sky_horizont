@@ -31,7 +31,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (target == null)
                 yield break;
 
-            var score = ScoreRecruit(ctx.Actor, target, ctx.ActorFactionId, ctx.FactionStatus, ctx.FactionOf, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias[IntentType.Recruit];
+            var score = ScoreRecruit(ctx.Actor, target, ctx.ActorFactionId, ctx.FactionStatus, ctx.FactionOf, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias.Recruit;
             if (score > 0)
                 yield return new ScoredIntent(IntentType.Recruit, score, target.Id, null, null);
         }

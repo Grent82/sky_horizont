@@ -22,7 +22,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (targetFaction == Guid.Empty)
                 yield break;
 
-            var score = ScoreNegotiate(ctx.Actor, ctx.ActorFactionId, targetFaction, ctx.FactionStatus, ctx.Config) * ctx.AmbitionBias[IntentType.Negotiate];
+            var score = ScoreNegotiate(ctx.Actor, ctx.ActorFactionId, targetFaction, ctx.FactionStatus, ctx.Config) * ctx.AmbitionBias.Negotiate;
             if (score > 0)
                 yield return new ScoredIntent(IntentType.Negotiate, score, null, targetFaction, null);
         }

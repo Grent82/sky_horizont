@@ -214,79 +214,82 @@ namespace SkyHorizont.Infrastructure.Social
             return security;
         }
 
-        private IReadOnlyDictionary<IntentType, double> GetAmbitionBias(CharacterAmbition ambition)
+        private AmbitionBias GetAmbitionBias(CharacterAmbition ambition)
         {
-            var bias = Enum.GetValues<IntentType>().ToDictionary(t => t, _ => 1.0);
+            var bias = new AmbitionBias();
 
-            switch (ambition)
+            return ambition switch
             {
-                case CharacterAmbition.GainPower:
-                    bias[IntentType.Court] = 0.8;
-                    bias[IntentType.VisitFamily] = 0.7;
-                    bias[IntentType.Spy] = 1.2;
-                    bias[IntentType.Bribe] = 1.1;
-                    bias[IntentType.Recruit] = 1.2;
-                    bias[IntentType.Defect] = 1.3;
-                    bias[IntentType.Negotiate] = 1.0;
-                    bias[IntentType.Quarrel] = 1.0;
-                    bias[IntentType.Assassinate] = 1.3;
-                    bias[IntentType.TorturePrisoner] = 1.0;
-                    bias[IntentType.RapePrisoner] = 0.9;
-                    bias[IntentType.TravelToPlanet] = 0.8;
-                    bias[IntentType.BecomePirate] = 0.9;
-                    bias[IntentType.RaidConvoy] = 0.8;
-                    break;
-                case CharacterAmbition.BuildWealth:
-                    bias[IntentType.Court] = 0.9;
-                    bias[IntentType.VisitFamily] = 0.8;
-                    bias[IntentType.Spy] = 1.1;
-                    bias[IntentType.Bribe] = 1.3;
-                    bias[IntentType.Recruit] = 1.1;
-                    bias[IntentType.Defect] = 0.8;
-                    bias[IntentType.Negotiate] = 1.2;
-                    bias[IntentType.Quarrel] = 0.7;
-                    bias[IntentType.Assassinate] = 0.8;
-                    bias[IntentType.TorturePrisoner] = 0.7;
-                    bias[IntentType.RapePrisoner] = 0.6;
-                    bias[IntentType.TravelToPlanet] = 1.0;
-                    bias[IntentType.BecomePirate] = 1.2;
-                    bias[IntentType.RaidConvoy] = 1.3;
-                    break;
-                case CharacterAmbition.EnsureFamilyLegacy:
-                    bias[IntentType.Court] = 1.2;
-                    bias[IntentType.VisitFamily] = 1.3;
-                    bias[IntentType.Spy] = 0.8;
-                    bias[IntentType.Bribe] = 0.9;
-                    bias[IntentType.Recruit] = 0.9;
-                    bias[IntentType.Defect] = 0.7;
-                    bias[IntentType.Negotiate] = 0.9;
-                    bias[IntentType.Quarrel] = 0.8;
-                    bias[IntentType.Assassinate] = 0.7;
-                    bias[IntentType.TorturePrisoner] = 0.6;
-                    bias[IntentType.RapePrisoner] = 0.5;
-                    bias[IntentType.TravelToPlanet] = 1.1;
-                    bias[IntentType.BecomePirate] = 0.7;
-                    bias[IntentType.RaidConvoy] = 0.6;
-                    break;
-                case CharacterAmbition.SeekAdventure:
-                    bias[IntentType.Court] = 0.9;
-                    bias[IntentType.VisitFamily] = 0.8;
-                    bias[IntentType.Spy] = 1.2;
-                    bias[IntentType.Bribe] = 0.9;
-                    bias[IntentType.Recruit] = 0.9;
-                    bias[IntentType.Defect] = 1.0;
-                    bias[IntentType.Negotiate] = 0.9;
-                    bias[IntentType.Quarrel] = 1.0;
-                    bias[IntentType.Assassinate] = 1.0;
-                    bias[IntentType.TorturePrisoner] = 0.8;
-                    bias[IntentType.RapePrisoner] = 0.7;
-                    bias[IntentType.TravelToPlanet] = 1.3;
-                    bias[IntentType.BecomePirate] = 1.2;
-                    bias[IntentType.RaidConvoy] = 1.2;
-                    break;
-            }
-
-            return bias;
+                CharacterAmbition.GainPower => bias with
+                {
+                    Court = 0.8,
+                    VisitFamily = 0.7,
+                    Spy = 1.2,
+                    Bribe = 1.1,
+                    Recruit = 1.2,
+                    Defect = 1.3,
+                    Negotiate = 1.0,
+                    Quarrel = 1.0,
+                    Assassinate = 1.3,
+                    TorturePrisoner = 1.0,
+                    RapePrisoner = 0.9,
+                    TravelToPlanet = 0.8,
+                    BecomePirate = 0.9,
+                    RaidConvoy = 0.8
+                },
+                CharacterAmbition.BuildWealth => bias with
+                {
+                    Court = 0.9,
+                    VisitFamily = 0.8,
+                    Spy = 1.1,
+                    Bribe = 1.3,
+                    Recruit = 1.1,
+                    Defect = 0.8,
+                    Negotiate = 1.2,
+                    Quarrel = 0.7,
+                    Assassinate = 0.8,
+                    TorturePrisoner = 0.7,
+                    RapePrisoner = 0.6,
+                    TravelToPlanet = 1.0,
+                    BecomePirate = 1.2,
+                    RaidConvoy = 1.3
+                },
+                CharacterAmbition.EnsureFamilyLegacy => bias with
+                {
+                    Court = 1.2,
+                    VisitFamily = 1.3,
+                    Spy = 0.8,
+                    Bribe = 0.9,
+                    Recruit = 0.9,
+                    Defect = 0.7,
+                    Negotiate = 0.9,
+                    Quarrel = 0.8,
+                    Assassinate = 0.7,
+                    TorturePrisoner = 0.6,
+                    RapePrisoner = 0.5,
+                    TravelToPlanet = 1.1,
+                    BecomePirate = 0.7,
+                    RaidConvoy = 0.6
+                },
+                CharacterAmbition.SeekAdventure => bias with
+                {
+                    Court = 0.9,
+                    VisitFamily = 0.8,
+                    Spy = 1.2,
+                    Bribe = 0.9,
+                    Recruit = 0.9,
+                    Defect = 1.0,
+                    Negotiate = 0.9,
+                    Quarrel = 1.0,
+                    Assassinate = 1.0,
+                    TorturePrisoner = 0.8,
+                    RapePrisoner = 0.7,
+                    TravelToPlanet = 1.3,
+                    BecomePirate = 1.2,
+                    RaidConvoy = 1.2
+                },
+                _ => bias
+            };
         }
 
         private List<ScoredIntent> ResolveConflictsTargetAware(Character actor, List<ScoredIntent> candidates, int take, Func<Guid, Guid> fac)
