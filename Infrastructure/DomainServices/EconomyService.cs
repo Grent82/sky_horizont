@@ -20,6 +20,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IFactionService _factionInfo;
         private readonly IFactionTaxService _factionTaxService;
         private readonly IGameClockService _clock;
+        private readonly IStarmapService _starmap;
 
         private readonly EconomyTuning _cfg;
 
@@ -45,6 +46,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IFactionService factionInfo,
             IFactionTaxService factionTaxService,
             IGameClockService clock,
+            IStarmapService starmap,
             EconomyTuning? cfg = null) // NEW: optional tuning injected
         {
             _eco = eco;
@@ -55,6 +57,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _factionInfo = factionInfo;
             _factionTaxService = factionTaxService;
             _clock = clock;
+            _starmap = starmap;
             _cfg = cfg ?? new EconomyTuning(); // default matches old behavior
         }
 
@@ -276,7 +279,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
                 if (route.IsSmuggling)
                 {
-                    var pirateFaction = FindPirateFactionNear(from.FactionId) ?? from.FactionId;
+                    var pirateFaction = FindPirateFactionNear(from.SystemId, from.FactionId);
                     int leakage = (int)Math.Round(grossValue * SmugglingLossAtSource);
                     int piratesTake = (int)Math.Round((grossValue - leakage) * SmugglingCutToPirates);
 
@@ -395,11 +398,10 @@ namespace SkyHorizont.Infrastructure.DomainServices
             }
         }
 
-        private Guid? FindPirateFactionNear(Guid fallbackFaction)
+        private Guid FindPirateFactionNear(Guid systemId, Guid fallbackFaction)
         {
-            // TODO: integrate a pirate directory or starmap proximity.
-            // For now, return null to fall back to controlling faction when needed.
-            return null;
+            var nearest = _starmap.GetNearestPirateFaction(systemId);
+            return nearest ?? fallbackFaction;
         }
 
         // -------------------- NEW helpers (rates & distance) --------------------
@@ -434,10 +436,11 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private double DistanceValueFactor(Guid fromPlanetId, Guid toPlanetId)
         {
-            // Stub for now (no extra dependency). 
-            // ToDo: Integrate starmap later.
-            // Return 1.0 → your current behavior.
-            return 1.0;
+            var from = _planets.GetById(fromPlanetId);
+            var to = _planets.GetById(toPlanetId);
+            if (from is null || to is null) return 1.0;
+            double dist = _starmap.GetDistance(from.SystemId, to.SystemId);
+            return 1.0 + dist / 100.0;
         }
     }
 }
