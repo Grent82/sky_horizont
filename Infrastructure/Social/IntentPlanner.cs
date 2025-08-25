@@ -236,6 +236,7 @@ namespace SkyHorizont.Infrastructure.Social
                     TravelToPlanet = 0.8,
                     BecomePirate = 0.9,
                     RaidConvoy = 0.8,
+                    BuildInfrastructure = 0.9
                     BuildFleet = 1.3
                 },
                 CharacterAmbition.BuildWealth => bias with
@@ -254,6 +255,7 @@ namespace SkyHorizont.Infrastructure.Social
                     TravelToPlanet = 1.0,
                     BecomePirate = 1.2,
                     RaidConvoy = 1.3,
+                    BuildInfrastructure = 1.3
                     BuildFleet = 0.8
                 },
                 CharacterAmbition.EnsureFamilyLegacy => bias with
@@ -272,6 +274,7 @@ namespace SkyHorizont.Infrastructure.Social
                     TravelToPlanet = 1.1,
                     BecomePirate = 0.7,
                     RaidConvoy = 0.6,
+                    BuildInfrastructure = 1.2
                     BuildFleet = 0.7
                 },
                 CharacterAmbition.SeekAdventure => bias with
@@ -290,6 +293,7 @@ namespace SkyHorizont.Infrastructure.Social
                     TravelToPlanet = 1.3,
                     BecomePirate = 1.2,
                     RaidConvoy = 1.2,
+                    BuildInfrastructure = 0.8
                     BuildFleet = 1.2
                 },
                 _ => bias
@@ -329,7 +333,8 @@ namespace SkyHorizont.Infrastructure.Social
                         conflict = true;
                 }
 
-                if (si.Type == IntentType.TravelToPlanet || si.Type == IntentType.ClaimPlanetSeat)
+                if (si.Type == IntentType.TravelToPlanet || si.Type == IntentType.ClaimPlanetSeat ||
+                    si.Type == IntentType.BuildInfrastructure)
                 {
                     if (tp.HasValue && chosenPlanetTargets.Contains(tp.Value))
                         conflict = true;

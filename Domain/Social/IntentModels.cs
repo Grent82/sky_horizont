@@ -11,6 +11,7 @@ namespace SkyHorizont.Domain.Social
         FoundPirateClan,
         ExpelFromHouse,
         ClaimPlanetSeat,
+        BuildInfrastructure
         BuildFleet
     }
 
