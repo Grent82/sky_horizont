@@ -76,6 +76,12 @@ public class BuildFleetResolverTests
         var intent = new CharacterIntent(actor.Id, IntentType.BuildFleet);
         var ev = resolver.Resolve(intent, 3000, 1).Single();
 
+        funds.Verify(f => f.Deduct(factionId, 1000), Times.Once);
+        fleetRepo.Verify(f => f.Save(It.IsAny<Fleet>()), Times.Once);
+        savedFleet.Should().NotBeNull();
+        savedFleet!.Ships.Should().NotBeEmpty();
+        ev.Success.Should().BeTrue();
+        ev.Type.Should().Be(SocialEventType.BuildFleet);
         ev.Success.Should().BeFalse();
         fleetRepo.Verify(f => f.Save(It.IsAny<Fleet>()), Times.Never);
     }
@@ -108,6 +114,7 @@ public class BuildFleetResolverTests
         fleetRepo.Setup(f => f.Save(It.IsAny<Fleet>())).Callback<Fleet>(f => savedFleet = f);
 
         var funds = new Mock<IFundsService>();
+        funds.Setup(f => f.HasFunds(It.IsAny<Guid>(), 1000)).Returns(false);
         funds.Setup(f => f.GetBalance(factionId)).Returns(10000);
         funds.Setup(f => f.HasFunds(It.IsAny<Guid>(), It.IsAny<int>())).Returns(true);
         funds.Setup(f => f.Deduct(It.IsAny<Guid>(), It.IsAny<int>()));

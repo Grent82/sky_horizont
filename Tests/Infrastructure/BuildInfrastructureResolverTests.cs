@@ -11,8 +11,6 @@ using SkyHorizont.Domain.Intrigue;
 using SkyHorizont.Domain.Diplomacy;
 using SkyHorizont.Domain.Battle;
 using SkyHorizont.Infrastructure.Social;
-using Infrastructure.Persistence.Repositories;
-using SkyHorizont.Infrastructure.Persistence;
 using Xunit;
 
 namespace SkyHorizont.Tests.Infrastructure;
@@ -30,9 +28,8 @@ public class BuildInfrastructureResolverTests
         var charRepo = new Mock<ICharacterRepository>();
         charRepo.Setup(r => r.GetById(actorId)).Returns(actor);
 
-        var ecoRepo = new PlanetEconomyRepository(new InMemoryPlanetEconomyDbContext());
         var planetRepo = new Mock<IPlanetRepository>();
-        var planet = new Planet(Guid.NewGuid(), "Home", systemId, factionId, new Resources(0,0,0), charRepo.Object, planetRepo.Object, ecoRepo, infrastructureLevel: 10, credits: 500);
+        var planet = new Planet(Guid.NewGuid(), "Home", systemId, factionId, new Resources(0,0,0), charRepo.Object, planetRepo.Object, infrastructureLevel: 10, credits: 500);
         planet.Citizens.Add(actorId);
         planetRepo.Setup(r => r.GetById(planet.Id)).Returns(planet);
         planetRepo.Setup(r => r.GetAll()).Returns(new[] { planet });
@@ -65,7 +62,6 @@ public class BuildInfrastructureResolverTests
             piracy.Object,
             planetRepo.Object,
             fleetRepo.Object,
-            Mock.Of<IFundsService>(),
             eventBus.Object,
             Mock.Of<IBattleOutcomeService>(),
             Mock.Of<IIntimacyLog>(),
