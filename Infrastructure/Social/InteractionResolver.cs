@@ -1377,9 +1377,117 @@ namespace SkyHorizont.Infrastructure.Social
         private IEnumerable<ISocialEvent> ResolveBuildFleet(Character actor, CharacterIntent intent, int y, int m, Guid actorFactionId, Guid? actorSystemId)
         {
             var ev = new SocialEvent(Guid.NewGuid(), y, m, SocialEventType.BuildFleet, actor.Id, null, null, null, false, 0, 0, Array.Empty<Guid>(), "");
+
+            var planets = _planets.GetPlanetsControlledByFaction(actorFactionId).ToList();
+            if (!planets.Any())
+            {
+                _events.Publish(ev);
+                return new[] { ev };
+            }
+
+            var factionStatus = GetFactionStatus(actorFactionId);
+            var security = actorSystemId.HasValue ? GetSystemSecurity(actorSystemId.Value) : null;
+            var faction = _factions.GetFaction(actorFactionId);
+
+            int funds = _funds.GetBalance(actorFactionId);
+            int econStrength = _factions.GetEconomicStrength(actorFactionId);
+            int budget = Math.Min(funds, (int)(econStrength * 0.5));
+            if (budget < ShipSpecs.Values.Min(s => s.Cost))
+            {
+                _events.Publish(ev);
+                return new[] { ev };
+            }
+
+            var planet = planets[0];
+            var fleet = _fleets.GetFleetsForFaction(actorFactionId).FirstOrDefault();
+            if (fleet == null)
+            {
+                var system = actorSystemId ?? planet.SystemId;
+                fleet = new Fleet(Guid.NewGuid(), actorFactionId, system, _piracy);
+            }
+
+            var desired = fleet.DesiredComposition.ToDictionary(k => k.Key, v => v.Value);
+            bool builtAny = false;
+            int remainingBudget = budget;
+
+            int ResourceLimit(Resources available, Resources cost)
+            {
+                int limit = int.MaxValue;
+                if (cost.Organics > 0) limit = Math.Min(limit, available.Organics / cost.Organics);
+                if (cost.Ore > 0) limit = Math.Min(limit, available.Ore / cost.Ore);
+                if (cost.Volatiles > 0) limit = Math.Min(limit, available.Volatiles / cost.Volatiles);
+                return limit;
+            }
+
+            int BuildShips(ShipClass cls, int count)
+            {
+                var spec = ShipSpecs[cls];
+                count = Math.Min(count, remainingBudget / spec.Cost);
+                count = Math.Min(count, planet.ProductionCapacity / spec.ProductionRequired);
+                count = Math.Min(count, ResourceLimit(planet.Resources, spec.ResourceCost));
+                if (count <= 0) return 0;
+
+                _funds.Deduct(actorFactionId, spec.Cost * count);
+                remainingBudget -= spec.Cost * count;
+                planet.Resources = planet.Resources - spec.ResourceCost.Scale(count);
+                for (int i = 0; i < count; i++)
+                {
+                    var ship = new Ship(Guid.NewGuid(), cls, spec.Attack, spec.Defense, spec.Cargo, spec.Speed, spec.Cost);
+                    fleet.AddShip(ship);
+                }
+                if (desired.ContainsKey(cls)) desired[cls] += count; else desired[cls] = count;
+                builtAny = true;
+                return count;
+            }
+
+            if (fleet.DesiredComposition.Any())
+            {
+                foreach (var kv in fleet.DesiredComposition)
+                {
+                    var current = fleet.Ships.Count(s => s.Class == kv.Key);
+                    var missing = kv.Value - current;
+                    if (missing > 0) BuildShips(kv.Key, missing);
+                }
+            }
+            else
+            {
+                double cargoWeight = 1, fighterWeight = 1, scoutWeight = 1;
+                if (security != null)
+                {
+                    if (security.Traffic > 60) cargoWeight += 1;
+                    if (security.PirateActivity > 40) fighterWeight += 1;
+                }
+                if (factionStatus.IsAtWar) fighterWeight += 1;
+                if (actor.Personality.Agreeableness < 40) fighterWeight += 0.5;
+                if (actor.Personality.Openness > 60) scoutWeight += 0.5;
+                if (actor.Personality.Conscientiousness > 60) cargoWeight += 0.5;
+                switch (faction.Doctrine)
+                {
+                    case FactionDoctrine.Carrier:
+                        fighterWeight += 0.5;
+                        break;
+                    case FactionDoctrine.TradeProtection:
+                        cargoWeight += 0.5;
+                        break;
+                }
+
+                double total = cargoWeight + fighterWeight + scoutWeight;
+                BuildShips(ShipClass.Freighter, (int)(budget * (cargoWeight / total) / ShipSpecs[ShipClass.Freighter].Cost));
+                BuildShips(ShipClass.Corvette, (int)(budget * (fighterWeight / total) / ShipSpecs[ShipClass.Corvette].Cost));
+                BuildShips(ShipClass.Scout, (int)(budget * (scoutWeight / total) / ShipSpecs[ShipClass.Scout].Cost));
+            }
+
+            if (builtAny)
+            {
+                fleet.SetDesiredComposition(desired);
+                _fleets.Save(fleet);
+                _planets.Save(planet);
+                ev = ev with { Success = true };
+            }
+
             _events.Publish(ev);
             return new[] { ev };
-            
+
         }
         #endregion
 
