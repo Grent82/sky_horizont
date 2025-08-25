@@ -1,8 +1,4 @@
-# Notes
-
-## Ledger Consolidation
-
-Planet credit balances now live in `IPlanetEconomyRepository`, replacing direct `Planet.Credits` mutations for a single, consistent ledger.
+# Notes / ToDos
 
 ## Features
 
@@ -60,9 +56,6 @@ Planet credit balances now live in `IPlanetEconomyRepository`, replacing direct 
 [ ] **BuildShip/RefitFleet** – capacity growth; unlocks hull techs.
 [ ] **UpgradeDefenseGrid** – anti‑raid/anti‑bombard resilience.
 
-- Trade value now scales with distance between systems.
-- Smuggling payouts credit the nearest pirate faction.
-
 ### Exploration & Science
 
 [ ] **SurveyPlanet** – reveals resources/habitability hooks.
@@ -103,7 +96,7 @@ Planet credit balances now live in `IPlanetEconomyRepository`, replacing direct 
 
 ### Fleet & Travel
 
-[x] **TravelToPlanet/System** – your backbone for presence and story.
+[ ] **TravelToPlanet/System** – your backbone for presence and story.
 [ ] **RedeployFleet** – posture shifts; threat projection.
 [ ] **TrainCrew/Drill** – slow, safe combat readiness gain.
 [ ] **FormTaskForce** – temporary multi‑fleet operations package.
@@ -115,6 +108,13 @@ Planet credit balances now live in `IPlanetEconomyRepository`, replacing direct 
 [ ] **SaveLeader** – emergency rescue arc; huge political aftermath.
 [ ] **UncoverMegaSecret** – galaxy‑shaking intel → multi‑faction response.
 [ ] **FoundGreatHouse/Clan** – late‑game identity/power reframe.
+
+### Event Broadcasting
+[ ] Domain events broadcasting conquest progress to UI or simulation loop.
+[ ] Eventbus
+
+### UI
+[ ] UI Integration: Use GetActiveTraits to display a character’s personality profile in-game.
 
 
 ## Earn Merrits
@@ -134,33 +134,29 @@ Think in bands so tuning stays predictable:
   War‑deciding battle, founding a colony, uncovering a mega‑secret, saving a leader’s life, top‑tier scientific breakthrough.
 
 ### Guidelines:
-
 * Rank multiplier: small upward bias at higher ranks (they take bigger risks / lead larger ops), but avoid snowballing.
-
 * Diminishing returns on repeated spammy actions (e.g., the 5th “easy bribe” this month yields less).
-
 * Faction alignment: award a small bonus if action aligns with faction doctrine (e.g., pirates value raids, technocrats value research).
-
 * Penalties: failed plots, insubordination, harming allies/civilians, getting caught for crimes (bigger hit if doctrine-discordant).
-
 * This keeps merit as a meaningful, legible resource that reflects impact, not just activity spam.
 
 ## About the game
 
 * Scope & style: character-driven 4X-ish sci‑fi sim with factions, planets, fleets, piracy, travel, diplomacy, espionage, and interpersonal relationships.
-
 * Characters: have Big Five‑like personalities + named traits/combos (e.g., Assertive, ThrillSeeker, ImpulsiveAnger), skills (Military/Intelligence/Economy/Research), ranks, opinions, relationships, ambitions (GainPower/BuildWealth/EnsureFamilyLegacy/SeekAdventure), merit, traumas, pregnancy state.
-
 * Planning loop: monthly IntentPlanner scores intents (Court, VisitFamily, VisitLover, Spy, Bribe, Recruit, Defect, Negotiate, Quarrel, Assassinate, Torture/Rape of prisoners, TravelToPlanet, BecomePirate, RaidConvoy), resolves conflicts, and emits a small set.
-
 * Resolution loop: InteractionResolver executes intents → adjusts opinions/diplomacy/merit, creates secrets/events, triggers travel/battles, logs intimacy for Lifecycle.
-
 * Lifecycle: handles birthdays, conception (now driven by intimacy log + IPregnancyPolicy), pregnancy progression/twins/complications, birth, and mortality; places newborns via ILocationService and wires lineage.
-
 * Pregnancy policy: centralized, tunable rules (opinion gates, co‑location, postpartum cooldown, optional coercion toggle), plus chance curves.
-
 * Intimacy log: month‑bucketed, now should be consume‑on-read (previous month) to avoid off‑by‑one and memory growth.
-
 * Piracy: distinct pirate faction(s), system security model (pirate activity/traffic/patrols), ambush/raid flows; BattleOutcomeService processes quick sim outcomes.
-
 * Events/Secrets: an event bus publishes social/battle/logistics events; secrets track espionage/corruption/plots.
+
+
+## Additional  Ideas
+* each character has its own credits
+    * get credits by planets (steuern handel) oder durch überfälle
+
+* consider time of conquest battle in hours depends on strength of both opponents
+* Ensures that loot flows and political influence hierarchies feel meaningful, incentivizing hierarchical chain-of-command dynamics
+*  expand to capture civilians or family members for ransom as additional loot flows, but keep character and role-based share logic separate
