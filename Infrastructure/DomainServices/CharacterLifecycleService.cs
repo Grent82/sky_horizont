@@ -202,6 +202,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             var babySkills = _skillInherit.Inherit(mother.Skills, father?.Skills, _rng);
 
+
             var loc = _loc.GetCharacterLocation(mother.Id);
             (babyPersonality, babySkills) = ApplyBirthVariance(babyPersonality, babySkills, loc);
 
@@ -226,7 +227,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             }
             _characters.Save(mother);
 
-            var loc = _loc.GetCharacterLocation(mother.Id);
+            loc = _loc.GetCharacterLocation(mother.Id);
             if (loc != null)
             {
                 switch (loc.Kind)
@@ -243,8 +244,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 }
             }
 
-            var motherFaction =_factions.GetFaction(mother.Id);
-            _factions.MoveCharacterToFaction(babyId, motherFaction.Id);
+            var motherFactionId = _factions.GetFactionIdForCharacter(mother.Id);
+            _factions.MoveCharacterToFaction(babyId, motherFactionId);
 
             return baby;
         }

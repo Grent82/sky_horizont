@@ -6,9 +6,11 @@ using Xunit;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Infrastructure.DomainServices;
-using SkyHorizont.Infrastructure.Persistence.Repositories;
 using SkyHorizont.Infrastructure.Persistence;
 using SkyHorizont.Infrastructure.Testing;
+using SkyHorizont.Infrastructure.Repository;
+using SkyHorizont.Domain.Factions;
+using SkyHorizont.Application.Turns;
 
 namespace SkyHorizont.Tests.Domain
 {
@@ -75,7 +77,7 @@ namespace SkyHorizont.Tests.Domain
 
             return new CharacterLifecycleService(
                 characters, lineage, clock, rng, mortality, names, inherit,
-                pregPolicy, skillInherit, loc, events, intimacy);
+                pregPolicy, skillInherit, loc, events, intimacy, new DummyFactionService());
         }
 
         private sealed class DummyPregnancyPolicy : IPregnancyPolicy
@@ -112,6 +114,21 @@ namespace SkyHorizont.Tests.Domain
             public void RecordIntimacyEncounter(Guid charA, Guid charB, int year, int month) { }
             public IReadOnlyList<Guid> GetPartnersForMother(Guid motherId, int year, int month) => Array.Empty<Guid>();
             public void PurgeOlderThan(int year, int month) { }
+        }
+
+        private sealed class DummyFactionService : IFactionService
+        {
+            public Guid GetFactionIdForCharacter(Guid characterId) => Guid.Empty;
+            public Guid GetFactionIdForPlanet(Guid planetId) => Guid.Empty;
+            public Guid GetFactionIdForSystem(Guid systemId) => Guid.Empty;
+            public Guid? GetLeaderId(Guid factionId) => null;
+            public bool IsAtWar(Guid a, Guid b) => false;
+            public IEnumerable<Guid> GetAllRivalFactions(Guid forFaction) => Array.Empty<Guid>();
+            public bool HasAlliance(Guid factionA, Guid factionB) => false;
+            public int GetEconomicStrength(Guid factionId) => 0;
+            public void MoveCharacterToFaction(Guid characterId, Guid newFactionId) { }
+            public void Save(Faction faction) { }
+            public Faction GetFaction(Guid factionId) => new Faction(factionId, "Dummy", Guid.Empty);
         }
     }
 }
