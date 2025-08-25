@@ -957,7 +957,7 @@ namespace SkyHorizont.Infrastructure.Social
             if (factionStatus.HasUnrest) baseChance += 0.15;
             if (actor.Ambition == CharacterAmbition.SeekAdventure) baseChance += 0.15;
 
-            var actorSystemId = FindSystemOfCharacter(actor.Id);
+            var actorSystemId = GetSystemOfCharacter(actor.Id);
             if (actorSystemId.HasValue)
             {
                 var sec = GetSystemSecurity(actorSystemId.Value);
@@ -1444,6 +1444,13 @@ namespace SkyHorizont.Infrastructure.Social
 
         private Guid? GetSystemOfCharacter(Guid characterId)
             => GetCharacterLocation(characterId).SystemId;
+
+        private Guid? PickLocalPirateClan(Guid systemId)
+        {
+            // Currently no local pirate tracking; always prefer global faction
+            // or create a new one when none exists.
+            return null;
+        }
 
         private (Guid? PlanetId, Guid? SystemId) GetCharacterLocation(Guid characterId)
         {
