@@ -48,7 +48,9 @@ namespace SkyHorizont.Tests.Common
             var skillInh = new SimpleSkillInheritanceService();
             var faction = new FactionService(factions, planets);
             var piracy = new PiracyService(faction, rng, Guid.NewGuid());
-            var travel = new TravelService(planets, fleets, rng, travels, piracy, clock);
+            var starmap = new DummyStarmapService();
+            var route = new RouteService(starmap);
+            var travel = new TravelService(planets, fleets, rng, travels, piracy, clock, route, starmap);
             var fund = new CharacterFundsService(funds);
             var tax = new FactionTaxService(factionFunds, funds, planets, eco, faction, characters, clock);
             var factionFundsSvc = new FundsService(factionFunds);
@@ -91,8 +93,14 @@ namespace SkyHorizont.Tests.Common
         {
             public void Publish<T>(T @event)
             {
-                
+
             }
+        }
+
+        private sealed class DummyStarmapService : IStarmapService
+        {
+            public double GetDistance(Guid systemA, Guid systemB) => 1.0;
+            public Guid? GetNearestPirateFaction(Guid systemId) => null;
         }
     }
 }

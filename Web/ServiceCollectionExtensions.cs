@@ -7,6 +7,7 @@ using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Entity.Lineage;
 using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Fleets;
+using SkyHorizont.Domain.Galaxy;
 using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Intrigue;
 using SkyHorizont.Domain.Research;
@@ -87,6 +88,8 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<IPregnancyPolicy, DefaultPregnancyPolicy>();
             services.AddScoped<IRansomService, RansomService>();
             services.AddScoped<IResearchService, ResearchService>();
+            services.AddSingleton<IStarmapService>(_ => new StarmapService(Array.Empty<StarSystem>()));
+            services.AddScoped<IRouteService, RouteService>();
             services.AddScoped<ITravelService, TravelService>();
 
 
