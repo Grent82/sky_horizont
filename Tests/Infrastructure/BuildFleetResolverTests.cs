@@ -144,7 +144,10 @@ public class BuildFleetResolverTests
 
         ev.Success.Should().BeTrue();
         savedFleet.Should().NotBeNull();
-        savedFleet!.DesiredComposition[ShipClass.Corvette].Should().BeGreaterThan(savedFleet.DesiredComposition[ShipClass.Freighter]);
+
+        savedFleet!.DesiredComposition.TryGetValue(ShipClass.Corvette, out var corvettes).Should().BeTrue();
+        savedFleet.DesiredComposition.TryGetValue(ShipClass.Freighter, out var freighters);
+        corvettes.Should().BeGreaterThan(freighters);
     }
 
     [Fact]
