@@ -131,7 +131,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         {
             var taxIncome = (int)(Population * BaseTaxRate * (Satisfaction / 100.0));
             Credits += taxIncome;
-            Satisfaction = Math.Clamp(Satisfaction - (BaseTaxRate * 5.0), 0, 100); // Taxes reduce satisfaction
+            Satisfaction = Math.Clamp(Satisfaction - (BaseTaxRate * 5.0), 0, 100);
             AdjustStabilityBasedOnSatisfaction();
             _planetRepository.Save(this);
             return taxIncome;
@@ -185,8 +185,8 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             GovernorId = null;
             Stability = Math.Clamp(Stability - 0.2, 0, 1.0);
             Satisfaction = Math.Clamp(Satisfaction - 10.0, 0, 100.0);
-            Population = (int)(Population * 0.9); // 10% population loss
-            Credits = (int)(Credits * 0.8); // Economic disruption
+            Population = (int)(Population * 0.9);
+            Credits = (int)(Credits * 0.8); 
             _planetRepository.Save(this);
             return true;
         }
@@ -196,11 +196,11 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             FactionId = newFaction;
             Stability = Math.Clamp(Stability - 0.3, 0, 1.0);
             Satisfaction = Math.Clamp(Satisfaction - 15.0, 0, 100.0);
-            Population = (int)(Population * 0.95); // 5% population loss
-            Credits = (int)(Credits * 0.9); // Economic disruption
+            Population = (int)(Population * 0.95);
+            Credits = (int)(Credits * 0.9);
             GovernorId = null;
-            _stationedFleets.Clear(); // Remove stationed fleets
-            BaseDefense = Math.Max(0, BaseDefense * 0.5); // Halve defenses
+            _stationedFleets.Clear();
+            BaseDefense = Math.Max(0, BaseDefense * 0.5);
             _planetRepository.Save(this);
         }
 
@@ -209,7 +209,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
             ChangeControl(newFaction);
             outcomeService.ProcessPlanetConquest(this, result.WinnerFleet!, result);
             Credits += result.PlanetCaptureBonus;
-            Population = (int)(Population * 0.9); // Additional population loss
+            Population = (int)(Population * 0.9);
             Satisfaction = Math.Clamp(Satisfaction - 20.0, 0, 100.0);
             _planetRepository.Save(this);
         }

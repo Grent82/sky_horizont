@@ -20,7 +20,8 @@ namespace SkyHorizont.Domain.Social
         FoundGreatHouse,
         FoundPirateClan,
         ClaimPlanet,
-        ExpelFromHouse
+        ExpelFromHouse,
+        Custom
     }
 
     public interface ISocialEvent
