@@ -309,6 +309,7 @@ namespace SkyHorizont.Domain.Galaxy.Planet
         public void SetSeatPlanet(Guid factionId)
         {
             SeatFactionId = factionId;
+            _planetRepository.Save(this);
         }
 
         public bool IsSeatOf(Guid factionId) => SeatFactionId.HasValue && SeatFactionId.Value == factionId;

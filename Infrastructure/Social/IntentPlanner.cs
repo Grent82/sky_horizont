@@ -308,7 +308,8 @@ namespace SkyHorizont.Infrastructure.Social
                 if (si.Type == IntentType.Bribe || si.Type == IntentType.Recruit ||
                     si.Type == IntentType.Court || si.Type == IntentType.Assassinate ||
                     si.Type == IntentType.Quarrel || si.Type == IntentType.TorturePrisoner ||
-                    si.Type == IntentType.RapePrisoner || si.Type == IntentType.VisitLover)
+                    si.Type == IntentType.RapePrisoner || si.Type == IntentType.VisitLover ||
+                    si.Type == IntentType.ExpelFromHouse)
                 {
                     if (tc.HasValue && chosenCharTargets.Contains(tc.Value))
                         conflict = true;
@@ -320,7 +321,7 @@ namespace SkyHorizont.Infrastructure.Social
                         conflict = true;
                 }
 
-                if (si.Type == IntentType.TravelToPlanet)
+                if (si.Type == IntentType.TravelToPlanet || si.Type == IntentType.ClaimPlanetSeat)
                 {
                     if (tp.HasValue && chosenPlanetTargets.Contains(tp.Value))
                         conflict = true;

@@ -19,6 +19,10 @@ namespace SkyHorizont.Domain.Social
         public double TravelWeight { get; init; } = 0.8;
         public double BecomePirateWeight { get; init; } = 0.9;
         public double RaidConvoyWeight { get; init; } = 1.0;
+        public double FoundHouseWeight { get; init; } = 0.9;
+        public double FoundPirateClanWeight { get; init; } = 0.9;
+        public double ExpelFromHouseWeight { get; init; } = 0.8;
+        public double ClaimPlanetSeatWeight { get; init; } = 1.0;
         public int MinBribeBudget { get; init; } = 200;
         public double AssassinateFrequency { get; init; } = 0.05;
         public int MaxCandidatePool { get; init; } = 60;
