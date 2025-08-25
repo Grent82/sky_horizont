@@ -1,9 +1,7 @@
-using System.Transactions;
 using SkyHorizont.Domain.Economy;
-using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Infrastructure.Persistence.Interfaces;
 
-namespace Infrastructure.Persistence.Repositories
+namespace SkyHorizont.Infrastructure.Persistence.Repositories
 {
     public class PlanetEconomyRepository : IPlanetEconomyRepository
     {

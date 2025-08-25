@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Infrastructure.Persistence.Repositories;
 using SkyHorizont.Application.Turns;
 using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Social;
@@ -12,6 +11,7 @@ using SkyHorizont.Infrastructure.Social;
 using SkyHorizont.Infrastructure.Social.IntentRules;
 using SkyHorizont.Infrastructure.Testing;
 using Xunit;
+using SkyHorizont.Infrastructure.Persistence.Repositories;
 
 namespace SkyHorizont.Tests.Common
 {
@@ -62,7 +62,8 @@ namespace SkyHorizont.Tests.Common
             var rules = new IIntentRule[]
             {
                 new CourtshipIntentRule(rng),
-                new VisitFamilyIntentRule(rng)
+                new VisitFamilyIntentRule(rng),
+                new VisitLoverIntentRule(characters, faction, rng)
             };
             var planner = new IntentPlanner(characters, opinions, faction, rng, planets, fleets, piracy, rules);
             var diplomacy = new DiplomacyService(diplomacies, faction, clock, opinions);

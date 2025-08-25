@@ -1,9 +1,9 @@
 using FluentAssertions;
 using Moq;
+using SkyHorizont.Domain.Economy;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Galaxy.Planet;
-using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Social;
 using SkyHorizont.Infrastructure.Social.IntentRules;
 using Xunit;
@@ -20,7 +20,8 @@ public class BuildInfrastructureIntentRuleTests
 
         var charRepo = Mock.Of<ICharacterRepository>();
         var planetRepo = new Mock<IPlanetRepository>();
-        var planet = new Planet(Guid.NewGuid(), "P", systemId, factionId, new Resources(0,0,0), charRepo, planetRepo.Object, infrastructureLevel: infra, credits: 1000);
+        var ecoRepo = Mock.Of<IPlanetEconomyRepository>();
+        var planet = new Planet(Guid.NewGuid(), "P", systemId, factionId, new Resources(0,0,0), charRepo, planetRepo.Object, ecoRepo, infrastructureLevel: infra, credits: 1000);
         planet.Citizens.Add(actorId);
         planetRepo.Setup(r => r.GetAll()).Returns(new[] { planet });
         planetRepo.Setup(r => r.GetById(planet.Id)).Returns(planet);

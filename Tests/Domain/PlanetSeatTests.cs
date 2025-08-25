@@ -3,7 +3,7 @@ using FluentAssertions;
 using Xunit;
 using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Infrastructure.Persistence;
-using Infrastructure.Persistence.Repositories;
+using SkyHorizont.Infrastructure.Persistence.Repositories;
 
 namespace SkyHorizont.Tests.Domain
 {

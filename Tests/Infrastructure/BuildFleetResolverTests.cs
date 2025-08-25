@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using FluentAssertions;
 using Moq;
 using SkyHorizont.Domain.Entity;
@@ -10,9 +8,12 @@ using SkyHorizont.Domain.Services;
 using SkyHorizont.Domain.Social;
 using SkyHorizont.Domain.Travel;
 using SkyHorizont.Infrastructure.Social;
-using Infrastructure.Persistence.Repositories;
 using SkyHorizont.Infrastructure.Persistence;
 using Xunit;
+using SkyHorizont.Domain.Intrigue;
+using SkyHorizont.Domain.Diplomacy;
+using SkyHorizont.Domain.Battle;
+using SkyHorizont.Infrastructure.Persistence.Repositories;
 
 namespace SkyHorizont.Tests.Infrastructure;
 
@@ -98,7 +99,7 @@ public class BuildFleetResolverTests
 
         ev.Success.Should().BeTrue();
         savedFleet.Should().NotBeNull();
-        savedFleet!.DesiredComposition[ShipClass.Freighter].Should().BeGreaterOrEqualTo(savedFleet.DesiredComposition[ShipClass.Corvette]);
+        savedFleet!.DesiredComposition[ShipClass.Freighter].Should().BeGreaterThanOrEqualTo(savedFleet.DesiredComposition[ShipClass.Corvette]);
     }
 
     [Fact]

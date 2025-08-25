@@ -4,8 +4,8 @@ using SkyHorizont.Domain.Galaxy.Planet;
 using SkyHorizont.Domain.Services;
 using SkyHorizont.Infrastructure.DomainServices;
 using SkyHorizont.Infrastructure.Social;
-using Infrastructure.Persistence.Repositories;
 using SkyHorizont.Infrastructure.Persistence;
+using SkyHorizont.Infrastructure.Persistence.Repositories;
 
 namespace SkyHorizont.Infrastructure.Testing
 {

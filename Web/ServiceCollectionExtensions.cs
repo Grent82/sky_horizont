@@ -1,4 +1,3 @@
-using Infrastructure.Persistence.Repositories;
 using SkyHorizont.Application;
 using SkyHorizont.Application.Turns;
 using SkyHorizont.Domain.Battle;
@@ -19,6 +18,7 @@ using SkyHorizont.Infrastructure.Persistence;
 using SkyHorizont.Infrastructure.Persistence.Diplomacy;
 using SkyHorizont.Infrastructure.Persistence.Interfaces;
 using SkyHorizont.Infrastructure.Persistence.Intrigue;
+using SkyHorizont.Infrastructure.Persistence.Repositories;
 using SkyHorizont.Infrastructure.Repository;
 using SkyHorizont.Infrastructure.Social;
 using SkyHorizont.Infrastructure.Social.IntentRules;

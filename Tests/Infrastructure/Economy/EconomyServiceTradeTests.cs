@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using FluentAssertions;
 using Moq;
 using SkyHorizont.Domain.Economy;
@@ -21,7 +18,7 @@ public class EconomyServiceTradeTests
     private sealed class TestStarmapService : IStarmapService
     {
         private readonly Dictionary<Guid, (double x, double y)> _systems = new();
-        private readonly Dictionary<Guid, Guid> _pirateBases = new(); // faction -> system
+        private readonly Dictionary<Guid, Guid> _pirateBases = new();
 
         public void SetSystem(Guid id, double x, double y) => _systems[id] = (x, y);
         public void RegisterPirate(Guid factionId, Guid systemId) => _pirateBases[factionId] = systemId;
@@ -60,10 +57,10 @@ public class EconomyServiceTradeTests
         public void AdvanceTurn() { }
     }
 
-    private static Planet CreatePlanet(Guid id, Guid systemId, Guid factionId, IPlanetRepository repo, ICharacterRepository chars)
+    private static Planet CreatePlanet(Guid id, Guid systemId, Guid factionId, IPlanetRepository repo, ICharacterRepository chars, IPlanetEconomyRepository ecoRepo)
     {
         var planet = new Planet(id, $"P{id.ToString()[..4]}", systemId, factionId,
-            new Resources(0, 0, 0), chars, repo, infrastructureLevel: 0);
+            new Resources(0, 0, 0), chars, repo, ecoRepo, infrastructureLevel: 0);
         repo.Save(planet);
         return planet;
     }
@@ -85,10 +82,10 @@ public class EconomyServiceTradeTests
         var planetCtx = new InMemoryPlanetsDbContext();
         var planetRepo = new PlanetsRepository(planetCtx);
         var charRepo = Mock.Of<ICharacterRepository>(c => c.GetAll() == Array.Empty<Character>() && c.GetLiving() == Array.Empty<Character>());
-        var planetA = CreatePlanet(Guid.NewGuid(), systemA, Guid.NewGuid(), planetRepo, charRepo);
-        var planetB = CreatePlanet(Guid.NewGuid(), systemB, Guid.NewGuid(), planetRepo, charRepo);
-
         var ecoRepo = new PlanetEconomyRepository(new InMemoryPlanetEconomyDbContext());
+        var planetA = CreatePlanet(Guid.NewGuid(), systemA, Guid.NewGuid(), planetRepo, charRepo, ecoRepo);
+        var planetB = CreatePlanet(Guid.NewGuid(), systemB, Guid.NewGuid(), planetRepo, charRepo, ecoRepo);
+
         var fundsRepo = new FactionFundsRepository(new InMemoryFundsDbContext());
         var fleetRepo = Mock.Of<IFleetRepository>(f => f.GetAll() == Array.Empty<Fleet>());
         var factionService = Mock.Of<IFactionService>();
@@ -119,11 +116,11 @@ public class EconomyServiceTradeTests
         var planetCtx = new InMemoryPlanetsDbContext();
         var planetRepo = new PlanetsRepository(planetCtx);
         var charRepo = Mock.Of<ICharacterRepository>(c => c.GetAll() == Array.Empty<Character>() && c.GetLiving() == Array.Empty<Character>());
-        var planetA = CreatePlanet(Guid.NewGuid(), systemA, Guid.NewGuid(), planetRepo, charRepo);
-        var planetB = CreatePlanet(Guid.NewGuid(), systemB, Guid.NewGuid(), planetRepo, charRepo);
-        var planetC = CreatePlanet(Guid.NewGuid(), systemC, Guid.NewGuid(), planetRepo, charRepo);
-
         var ecoRepo = new PlanetEconomyRepository(new InMemoryPlanetEconomyDbContext());
+        var planetA = CreatePlanet(Guid.NewGuid(), systemA, Guid.NewGuid(), planetRepo, charRepo, ecoRepo);
+        var planetB = CreatePlanet(Guid.NewGuid(), systemB, Guid.NewGuid(), planetRepo, charRepo, ecoRepo);
+        var planetC = CreatePlanet(Guid.NewGuid(), systemC, Guid.NewGuid(), planetRepo, charRepo, ecoRepo);
+
         var fundsRepo = new FactionFundsRepository(new InMemoryFundsDbContext());
         var fleetRepo = Mock.Of<IFleetRepository>(f => f.GetAll() == Array.Empty<Fleet>());
         var factionService = Mock.Of<IFactionService>();
