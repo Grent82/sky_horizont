@@ -19,5 +19,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         public void Credit(Guid factionId, int amount)
             => _repo.AddBalance(factionId, amount);
+
+        public int GetBalance(Guid factionId) => _repo.GetBalance(factionId);
     }
 }

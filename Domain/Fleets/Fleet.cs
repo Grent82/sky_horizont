@@ -12,6 +12,7 @@ namespace SkyHorizont.Domain.Fleets
         private readonly Dictionary<Guid, Ship> _ships = new();
         private readonly List<FleetOrder> _orders = new();
         private Resources _cargo;
+        private readonly Dictionary<ShipClass, int> _desiredComposition = new();
 
         public Guid Id { get; }
         public Guid FactionId { get; private set; }
@@ -20,6 +21,7 @@ namespace SkyHorizont.Domain.Fleets
         public double TravelProgress { get; internal set; }
         public IReadOnlyCollection<Ship> Ships => _ships.Values;
         public IReadOnlyList<FleetOrder> Orders => _orders.AsReadOnly();
+        public IReadOnlyDictionary<ShipClass, int> DesiredComposition => _desiredComposition;
 
         public IList<Guid> Prisoners { get; } = new List<Guid>();
 
@@ -129,6 +131,13 @@ namespace SkyHorizont.Domain.Fleets
         {
             var newCargo = _cargo - resources;
             _cargo = newCargo;
+        }
+
+        public void SetDesiredComposition(IDictionary<ShipClass, int> template)
+        {
+            _desiredComposition.Clear();
+            foreach (var kv in template)
+                _desiredComposition[kv.Key] = kv.Value;
         }
     }
 }

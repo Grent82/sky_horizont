@@ -14,14 +14,16 @@ namespace SkyHorizont.Domain.Factions
         public IReadOnlyCollection<Guid> CharacterIds => _characterIds.ToList().AsReadOnly();
         public IReadOnlyCollection<Guid> PlanetIds => _planetIds.ToList().AsReadOnly();
         public IReadOnlyDictionary<Guid, DiplomaticStanding> Diplomacy => _diplomacy;
+        public FactionDoctrine Doctrine { get; private set; }
 
-        public Faction(Guid id, string name, Guid leaderId)
+        public Faction(Guid id, string name, Guid leaderId, FactionDoctrine doctrine = FactionDoctrine.Balanced)
         {
             Id = id;
             Name = name ?? throw new ArgumentNullException(nameof(name));
             LeaderId = leaderId;
             _characterIds = new();
             _planetIds = new();
+            Doctrine = doctrine;
         }
 
         public void AddCharacter(Guid characterId)
@@ -75,5 +77,7 @@ namespace SkyHorizont.Domain.Factions
                 throw new DomainException($"Character {newLeader} is not part of faction {Name}.");
             LeaderId = newLeader;
         }
+
+        public void ChangeDoctrine(FactionDoctrine doctrine) => Doctrine = doctrine;
     }
 }

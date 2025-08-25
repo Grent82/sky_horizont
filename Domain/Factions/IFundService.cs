@@ -8,5 +8,6 @@ namespace SkyHorizont.Domain.Factions
         bool HasFunds(Guid factionId, int amount);
         void Deduct(Guid factionId, int amount);
         void Credit(Guid factionId, int amount);
+        int GetBalance(Guid factionId);
     }
 }
