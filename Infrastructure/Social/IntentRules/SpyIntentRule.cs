@@ -18,7 +18,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
 
         public IEnumerable<ScoredIntent> Generate(IntentContext ctx)
         {
-            var scoreBase = ScoreSpy(ctx.Actor, ctx.FactionStatus, ctx.Config) * ctx.AmbitionBias[IntentType.Spy];
+            var scoreBase = ScoreSpy(ctx.Actor, ctx.FactionStatus, ctx.Config) * ctx.AmbitionBias.Spy;
             if (scoreBase <= 0)
                 yield break;
 

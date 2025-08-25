@@ -22,7 +22,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (target == null)
                 yield break;
 
-            var score = ScoreBribe(ctx.Actor, target, ctx.ActorFactionId, ctx.FactionStatus, ctx.FactionOf, ctx.Config) * ctx.AmbitionBias[IntentType.Bribe];
+            var score = ScoreBribe(ctx.Actor, target, ctx.ActorFactionId, ctx.FactionStatus, ctx.FactionOf, ctx.Config) * ctx.AmbitionBias.Bribe;
             if (score > 0)
                 yield return new ScoredIntent(IntentType.Bribe, score, target.Id, null, null);
         }

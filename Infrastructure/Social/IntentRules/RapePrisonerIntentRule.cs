@@ -22,7 +22,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (target == null)
                 yield break;
 
-            var score = ScoreRape(ctx.Actor, target, ctx.ActorFactionId, ctx.FactionStatus, ctx.FactionOf, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias[IntentType.RapePrisoner];
+            var score = ScoreRape(ctx.Actor, target, ctx.ActorFactionId, ctx.FactionStatus, ctx.FactionOf, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias.RapePrisoner;
             if (score > 0)
                 yield return new ScoredIntent(IntentType.RapePrisoner, score, target.Id, null, null);
         }

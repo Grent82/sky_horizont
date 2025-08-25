@@ -19,7 +19,7 @@ namespace SkyHorizont.Domain.Social
         public IReadOnlyList<Character> OtherFactionCharacters { get; }
         public IReadOnlyList<Character> Captives { get; }
         public CharacterAmbition Ambition { get; }
-        public IReadOnlyDictionary<IntentType, double> AmbitionBias { get; }
+        public AmbitionBias AmbitionBias { get; }
         public Func<Guid, int> OpinionOf { get; }
         public Func<Guid, Guid> FactionOf { get; }
         public PlannerConfig Config { get; }
@@ -35,7 +35,7 @@ namespace SkyHorizont.Domain.Social
             IReadOnlyList<Character> otherFactionCharacters,
             IReadOnlyList<Character> captives,
             CharacterAmbition ambition,
-            IReadOnlyDictionary<IntentType, double> ambitionBias,
+            AmbitionBias ambitionBias,
             Func<Guid, int> opinionOf,
             Func<Guid, Guid> factionOf,
             PlannerConfig config)
