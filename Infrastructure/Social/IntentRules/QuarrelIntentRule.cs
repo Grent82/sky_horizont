@@ -20,7 +20,7 @@ namespace SkyHorizont.Infrastructure.Social.IntentRules
             if (target == null)
                 yield break;
 
-            var score = ScoreQuarrel(ctx.Actor, target, ctx.FactionStatus, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias.Quarrel;
+            var score = ScoreQuarrel(ctx.Actor, target, ctx.FactionStatus, ctx.OpinionOf, ctx.Config) * ctx.AmbitionBias[IntentType.Quarrel];
             if (score > 0)
                 yield return new ScoredIntent(IntentType.Quarrel, score, target.Id, null, null);
         }

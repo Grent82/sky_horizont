@@ -75,5 +75,11 @@ namespace SkyHorizont.Infrastructure.DomainServices
         }
 
         public Guid GetPirateFactionId() => _pirateFactionId;
+
+        public void RegisterPirateFaction(Guid id)
+        {
+            // current implementation supports only a single pirate faction
+            // additional factions can be registered in future enhancements
+        }
     }
 }
