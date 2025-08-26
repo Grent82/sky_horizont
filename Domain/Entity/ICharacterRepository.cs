@@ -13,5 +13,9 @@ namespace SkyHorizont.Domain.Entity
         /// character, such as friends, rivals or lovers.
         /// </summary>
         IEnumerable<Character> GetAssociates(Guid characterId);
+        /// <summary>
+        /// Returns all family members linked to the specified character.
+        /// </summary>
+        IEnumerable<Character> GetFamilyMembers(Guid characterId);
     }
 }

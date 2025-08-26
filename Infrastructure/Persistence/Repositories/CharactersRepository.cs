@@ -64,5 +64,14 @@ namespace SkyHorizont.Infrastructure.Persistence
 
             return GetByIds(associateIds);
         }
+
+        public IEnumerable<Character> GetFamilyMembers(Guid characterId)
+        {
+            var character = GetById(characterId);
+            if (character == null)
+                return Enumerable.Empty<Character>();
+
+            return GetByIds(character.FamilyLinkIds);
+        }
     }
 }
