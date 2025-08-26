@@ -1390,6 +1390,7 @@ namespace SkyHorizont.Infrastructure.Social
             var security = actorSystemId.HasValue ? GetSystemSecurity(actorSystemId.Value) : null;
             var faction = _factions.GetFaction(actorFactionId);
 
+            var planet = planets[0];
             int funds = planet.Credits;
             int econStrength = _factions.GetEconomicStrength(actorFactionId);
             int budget = Math.Min(funds, (int)(econStrength * 0.5));
@@ -1398,8 +1399,6 @@ namespace SkyHorizont.Infrastructure.Social
                 _events.Publish(ev);
                 return new[] { ev };
             }
-
-            var planet = planets[0];
             var fleet = _fleets.GetFleetsForFaction(actorFactionId).FirstOrDefault();
             if (fleet == null)
             {

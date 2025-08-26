@@ -12,7 +12,7 @@ namespace SkyHorizont.Application
 
     /// <summary>
     /// Orchestrates the monthly turn:
-    /// Clock → Lifecycle → Social (plan/resolve) → Affection → Ransom → Morale → Intrigue → Economy.
+    /// Clock → Lifecycle → Social (plan/resolve) → Affection → Morale → Intrigue → Economy.
     /// </summary>
     public sealed class TurnProcessor : ITurnProcessor
     {
@@ -22,7 +22,6 @@ namespace SkyHorizont.Application
         private readonly IInteractionResolver _resolver;
         private readonly ISocialEventLog _socialLog;
         private readonly IAffectionService _affection;
-        private readonly IRansomService _ransom;
         private readonly IMoraleService _morale;
         private readonly ICharacterLifecycleService _lifecycle;
         private readonly IIntrigueService _intrigue;
@@ -35,7 +34,6 @@ namespace SkyHorizont.Application
             IInteractionResolver resolver,
             ISocialEventLog socialLog,
             IAffectionService affectionService,
-            IRansomService ransom,
             IMoraleService morale,
             ICharacterLifecycleService lifecycle,
             IIntrigueService intrigue,
@@ -49,7 +47,6 @@ namespace SkyHorizont.Application
             _socialLog = socialLog;
 
             _affection = affectionService;
-            _ransom    = ransom;
             _morale    = morale;
             _lifecycle = lifecycle;
 
@@ -93,16 +90,13 @@ namespace SkyHorizont.Application
             // 4) Affection drift / captive affection adjustments (monthly)
             SafeRun("Affection.Update", () => _affection.UpdateAffection());
 
-            // 5) Ransom attempts / hostage negotiations this month
-            SafeRun("Ransom.TryRequestRansoms", () => _ransom.TryRequestRansoms());
-
-            // 6) Morale (apply per-fleet / per-garrison modifiers)
+            // 5) Morale (apply per-fleet / per-garrison modifiers)
             SafeRun("Morale.Apply", () => _morale.ApplyMoraleEffects());
 
-            // 7) Intrigue (plots progress, exposure, recruitment, defections, blackmail)
+            // 6) Intrigue (plots progress, exposure, recruitment, defections, blackmail)
             SafeRun("Intrigue.TickPlots", () => _intrigue.TickPlots());
 
-            // 8) Economy (upkeep, trade/tariffs/smuggling, loans)
+            // 7) Economy (upkeep, trade/tariffs/smuggling, loans)
             SafeRun("Economy.EndOfTurnUpkeep", () => _economy.EndOfTurnUpkeep());
         }
 

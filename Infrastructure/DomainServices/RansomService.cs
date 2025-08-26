@@ -6,7 +6,9 @@ using SkyHorizont.Domain.Services;
 
 namespace SkyHorizont.Infrastructure.DomainServices
 {
-    // ToDo: ransom service
+    /// <summary>
+    /// Provides operations for settling ransom payments between characters.
+    /// </summary>
     public class RansomService : IRansomService
     {
         private readonly ICharacterRepository _cmdRepo;
@@ -14,20 +16,37 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IFactionFundsRepository _factionFunds;
         private readonly IPlanetRepository _planetRepo;
         private readonly IFleetRepository _fleetRepo;
+        private readonly IRansomDecisionService _decision;
 
-        public RansomService(ICharacterRepository characterRepository, ICharacterFundsService characterFundsService, IFactionFundsRepository fleetRepository, IPlanetRepository planetRepo, IFleetRepository fleetRepo)
+        public RansomService(
+            ICharacterRepository characterRepository,
+            ICharacterFundsService characterFundsService,
+            IFactionFundsRepository fleetRepository,
+            IPlanetRepository planetRepo,
+            IFleetRepository fleetRepo,
+            IRansomDecisionService decisionService)
         {
             _cmdRepo = characterRepository;
             _funds = characterFundsService;
             _factionFunds = fleetRepository;
             _planetRepo = planetRepo;
             _fleetRepo = fleetRepo;
+            _decision = decisionService;
         }
 
-        public void TryRequestRansoms()
+        /// <summary>
+        /// Attempts to settle a ransom between a payer and a captive.
+        /// The payer is first evaluated for willingness via <see cref="IRansomDecisionService"/>
+        /// and then charged if sufficient funds exist.
+        /// </summary>
+        public bool TryResolveRansom(Guid payerId, Guid captiveId, int amount)
         {
-            // Loop through captives—planet and fleet—and attempt ransom
-            // Try family character, then faction, then offer to others
+            if (!_decision.WillPayRansom(payerId, captiveId, amount))
+                return false;
+            if (!_funds.DeductCharacter(payerId, amount))
+                return false;
+            _funds.CreditCharacter(captiveId, amount);
+            return true;
         }
     }
 }
