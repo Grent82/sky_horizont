@@ -73,6 +73,11 @@ namespace SkyHorizont.Infrastructure.DomainServices
                     .Where(c => c != null && c.IsAlive)
                     .ToList()!;
 
+                // Only keep living conspirator IDs moving forward
+                var newConspirators = conspirators
+                    .Select(c => c!.Id)
+                    .ToList();
+
                 int avgIntel = conspirators.Any()
                     ? (int)conspirators.Average(c => c!.Skills.Intelligence)
                     : leader.Skills.Intelligence;
@@ -83,17 +88,16 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
                 // Exposure chance: grows with plot size and target count; reduced by conspirators’ Intelligence
                 double exposureChance = ExposureBaseChance
-                                        + 0.01 * Math.Max(0, plot.Conspirators.Count - 2)
+                                        + 0.01 * Math.Max(0, newConspirators.Count - 2)
                                         + 0.01 * Math.Max(0, plot.Targets.Count - 1)
                                         - 0.005 * (avgIntel / 30.0);
                 exposureChance = Math.Clamp(exposureChance, 0.01, 0.25);
 
                 // Recruit chance: if any candidate in leader's faction has opinion >= threshold, might be added
-                double recruitChance = RecruitBaseChance - 0.005 * (plot.Conspirators.Count / 3.0);
+                double recruitChance = RecruitBaseChance - 0.005 * (newConspirators.Count / 3.0);
                 recruitChance = Math.Clamp(recruitChance, 0.01, 0.06);
 
                 bool exposed = _rng.NextDouble() < exposureChance;
-                var newConspirators = new List<Guid>(plot.Conspirators);
 
                 if (!exposed && _rng.NextDouble() < recruitChance)
                 {
@@ -102,7 +106,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
                         .Where(c => c.IsAlive
                                     && c.Id != leader.Id
                                     && !_factionInfo.IsAtWar(leaderFaction, _factionInfo.GetFactionIdForCharacter(c.Id))
-                                    && !plot.Conspirators.Contains(c.Id))
+                                    && !newConspirators.Contains(c.Id))
                         .ToList();
 
                     // pick the best opinion candidate who meets threshold

@@ -60,6 +60,18 @@ namespace SkyHorizont.Domain.Factions
                 : new DiplomaticStanding(0);
         }
 
+        /// <summary>
+        /// Adjusts diplomacy with another faction by the specified amount.
+        /// Positive values improve goodwill while negative values increase hostility.
+        /// </summary>
+        public void AdjustDiplomacy(Guid otherFactionId, int change)
+        {
+            var newVal = _diplomacy.TryGetValue(otherFactionId, out var current)
+                ? current.Adjust(change)
+                : new DiplomaticStanding(change);
+            _diplomacy[otherFactionId] = newVal;
+        }
+
         public void ConquerPlanet(Guid planetId)
         {
             if (!_planetIds.Add(planetId))
