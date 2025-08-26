@@ -43,7 +43,9 @@ public class RansomServiceTests
 
         var factionSvc = new Mock<IFactionService>();
         var faction = new Faction(Guid.NewGuid(), "f", Guid.NewGuid());
-        faction.CharacterIds.AddRange(new[] { captiveId, firstCandidate, secondCandidate });
+        faction.AddCharacter(captiveId);
+        faction.AddCharacter(firstCandidate);
+        faction.AddCharacter(secondCandidate);
         factionSvc.Setup(f => f.GetFactionIdForCharacter(It.IsAny<Guid>())).Returns(Guid.NewGuid());
         factionSvc.Setup(f => f.GetFaction(It.IsAny<Guid>())).Returns(faction);
 
