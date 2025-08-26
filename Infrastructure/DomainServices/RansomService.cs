@@ -42,8 +42,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
         /// considered in order: family members, rival characters, faction members
         /// and secret lovers. For each candidate the decision service is consulted
         /// before attempting to deduct funds from either personal or faction treasuries.
+        /// When payment succeeds, the amount is credited to the captor.
         /// </summary>
-        public bool TryResolveRansom(Guid captiveId, int amount, Guid captorId)
+        public bool TryResolveRansom(Guid captiveId, Guid captorId, int amount)
         {
             var captive = _cmdRepo.GetById(captiveId);
             if (captive == null)
@@ -76,7 +77,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
                 if (_funds.DeductCharacter(payerId, amount))
                 {
-                    _funds.CreditCharacter(captiveId, amount);
+                    _funds.CreditCharacter(captorId, amount);
                     return true;
                 }
 
@@ -84,7 +85,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 if (_factionFunds.GetBalance(payerFaction) >= amount)
                 {
                     _factionFunds.AddBalance(payerFaction, -amount);
-                    _funds.CreditCharacter(captiveId, amount);
+                    _funds.CreditCharacter(captorId, amount);
                     return true;
                 }
             }

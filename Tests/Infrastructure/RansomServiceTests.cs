@@ -22,6 +22,7 @@ public class RansomServiceTests
     {
         var captiveId = Guid.NewGuid();
         var familyId = Guid.NewGuid();
+        var captorId = Guid.NewGuid();
         const int amount = 100;
 
         var captive = CreateCharacter(captiveId, "Captive");
@@ -46,11 +47,11 @@ public class RansomServiceTests
         var service = new RansomService(repo.Object, funds.Object, decision.Object,
             factionSvc.Object, factionFunds.Object, Mock.Of<IRandomService>(), Mock.Of<IRansomMarketplaceService>());
 
-        var result = service.TryResolveRansom(captiveId, amount, Guid.NewGuid());
+        var result = service.TryResolveRansom(captiveId, captorId, amount);
 
         result.Should().BeTrue();
         funds.Verify(f => f.DeductCharacter(familyId, amount), Times.Once);
-        funds.Verify(f => f.CreditCharacter(captiveId, amount), Times.Once);
+        funds.Verify(f => f.CreditCharacter(captorId, amount), Times.Once);
     }
 
     [Fact]
@@ -77,7 +78,7 @@ public class RansomServiceTests
         var service = new RansomService(repo.Object, funds.Object, decision.Object,
             factionSvc.Object, factionFunds.Object, Mock.Of<IRandomService>(), Mock.Of<IRansomMarketplaceService>());
 
-        var result = service.TryResolveRansom(captiveId, amount, Guid.NewGuid());
+        var result = service.TryResolveRansom(captiveId, Guid.NewGuid(), amount);
 
         result.Should().BeFalse();
         funds.Verify(f => f.DeductCharacter(It.IsAny<Guid>(), It.IsAny<int>()), Times.Never);
