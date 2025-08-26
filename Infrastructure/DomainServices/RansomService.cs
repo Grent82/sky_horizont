@@ -17,6 +17,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IPlanetRepository _planetRepo;
         private readonly IFleetRepository _fleetRepo;
         private readonly IRansomDecisionService _decision;
+        private readonly IFactionService _factions;
+        private readonly IRandomService _rng;
 
         public RansomService(
             ICharacterRepository characterRepository,
@@ -24,7 +26,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IFactionFundsRepository fleetRepository,
             IPlanetRepository planetRepo,
             IFleetRepository fleetRepo,
-            IRansomDecisionService decisionService)
+            IRansomDecisionService decisionService,
+            IFactionService factions,
+            IRandomService rng)
         {
             _cmdRepo = characterRepository;
             _funds = characterFundsService;
@@ -32,6 +36,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _planetRepo = planetRepo;
             _fleetRepo = fleetRepo;
             _decision = decisionService;
+            _factions = factions;
+            _rng = rng;
         }
 
         /// <summary>
@@ -47,6 +53,34 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 return false;
             _funds.CreditCharacter(captiveId, amount);
             return true;
+        }
+
+        public void HandleUnpaidRansom(Guid captiveId, Guid captorFaction)
+        {
+            var captive = _cmdRepo.GetById(captiveId);
+            if (captive == null)
+                return;
+
+            var outcome = _rng.NextInt(0, 3);
+            switch (outcome)
+            {
+                case 0:
+                    // Sold to a slavery market; no specific owner.
+                    captive.Enslave(null);
+                    break;
+                case 1:
+                    // Transferred to captor's harem/crew.
+                    var owner = _factions.GetLeaderId(captorFaction);
+                    captive.Enslave(owner);
+                    _factions.MoveCharacterToFaction(captiveId, captorFaction);
+                    break;
+                default:
+                    // Execution.
+                    captive.MarkDead();
+                    break;
+            }
+
+            _cmdRepo.Save(captive);
         }
     }
 }

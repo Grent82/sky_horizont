@@ -14,5 +14,12 @@ namespace SkyHorizont.Domain.Services
         /// <param name="amount">Ransom amount.</param>
         /// <returns>true if payment succeeded; otherwise false.</returns>
         bool TryResolveRansom(Guid payerId, Guid captiveId, int amount);
+
+        /// <summary>
+        /// Handles a captive whose ransom was not paid in time, determining their fate.
+        /// </summary>
+        /// <param name="captiveId">The captive in question.</param>
+        /// <param name="captorFaction">The faction currently holding the captive.</param>
+        void HandleUnpaidRansom(Guid captiveId, Guid captorFaction);
     }
 }
