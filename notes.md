@@ -161,9 +161,15 @@ Think in bands so tuning stays predictable:
 * Ensures that loot flows and political influence hierarchies feel meaningful, incentivizing hierarchical chain-of-command dynamics
 *  expand to capture civilians or family members for ransom as additional loot flows, but keep character and role-based share logic separate
 
+Are you aware that a ransom request is done in one round, in the next round an answer is given, if the answer was no the character is asked until all possible chracters where ask. If the prison could not be sold then the prisoner is hand over to the market against a fee.
+Price should be calculated on the rank of the inprisoned character and the rank of the parents. If parents are a couple then both are taken into account. If mother is single, then only the mother. Also the faction strength is important by the price. GreatHouse great price lower house or faction low price. The price should also be important if the decision is made if a character becomes a prisoner.
+In some circumstances the captor can capture a character wants it to be in his harem ()
+
 ## Open ToDos:
 * RelationTypes for other relation types (ExSpose, Rival)
 * RansomMarket, new RelationShipType and Rank after bought?
 * combine HandleUnpaidRansom and RansomMarket
 * Adapt Courtesan/Slave logic, no automatic ranks ups
 * no automatic rank ups, only decision of a leader when need
+* GetSecretLovers not complete
+
