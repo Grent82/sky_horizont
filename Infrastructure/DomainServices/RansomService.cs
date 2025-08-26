@@ -1,5 +1,3 @@
-using SkyHorizont.Domain.Galaxy.Planet;
-using SkyHorizont.Domain.Fleets;
 using SkyHorizont.Domain.Entity;
 using SkyHorizont.Domain.Factions;
 using SkyHorizont.Domain.Services;
@@ -13,33 +11,25 @@ namespace SkyHorizont.Infrastructure.DomainServices
     {
         private readonly ICharacterRepository _cmdRepo;
         private readonly ICharacterFundsService _funds;
-        private readonly IFactionFundsRepository _factionFunds;
-        private readonly IPlanetRepository _planetRepo;
-        private readonly IFleetRepository _fleetRepo;
         private readonly IRansomDecisionService _decision;
         private readonly IFactionService _factions;
         private readonly IRandomService _rng;
+        private readonly IRansomMarketplaceService _market;
 
         public RansomService(
             ICharacterRepository characterRepository,
             ICharacterFundsService characterFundsService,
-            IFactionFundsRepository fleetRepository,
-            IPlanetRepository planetRepo,
-            IFleetRepository fleetRepo,
             IRansomDecisionService decisionService,
             IFactionService factions,
             IRandomService rng,
-            IFactionService factionService)
+            IRansomMarketplaceService market)
         {
             _cmdRepo = characterRepository;
             _funds = characterFundsService;
-            _factionFunds = fleetRepository;
-            _planetRepo = planetRepo;
-            _fleetRepo = fleetRepo;
             _decision = decisionService;
             _factions = factions;
             _rng = rng;
-            _factions = factionService;
+            _market = market;
         }
 
         /// <summary>
