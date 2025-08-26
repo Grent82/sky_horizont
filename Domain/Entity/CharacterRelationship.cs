@@ -8,6 +8,8 @@ namespace SkyHorizont.Domain.Entity
         Lover,
         Fiance,
         Partner,
-        ExSpouse
+        ExSpouse,
+        Friend,
+        Rival
     }
 }

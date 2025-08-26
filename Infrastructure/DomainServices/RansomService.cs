@@ -35,18 +35,39 @@ namespace SkyHorizont.Infrastructure.DomainServices
         }
 
         /// <summary>
-        /// Attempts to settle a ransom between a payer and a captive.
-        /// The payer is first evaluated for willingness via <see cref="IRansomDecisionService"/>
-        /// and then charged if sufficient funds exist.
+        /// Attempts to settle a ransom for the specified captive. Potential payers are
+        /// considered in order: family members, faction members and then other
+        /// associates (friends, rivals, lovers). For each candidate the decision
+        /// service is consulted before attempting to deduct funds.
         /// </summary>
-        public bool TryResolveRansom(Guid payerId, Guid captiveId, int amount)
+        public bool TryResolveRansom(Guid captiveId, int amount)
         {
-            if (!_decision.WillPayRansom(payerId, captiveId, amount))
+            var captive = _cmdRepo.GetById(captiveId);
+            if (captive == null)
                 return false;
-            if (!_funds.DeductCharacter(payerId, amount))
-                return false;
-            _funds.CreditCharacter(captiveId, amount);
-            return true;
+
+            bool Attempt(Guid payerId)
+            {
+                if (!_decision.WillPayRansom(payerId, captiveId, amount))
+                    return false;
+                if (!_funds.DeductCharacter(payerId, amount))
+                    return false;
+                _funds.CreditCharacter(captiveId, amount);
+                return true;
+            }
+
+            // 1) Family
+            foreach (var familyId in captive.FamilyLinkIds)
+                if (Attempt(familyId)) return true;
+
+            // 2) Faction members - Placeholder: not yet implemented
+            // (retains previous behaviour where no faction payment occurs)
+
+            // 3) Associates
+            foreach (var associate in _cmdRepo.GetAssociates(captiveId))
+                if (Attempt(associate.Id)) return true;
+
+            return false;
         }
     }
 }
