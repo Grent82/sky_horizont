@@ -16,7 +16,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IRansomDecisionService _decision;
         private readonly IFactionService _factions;
         private readonly IFactionFundsRepository _factionFunds;
-        private readonly IRandomService _rng;
         private readonly IRansomMarketplaceService _market;
 
         public RansomService(
@@ -25,7 +24,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IRansomDecisionService decisionService,
             IFactionService factions,
             IFactionFundsRepository factionFunds,
-            IRandomService rng,
             IRansomMarketplaceService market)
         {
             _cmdRepo = characterRepository;
@@ -33,7 +31,6 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _decision = decisionService;
             _factions = factions;
             _factionFunds = factionFunds;
-            _rng = rng;
             _market = market;
         }
 
@@ -93,32 +90,14 @@ namespace SkyHorizont.Infrastructure.DomainServices
             return false;
         }
 
-        public void HandleUnpaidRansom(Guid captiveId, Guid captorFaction)
+        public void HandleUnpaidRansom(Guid captiveId, Guid captorId, int amount, bool captorIsFaction)
         {
             var captive = _cmdRepo.GetById(captiveId);
             if (captive == null)
                 return;
 
-            var outcome = _rng.NextInt(0, 3);
-            switch (outcome)
-            {
-                case 0:
-                    // Sold to a slavery market; no specific owner.
-                    captive.Enslave(null);
-                    break;
-                case 1:
-                    // Transferred to captor's harem/crew.
-                    var owner = _factions.GetLeaderId(captorFaction);
-                    captive.Enslave(owner);
-                    _factions.MoveCharacterToFaction(captiveId, captorFaction);
-                    break;
-                default:
-                    // Execution.
-                    captive.MarkDead();
-                    break;
-            }
-
-            _cmdRepo.Save(captive);
+            var listing = new RansomListing(captiveId, captorId, amount, captorIsFaction);
+            _market.AddListing(listing);
         }
     }
 }
