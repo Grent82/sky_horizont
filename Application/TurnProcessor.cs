@@ -12,7 +12,7 @@ namespace SkyHorizont.Application
 
     /// <summary>
     /// Orchestrates the monthly turn:
-    /// Clock → Lifecycle → Social (plan/resolve) → Affection → Morale → Intrigue → Economy.
+    /// Clock → Lifecycle → Social (plan/resolve) → Affection → Morale → Intrigue → Ransoms → Economy.
     /// </summary>
     public sealed class TurnProcessor : ITurnProcessor
     {
@@ -25,6 +25,7 @@ namespace SkyHorizont.Application
         private readonly IMoraleService _morale;
         private readonly ICharacterLifecycleService _lifecycle;
         private readonly IIntrigueService _intrigue;
+        private readonly IRansomService _ransom;
         private readonly IEconomyService _economy;
 
         public TurnProcessor(
@@ -37,6 +38,7 @@ namespace SkyHorizont.Application
             IMoraleService morale,
             ICharacterLifecycleService lifecycle,
             IIntrigueService intrigue,
+            IRansomService ransom,
             IEconomyService economy)
         {
             _clock      = clock;
@@ -51,6 +53,7 @@ namespace SkyHorizont.Application
             _lifecycle = lifecycle;
 
             _intrigue  = intrigue;
+            _ransom   = ransom;
             _economy   = economy;
         }
 
@@ -95,8 +98,10 @@ namespace SkyHorizont.Application
 
             // 6) Intrigue (plots progress, exposure, recruitment, defections, blackmail)
             SafeRun("Intrigue.TickPlots", () => _intrigue.TickPlots());
+            // 7) Ransom negotiations (one step per captive)
+            SafeRun("Ransom.ProcessPending", () => _ransom.ProcessPendingRansoms());
 
-            // 7) Economy (upkeep, trade/tariffs/smuggling, loans)
+            // 8) Economy (upkeep, trade/tariffs/smuggling, loans)
             SafeRun("Economy.EndOfTurnUpkeep", () => _economy.EndOfTurnUpkeep());
         }
 

@@ -118,6 +118,7 @@ namespace SkyHorizont.Tests.Domain
             public void AddCitizenToPlanet(Guid character, Guid locationId) { }
             public void AddPassengerToFleet(Guid character, Guid fleetId) { }
             public void StageAtHolding(Guid character, Guid fleetId) { }
+            public void KeepInHarem(Guid captiveId, Guid captorId) { }
             public bool IsPrisonerOf(Guid prisonerId, Guid captorId) => false;
         }
     }

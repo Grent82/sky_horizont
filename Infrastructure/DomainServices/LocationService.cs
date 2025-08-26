@@ -12,11 +12,13 @@ namespace SkyHorizont.Infrastructure.DomainServices
     {
         private readonly IPlanetRepository _planets;
         private readonly IFleetRepository _fleets;
+        private readonly IRansomService _ransom;
 
-        public LocationService(IPlanetRepository planets, IFleetRepository fleets)
+        public LocationService(IPlanetRepository planets, IFleetRepository fleets, IRansomService ransom)
         {
             _planets = planets;
             _fleets  = fleets;
+            _ransom  = ransom;
         }
 
         public CharacterLocation? GetCharacterLocation(Guid characterId)
@@ -134,6 +136,32 @@ namespace SkyHorizont.Infrastructure.DomainServices
             if (fleet is null)
                 return;
             fleet.AddCaptured(character);
+            _fleets.Save(fleet);
+            if (fleet.AssignedCharacterId.HasValue)
+                _ransom.StartRansom(character, fleet.AssignedCharacterId.Value);
+        }
+
+        public void KeepInHarem(Guid captiveId, Guid captorId)
+        {
+            if (!IsPrisonerOf(captiveId, captorId))
+                return;
+
+            foreach (var p in _planets.GetAll())
+            {
+                if (p.Prisoners.Remove(captiveId))
+                    _planets.Save(p);
+            }
+
+            foreach (var f in _fleets.GetAll())
+            {
+                if (f.Prisoners.Contains(captiveId))
+                {
+                    f.RemoveCaptured(captiveId);
+                    _fleets.Save(f);
+                }
+            }
+
+            _ransom.KeepInHarem(captiveId, captorId);
         }
 
         /// <summary>
