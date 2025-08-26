@@ -28,7 +28,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IFleetRepository fleetRepo,
             IRansomDecisionService decisionService,
             IFactionService factions,
-            IRandomService rng)
+            IRandomService rng,
             IFactionService factionService)
         {
             _cmdRepo = characterRepository;
@@ -48,7 +48,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         /// associates (friends, rivals, lovers). For each candidate the decision
         /// service is consulted before attempting to deduct funds.
         /// </summary>
-        public bool TryResolveRansom(Guid captiveId, int amount)
+        public bool TryResolveRansom(Guid payerId, Guid captiveId, int amount)
         {
             if (!_decision.WillPayRansom(payerId, captiveId, amount))
                 return _factions.NegotiatePrisonerExchange(payerId, captiveId);

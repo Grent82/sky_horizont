@@ -160,3 +160,10 @@ Think in bands so tuning stays predictable:
 * consider time of conquest battle in hours depends on strength of both opponents
 * Ensures that loot flows and political influence hierarchies feel meaningful, incentivizing hierarchical chain-of-command dynamics
 *  expand to capture civilians or family members for ransom as additional loot flows, but keep character and role-based share logic separate
+
+## Open ToDos:
+* RelationTypes for other relation types (ExSpose, Rival)
+* RansomMarket, new RelationShipType and Rank after bought?
+* combine HandleUnpaidRansom and RansomMarket
+* Adapt Courtesan/Slave logic, no automatic ranks ups
+* no automatic rank ups, only decision of a leader when need

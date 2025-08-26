@@ -17,7 +17,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
         public bool DeductCharacter(Guid characterId, int amount)
         {
             var balance = _repo.GetBalance(characterId);
-            if (balance < amount) return false;
+            if (balance < amount)
+                return false;
             _repo.AddBalance(characterId, -amount);
             return true;
         }
