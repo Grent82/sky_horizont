@@ -7,15 +7,15 @@ namespace SkyHorizont.Domain.Services
     {
         /// <summary>
         /// Attempts to settle a ransom for the specified captive.
-        /// The service will search for willing payers among family members,
+        /// The service searches for willing payers among family members,
         /// rivals, faction mates and secret lovers, charging the first candidate
-        /// that both agrees and has sufficient funds.
+        /// that both agrees and has sufficient funds and crediting the captor.
         /// </summary>
-        /// <param name="captiveId">Captive to receive the funds.</param>
+        /// <param name="captiveId">Identifier of the captive whose release is negotiated.</param>
+        /// <param name="captorId">Identifier of the captor character to receive payment.</param>
         /// <param name="amount">Ransom amount.</param>
-        /// <param name="captorId">Identifier of the captor character.</param>
         /// <returns>true if payment succeeded; otherwise false.</returns>
-        bool TryResolveRansom(Guid captiveId, int amount, Guid captorId);
+        bool TryResolveRansom(Guid captiveId, Guid captorId, int amount);
 
         /// <summary>
         /// Handles a captive whose ransom was not paid in time, determining their fate.
