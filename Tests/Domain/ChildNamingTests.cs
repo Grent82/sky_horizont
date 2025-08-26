@@ -127,6 +127,7 @@ namespace SkyHorizont.Tests.Domain
             public void MoveCharacterToFaction(Guid characterId, Guid newFactionId) { }
             public void Save(Faction faction) { }
             public Faction GetFaction(Guid factionId) => new Faction(factionId, "Dummy", Guid.Empty);
+            public bool NegotiatePrisonerExchange(Guid payerId, Guid captiveId) => false;
         }
     }
 }

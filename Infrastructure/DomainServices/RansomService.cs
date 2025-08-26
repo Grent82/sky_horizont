@@ -17,6 +17,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IPlanetRepository _planetRepo;
         private readonly IFleetRepository _fleetRepo;
         private readonly IRansomDecisionService _decision;
+        private readonly IFactionService _factions;
 
         public RansomService(
             ICharacterRepository characterRepository,
@@ -24,7 +25,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IFactionFundsRepository fleetRepository,
             IPlanetRepository planetRepo,
             IFleetRepository fleetRepo,
-            IRansomDecisionService decisionService)
+            IRansomDecisionService decisionService,
+            IFactionService factionService)
         {
             _cmdRepo = characterRepository;
             _funds = characterFundsService;
@@ -32,6 +34,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _planetRepo = planetRepo;
             _fleetRepo = fleetRepo;
             _decision = decisionService;
+            _factions = factionService;
         }
 
         /// <summary>
@@ -42,32 +45,12 @@ namespace SkyHorizont.Infrastructure.DomainServices
         /// </summary>
         public bool TryResolveRansom(Guid captiveId, int amount)
         {
-            var captive = _cmdRepo.GetById(captiveId);
-            if (captive == null)
-                return false;
-
-            bool Attempt(Guid payerId)
-            {
-                if (!_decision.WillPayRansom(payerId, captiveId, amount))
-                    return false;
-                if (!_funds.DeductCharacter(payerId, amount))
-                    return false;
-                _funds.CreditCharacter(captiveId, amount);
-                return true;
-            }
-
-            // 1) Family
-            foreach (var familyId in captive.FamilyLinkIds)
-                if (Attempt(familyId)) return true;
-
-            // 2) Faction members - Placeholder: not yet implemented
-            // (retains previous behaviour where no faction payment occurs)
-
-            // 3) Associates
-            foreach (var associate in _cmdRepo.GetAssociates(captiveId))
-                if (Attempt(associate.Id)) return true;
-
-            return false;
+            if (!_decision.WillPayRansom(payerId, captiveId, amount))
+                return _factions.NegotiatePrisonerExchange(payerId, captiveId);
+            if (!_funds.DeductCharacter(payerId, amount))
+                return _factions.NegotiatePrisonerExchange(payerId, captiveId);
+            _funds.CreditCharacter(captiveId, amount);
+            return true;
         }
     }
 }
