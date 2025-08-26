@@ -57,6 +57,8 @@ namespace SkyHorizont.Domain.Entity
         public int Balance => _balance;
         public IReadOnlyList<TraumaType> Traumas => _traumas.AsReadOnly();
         public CharacterAmbition? Ambition { get; set; }
+        public bool IsEnslaved { get; private set; }
+        public Guid? HaremOwnerId { get; private set; }
 
         public Character(
             Guid id,
@@ -173,6 +175,12 @@ namespace SkyHorizont.Domain.Entity
         public void IncreaseAge() => Age++;
 
         public void MarkDead() => IsAlive = false;
+
+        public void Enslave(Guid? ownerId)
+        {
+            IsEnslaved = true;
+            HaremOwnerId = ownerId;
+        }
 
         public void LinkFamilyMember(Guid otherId)
         {

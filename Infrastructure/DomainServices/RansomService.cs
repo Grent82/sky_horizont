@@ -18,6 +18,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IFleetRepository _fleetRepo;
         private readonly IRansomDecisionService _decision;
         private readonly IFactionService _factions;
+        private readonly IRandomService _rng;
 
         public RansomService(
             ICharacterRepository characterRepository,
@@ -26,6 +27,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IPlanetRepository planetRepo,
             IFleetRepository fleetRepo,
             IRansomDecisionService decisionService,
+            IFactionService factions,
+            IRandomService rng)
             IFactionService factionService)
         {
             _cmdRepo = characterRepository;
@@ -34,6 +37,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _planetRepo = planetRepo;
             _fleetRepo = fleetRepo;
             _decision = decisionService;
+            _factions = factions;
+            _rng = rng;
             _factions = factionService;
         }
 
@@ -51,6 +56,34 @@ namespace SkyHorizont.Infrastructure.DomainServices
                 return _factions.NegotiatePrisonerExchange(payerId, captiveId);
             _funds.CreditCharacter(captiveId, amount);
             return true;
+        }
+
+        public void HandleUnpaidRansom(Guid captiveId, Guid captorFaction)
+        {
+            var captive = _cmdRepo.GetById(captiveId);
+            if (captive == null)
+                return;
+
+            var outcome = _rng.NextInt(0, 3);
+            switch (outcome)
+            {
+                case 0:
+                    // Sold to a slavery market; no specific owner.
+                    captive.Enslave(null);
+                    break;
+                case 1:
+                    // Transferred to captor's harem/crew.
+                    var owner = _factions.GetLeaderId(captorFaction);
+                    captive.Enslave(owner);
+                    _factions.MoveCharacterToFaction(captiveId, captorFaction);
+                    break;
+                default:
+                    // Execution.
+                    captive.MarkDead();
+                    break;
+            }
+
+            _cmdRepo.Save(captive);
         }
     }
 }
