@@ -10,6 +10,7 @@ namespace SkyHorizont.Domain.Entity
         Partner,
         ExSpouse,
         Friend,
-        Rival
+        Rival,
+        HaremMember
     }
 }
