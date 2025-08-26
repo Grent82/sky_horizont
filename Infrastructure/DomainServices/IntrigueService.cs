@@ -62,7 +62,10 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
                 var leader = _characters.GetById(plot.LeaderId);
                 if (leader is null || !leader.IsAlive)
+                {
+                    _plots.Remove(plot.PlotId);
                     continue;
+                }
 
                 // Progress speed from conspirators' Intelligence + leader’s Conscientiousness
                 var conspirators = plot.Conspirators
