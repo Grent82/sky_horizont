@@ -65,6 +65,19 @@ namespace SkyHorizont.Infrastructure.Persistence
             return GetByIds(associateIds);
         }
 
+        public IEnumerable<Character> GetSecretLovers(Guid characterId)
+        {
+            var character = GetById(characterId);
+            if (character == null)
+                return Enumerable.Empty<Character>();
+
+            var loverIds = character.Relationships
+                .Where(r => r.Type == RelationshipType.Lover)
+                .Select(r => r.TargetCharacterId);
+
+            return GetByIds(loverIds);
+        }
+
         public IEnumerable<Character> GetFamilyMembers(Guid characterId)
         {
             var character = GetById(characterId);
