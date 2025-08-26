@@ -1399,6 +1399,7 @@ namespace SkyHorizont.Infrastructure.Social
                 _events.Publish(ev);
                 return new[] { ev };
             }
+
             var fleet = _fleets.GetFleetsForFaction(actorFactionId).FirstOrDefault();
             if (fleet == null)
             {
