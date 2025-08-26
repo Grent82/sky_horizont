@@ -12,6 +12,7 @@ using SkyHorizont.Infrastructure.Social.IntentRules;
 using SkyHorizont.Infrastructure.Testing;
 using Xunit;
 using SkyHorizont.Infrastructure.Persistence.Repositories;
+using Moq;
 
 namespace SkyHorizont.Tests.Common
 {
@@ -43,7 +44,8 @@ namespace SkyHorizont.Tests.Common
             var mortality = new GompertzMortalityModel();
             var nameGen = new NameGenerator(rng);
             var inherit = new SimplePersonalityInheritanceService(rng);
-            var loc = new LocationService(planets, fleets);
+            var ransom = new Mock<IRansomService>();
+            var loc = new LocationService(planets, fleets, ransom.Object);
             var pregPolicy = new DefaultPregnancyPolicy(rng, opinions, loc);
             var skillInh = new SimpleSkillInheritanceService();
             var faction = new FactionService(factions, planets);

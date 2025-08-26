@@ -96,6 +96,14 @@ namespace SkyHorizont.Infrastructure.DomainServices
             return pending.NextIndex < pending.CandidatePayers.Count;
         }
 
+
+        public void ProcessPendingRansoms()
+        {
+            var ids = _pending.Keys.ToList();
+            foreach (var id in ids)
+                ProcessRansomTurn(id);
+        }
+
         public void HandleUnpaidRansom(Guid captiveId, Guid captorId, int amount, bool captorIsFaction)
         {
             var captive = _cmdRepo.GetById(captiveId);

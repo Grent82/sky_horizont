@@ -18,6 +18,11 @@ namespace SkyHorizont.Domain.Services
         /// either by payment or by exhausting all candidates.
         /// </summary>
         bool ProcessRansomTurn(Guid captiveId);
+        /// <summary>
+        /// Processes a negotiation turn for all pending ransoms.
+        /// </summary>
+        void ProcessPendingRansoms();
+
 
         /// <summary>
         /// Handles a captive whose ransom was not paid in time by listing them on the

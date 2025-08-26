@@ -24,6 +24,7 @@ namespace SkyHorizont.Domain.Services
         void AddCitizenToPlanet(Guid character, Guid locationId);
         void AddPassengerToFleet(Guid character, Guid fleetId);
         void StageAtHolding(Guid character, Guid locationId);
+        void KeepInHarem(Guid captiveId, Guid captorId);
 
         bool IsPrisonerOf(Guid prisonerId, Guid captorId);
     }
