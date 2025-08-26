@@ -6,27 +6,28 @@ namespace SkyHorizont.Domain.Services
     public interface IRansomService
     {
         /// <summary>
-        /// Attempts to settle a ransom for the specified captive.
-        /// The service searches for willing payers among family members,
-        /// rivals, faction mates and secret lovers, charging the first candidate
-        /// that both agrees and has sufficient funds and crediting the captor.
+        /// Starts a ransom negotiation for the captive. The amount is calculated
+        /// by the pricing service and candidate payers are recorded.
         /// </summary>
-        /// <param name="captiveId">Identifier of the captive whose release is negotiated.</param>
-        /// <param name="captorId">Identifier of the captor character to receive payment.</param>
-        /// <param name="amount">Ransom amount.</param>
-        /// <returns>true if payment succeeded; otherwise false.</returns>
-        bool TryResolveRansom(Guid captiveId, Guid captorId, int amount);
+        void StartRansom(Guid captiveId, Guid captorId);
+
+        /// <summary>
+        /// Processes a single negotiation turn for the captive. Exactly one
+        /// candidate payer is approached per call. Returns true if the ransom
+        /// remains pending after this call; false if negotiation concluded
+        /// either by payment or by exhausting all candidates.
+        /// </summary>
+        bool ProcessRansomTurn(Guid captiveId);
 
         /// <summary>
         /// Handles a captive whose ransom was not paid in time by listing them on the
         /// ransom marketplace.
         /// </summary>
-        /// <param name="captiveId">Identifier of the captive being listed.</param>
-        /// <param name="captorId">Identifier of the captor (character or faction).
-        /// This entity will receive payment when the ransom is purchased.</param>
-        /// <param name="amount">Ransom amount to demand for the captive.</param>
-        /// <param name="captorIsFaction">True if the captor identifier refers to a faction;
-        /// otherwise it refers to an individual character.</param>
         void HandleUnpaidRansom(Guid captiveId, Guid captorId, int amount, bool captorIsFaction);
+
+        /// <summary>
+        /// Converts the captive into a harem member of the captor, skipping ransom flow.
+        /// </summary>
+        void KeepInHarem(Guid captiveId, Guid captorId);
     }
 }

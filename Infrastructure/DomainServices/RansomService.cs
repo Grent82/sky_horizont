@@ -1,13 +1,16 @@
-using SkyHorizont.Domain.Entity;
-using SkyHorizont.Domain.Factions;
-using SkyHorizont.Domain.Services;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using SkyHorizont.Domain.Entity;
+using SkyHorizont.Domain.Factions;
+using SkyHorizont.Domain.Prisoners;
+using SkyHorizont.Domain.Services;
 
 namespace SkyHorizont.Infrastructure.DomainServices
 {
     /// <summary>
     /// Provides operations for settling ransom payments between characters.
+    /// Supports multi-round negotiations and dynamic pricing.
     /// </summary>
     public class RansomService : IRansomService
     {
@@ -17,6 +20,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IFactionService _factions;
         private readonly IFactionFundsRepository _factionFunds;
         private readonly IRansomMarketplaceService _market;
+        private readonly IRansomPricingService _pricing;
+        private readonly Dictionary<Guid, PendingRansom> _pending = new();
 
         public RansomService(
             ICharacterRepository characterRepository,
@@ -24,7 +29,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IRansomDecisionService decisionService,
             IFactionService factions,
             IFactionFundsRepository factionFunds,
-            IRansomMarketplaceService market)
+            IRansomMarketplaceService market,
+            IRansomPricingService pricing)
         {
             _cmdRepo = characterRepository;
             _funds = characterFundsService;
@@ -32,62 +38,65 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _factions = factions;
             _factionFunds = factionFunds;
             _market = market;
+            _pricing = pricing;
         }
 
-        /// <summary>
-        /// Attempts to settle a ransom for the specified captive. Potential payers are
-        /// considered in order: family members, rival characters, faction members
-        /// and secret lovers. For each candidate the decision service is consulted
-        /// before attempting to deduct funds from either personal or faction treasuries.
-        /// When payment succeeds, the amount is credited to the captor.
-        /// </summary>
-        public bool TryResolveRansom(Guid captiveId, Guid captorId, int amount)
+        public void StartRansom(Guid captiveId, Guid captorId)
         {
             var captive = _cmdRepo.GetById(captiveId);
             if (captive == null)
-                return false;
+                return;
 
+            var amount = _pricing.EstimateRansomValue(captiveId);
             var candidates = new List<Guid>();
-
-            // Family members first
             candidates.AddRange(_cmdRepo.GetFamilyMembers(captiveId).Select(c => c.Id));
-
-            // Rivals
             candidates.AddRange(captive.Relationships
                 .Where(r => r.Type == RelationshipType.Rival)
                 .Select(r => r.TargetCharacterId));
-
-            // Faction members
             var factionId = _factions.GetFactionIdForCharacter(captiveId);
             var faction = _factions.GetFaction(factionId);
             candidates.AddRange(faction.CharacterIds.Where(id => id != captiveId));
-
-            // Secret lovers
             candidates.AddRange(captive.Relationships
                 .Where(r => r.Type == RelationshipType.Lover)
                 .Select(r => r.TargetCharacterId));
 
-            foreach (var payerId in candidates.Distinct())
+            var pending = new PendingRansom(captiveId, captorId, amount, candidates.Distinct());
+            _pending[captiveId] = pending;
+        }
+
+        public bool ProcessRansomTurn(Guid captiveId)
+        {
+            if (!_pending.TryGetValue(captiveId, out var pending))
+                return false;
+
+            var payerId = pending.NextPayer();
+            if (payerId == null)
             {
-                if (!_decision.WillPayRansom(payerId, captiveId, amount))
-                    continue;
-
-                if (_funds.DeductCharacter(payerId, amount))
-                {
-                    _funds.CreditCharacter(captorId, amount);
-                    return true;
-                }
-
-                var payerFaction = _factions.GetFactionIdForCharacter(payerId);
-                if (_factionFunds.GetBalance(payerFaction) >= amount)
-                {
-                    _factionFunds.AddBalance(payerFaction, -amount);
-                    _funds.CreditCharacter(captorId, amount);
-                    return true;
-                }
+                HandleUnpaidRansom(pending.CaptiveId, pending.CaptorId, pending.Amount, false);
+                _pending.Remove(captiveId);
+                return false;
             }
 
-            return false;
+            if (!_decision.WillPayRansom(payerId.Value, captiveId, pending.Amount))
+                return pending.NextIndex < pending.CandidatePayers.Count;
+
+            if (_funds.DeductCharacter(payerId.Value, pending.Amount))
+            {
+                _funds.CreditCharacter(pending.CaptorId, pending.Amount);
+                _pending.Remove(captiveId);
+                return false;
+            }
+
+            var payerFaction = _factions.GetFactionIdForCharacter(payerId.Value);
+            if (_factionFunds.GetBalance(payerFaction) >= pending.Amount)
+            {
+                _factionFunds.AddBalance(payerFaction, -pending.Amount);
+                _funds.CreditCharacter(pending.CaptorId, pending.Amount);
+                _pending.Remove(captiveId);
+                return false;
+            }
+
+            return pending.NextIndex < pending.CandidatePayers.Count;
         }
 
         public void HandleUnpaidRansom(Guid captiveId, Guid captorId, int amount, bool captorIsFaction)
@@ -98,6 +107,16 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
             var listing = new RansomListing(captiveId, captorId, amount, captorIsFaction);
             _market.AddListing(listing);
+        }
+
+        public void KeepInHarem(Guid captiveId, Guid captorId)
+        {
+            var captive = _cmdRepo.GetById(captiveId);
+            if (captive == null)
+                return;
+
+            captive.Enslave(captorId);
+            captive.AddRelationship(captorId, RelationshipType.HaremMember);
         }
     }
 }

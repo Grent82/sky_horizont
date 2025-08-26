@@ -18,71 +18,72 @@ public class RansomServiceTests
             new SkillSet(0, 0, 0, 0));
 
     [Fact]
-    public void TryResolveRansom_FamilyMemberPays()
+    public void ProcessRansomTurn_AsksOneCandidatePerCall()
     {
         var captiveId = Guid.NewGuid();
-        var familyId = Guid.NewGuid();
         var captorId = Guid.NewGuid();
+        var firstCandidate = Guid.NewGuid();
+        var secondCandidate = Guid.NewGuid();
         const int amount = 100;
 
         var captive = CreateCharacter(captiveId, "Captive");
-        var familyMember = CreateCharacter(familyId, "Kin");
+        var parent1 = CreateCharacter(firstCandidate, "Parent1");
+        var parent2 = CreateCharacter(secondCandidate, "Parent2");
 
         var repo = new Mock<ICharacterRepository>();
         repo.Setup(r => r.GetById(captiveId)).Returns(captive);
-        repo.Setup(r => r.GetFamilyMembers(captiveId)).Returns(new[] { familyMember });
+        repo.Setup(r => r.GetFamilyMembers(captiveId)).Returns(new[] { parent1, parent2 });
 
         var funds = new Mock<ICharacterFundsService>();
-        funds.Setup(f => f.DeductCharacter(familyId, amount)).Returns(true);
+        funds.Setup(f => f.DeductCharacter(secondCandidate, amount)).Returns(true);
 
         var decision = new Mock<IRansomDecisionService>();
-        decision.Setup(d => d.WillPayRansom(familyId, captiveId, amount)).Returns(true);
+        decision.Setup(d => d.WillPayRansom(firstCandidate, captiveId, amount)).Returns(false);
+        decision.Setup(d => d.WillPayRansom(secondCandidate, captiveId, amount)).Returns(true);
 
         var factionSvc = new Mock<IFactionService>();
         var faction = new Faction(Guid.NewGuid(), "f", Guid.NewGuid());
+        faction.CharacterIds.AddRange(new[] { captiveId, firstCandidate, secondCandidate });
         factionSvc.Setup(f => f.GetFactionIdForCharacter(It.IsAny<Guid>())).Returns(Guid.NewGuid());
         factionSvc.Setup(f => f.GetFaction(It.IsAny<Guid>())).Returns(faction);
 
         var factionFunds = new Mock<IFactionFundsRepository>();
+        var pricing = new Mock<IRansomPricingService>();
+        pricing.Setup(p => p.EstimateRansomValue(captiveId)).Returns(amount);
+
         var service = new RansomService(repo.Object, funds.Object, decision.Object,
-            factionSvc.Object, factionFunds.Object, Mock.Of<IRansomMarketplaceService>());
+            factionSvc.Object, factionFunds.Object, Mock.Of<IRansomMarketplaceService>(), pricing.Object);
 
-        var result = service.TryResolveRansom(captiveId, captorId, amount);
+        service.StartRansom(captiveId, captorId);
 
-        result.Should().BeTrue();
-        funds.Verify(f => f.DeductCharacter(familyId, amount), Times.Once);
+        // First turn: first candidate refuses
+        service.ProcessRansomTurn(captiveId).Should().BeTrue();
+        funds.Verify(f => f.CreditCharacter(It.IsAny<Guid>(), It.IsAny<int>()), Times.Never);
+
+        // Second turn: second candidate pays
+        service.ProcessRansomTurn(captiveId).Should().BeFalse();
         funds.Verify(f => f.CreditCharacter(captorId, amount), Times.Once);
     }
 
     [Fact]
-    public void TryResolveRansom_NoCandidatePays_ReturnsFalse()
+    public void KeepInHarem_CreatesRelationship()
     {
         var captiveId = Guid.NewGuid();
-        const int amount = 100;
-        var captive = CreateCharacter(captiveId, "Captive");
+        var captorId = Guid.NewGuid();
+        var captive = CharacterFactory.CreateSuperPositive(captiveId, "Cap", Sex.Female, 20, 2000, 1);
 
         var repo = new Mock<ICharacterRepository>();
         repo.Setup(r => r.GetById(captiveId)).Returns(captive);
-        repo.Setup(r => r.GetFamilyMembers(captiveId)).Returns(Array.Empty<Character>());
 
-        var funds = new Mock<ICharacterFundsService>();
-        var decision = new Mock<IRansomDecisionService>();
+        var service = new RansomService(repo.Object, Mock.Of<ICharacterFundsService>(), Mock.Of<IRansomDecisionService>(),
+            Mock.Of<IFactionService>(), Mock.Of<IFactionFundsRepository>(), Mock.Of<IRansomMarketplaceService>(),
+            Mock.Of<IRansomPricingService>());
 
-        var factionSvc = new Mock<IFactionService>();
-        var faction = new Faction(Guid.NewGuid(), "f", Guid.NewGuid());
-        factionSvc.Setup(f => f.GetFactionIdForCharacter(It.IsAny<Guid>())).Returns(Guid.NewGuid());
-        factionSvc.Setup(f => f.GetFaction(It.IsAny<Guid>())).Returns(faction);
+        service.KeepInHarem(captiveId, captorId);
 
-        var factionFunds = new Mock<IFactionFundsRepository>();
-
-        var service = new RansomService(repo.Object, funds.Object, decision.Object,
-            factionSvc.Object, factionFunds.Object, Mock.Of<IRansomMarketplaceService>());
-
-        var result = service.TryResolveRansom(captiveId, Guid.NewGuid(), amount);
-
-        result.Should().BeFalse();
-        funds.Verify(f => f.DeductCharacter(It.IsAny<Guid>(), It.IsAny<int>()), Times.Never);
-        factionFunds.Verify(f => f.AddBalance(It.IsAny<Guid>(), It.IsAny<int>()), Times.Never);
+        captive.IsEnslaved.Should().BeTrue();
+        captive.HaremOwnerId.Should().Be(captorId);
+        captive.Relationships.Should().Contain(r => r.TargetCharacterId == captorId && r.Type == RelationshipType.HaremMember);
     }
 
     [Fact]
@@ -99,7 +100,7 @@ public class RansomServiceTests
         var market = new Mock<IRansomMarketplaceService>();
         var service = new RansomService(repo.Object, Mock.Of<ICharacterFundsService>(),
             Mock.Of<IRansomDecisionService>(), Mock.Of<IFactionService>(), Mock.Of<IFactionFundsRepository>(),
-            market.Object);
+            market.Object, Mock.Of<IRansomPricingService>());
 
         service.HandleUnpaidRansom(captiveId, captorFaction, amount, true);
 

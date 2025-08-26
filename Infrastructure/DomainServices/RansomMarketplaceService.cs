@@ -8,20 +8,26 @@ namespace SkyHorizont.Infrastructure.DomainServices
 {
     /// <summary>
     /// In-memory implementation of <see cref="IRansomMarketplaceService"/>.
-    /// Allows browsing and purchasing ransom listings.
+    /// Allows browsing and purchasing ransom listings and applies a fee.
     /// </summary>
     public class RansomMarketplaceService : IRansomMarketplaceService
     {
         private readonly ICharacterFundsService _characterFunds;
         private readonly IFactionFundsRepository _factionFunds;
         private readonly List<RansomListing> _listings = new();
+        private readonly double _feeRate;
+        private readonly Guid _feeRecipient;
 
         public RansomMarketplaceService(
             ICharacterFundsService characterFunds,
-            IFactionFundsRepository factionFunds)
+            IFactionFundsRepository factionFunds,
+            double feeRate = 0.1,
+            Guid? feeRecipientFaction = null)
         {
             _characterFunds = characterFunds;
             _factionFunds = factionFunds;
+            _feeRate = feeRate;
+            _feeRecipient = feeRecipientFaction ?? Guid.Empty;
         }
 
         public IEnumerable<RansomListing> GetListings() => _listings.AsReadOnly();
@@ -58,11 +64,15 @@ namespace SkyHorizont.Infrastructure.DomainServices
 
         private void CreditCaptor(RansomListing listing)
         {
+            var fee = (int)(listing.Amount * _feeRate);
+            var net = listing.Amount - fee;
             if (listing.CaptorIsFaction)
-                _factionFunds.AddBalance(listing.CaptorId, listing.Amount);
+                _factionFunds.AddBalance(listing.CaptorId, net);
             else
-                _characterFunds.CreditCharacter(listing.CaptorId, listing.Amount);
+                _characterFunds.CreditCharacter(listing.CaptorId, net);
+
+            if (_feeRecipient != Guid.Empty)
+                _factionFunds.AddBalance(_feeRecipient, fee);
         }
     }
 }
-
