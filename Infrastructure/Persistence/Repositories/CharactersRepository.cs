@@ -49,5 +49,20 @@ namespace SkyHorizont.Infrastructure.Persistence
                 .Where(c => c != null)
                 .ToList()!;
         }
+
+        public IEnumerable<Character> GetAssociates(Guid characterId)
+        {
+            var character = GetById(characterId);
+            if (character == null)
+                return Enumerable.Empty<Character>();
+
+            var associateIds = character.Relationships
+                .Where(r => r.Type == RelationshipType.Friend ||
+                            r.Type == RelationshipType.Rival ||
+                            r.Type == RelationshipType.Lover)
+                .Select(r => r.TargetCharacterId);
+
+            return GetByIds(associateIds);
+        }
     }
 }

@@ -6,13 +6,14 @@ namespace SkyHorizont.Domain.Services
     public interface IRansomService
     {
         /// <summary>
-        /// Attempts to settle a ransom by charging the payer and crediting the captive
-        /// if the payer is willing and has sufficient funds.
+        /// Attempts to settle a ransom for the specified captive.
+        /// The service will search for willing payers among family members,
+        /// faction mates and other associates, charging the first candidate
+        /// that both agrees and has sufficient funds.
         /// </summary>
-        /// <param name="payerId">Character attempting to pay.</param>
         /// <param name="captiveId">Captive to receive the funds.</param>
         /// <param name="amount">Ransom amount.</param>
         /// <returns>true if payment succeeded; otherwise false.</returns>
-        bool TryResolveRansom(Guid payerId, Guid captiveId, int amount);
+        bool TryResolveRansom(Guid captiveId, int amount);
     }
 }

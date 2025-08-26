@@ -38,11 +38,12 @@ namespace SkyHorizont.Infrastructure.DomainServices
         }
 
         /// <summary>
-        /// Attempts to settle a ransom between a payer and a captive.
-        /// The payer is first evaluated for willingness via <see cref="IRansomDecisionService"/>
-        /// and then charged if sufficient funds exist.
+        /// Attempts to settle a ransom for the specified captive. Potential payers are
+        /// considered in order: family members, faction members and then other
+        /// associates (friends, rivals, lovers). For each candidate the decision
+        /// service is consulted before attempting to deduct funds.
         /// </summary>
-        public bool TryResolveRansom(Guid payerId, Guid captiveId, int amount)
+        public bool TryResolveRansom(Guid captiveId, int amount)
         {
             if (!_decision.WillPayRansom(payerId, captiveId, amount))
                 return _factions.NegotiatePrisonerExchange(payerId, captiveId);
