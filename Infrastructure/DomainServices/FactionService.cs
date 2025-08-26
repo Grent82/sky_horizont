@@ -65,6 +65,25 @@ namespace SkyHorizont.Domain.Factions
             return planetCount > 0 ? (int)((totalInfrastructure + totalStability) / (2 * planetCount)) : 0;
         }
 
+        public bool NegotiatePrisonerExchange(Guid payerId, Guid captiveId)
+        {
+            var payerFactionId = GetFactionIdForCharacter(payerId);
+            var captorFactionId = GetFactionIdForCharacter(captiveId);
+            if (payerFactionId == Guid.Empty || captorFactionId == Guid.Empty)
+                return false;
+
+            var payerFaction = _factionRepository.GetFaction(payerFactionId);
+            var captorFaction = _factionRepository.GetFaction(captorFactionId);
+            if (payerFaction == null || captorFaction == null)
+                return false;
+
+            bool success = !IsAtWar(payerFactionId, captorFactionId);
+            var delta = success ? 5 : -5;
+            payerFaction.AdjustDiplomacy(captorFactionId, delta);
+            captorFaction.AdjustDiplomacy(payerFactionId, delta);
+            return success;
+        }
+
         public IEnumerable<Guid> GetAllRivalFactions(Guid forFaction)
         {
             if (forFaction == Guid.Empty) return Enumerable.Empty<Guid>();

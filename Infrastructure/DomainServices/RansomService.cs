@@ -17,6 +17,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
         private readonly IPlanetRepository _planetRepo;
         private readonly IFleetRepository _fleetRepo;
         private readonly IRansomDecisionService _decision;
+        private readonly IFactionService _factions;
 
         public RansomService(
             ICharacterRepository characterRepository,
@@ -24,7 +25,8 @@ namespace SkyHorizont.Infrastructure.DomainServices
             IFactionFundsRepository fleetRepository,
             IPlanetRepository planetRepo,
             IFleetRepository fleetRepo,
-            IRansomDecisionService decisionService)
+            IRansomDecisionService decisionService,
+            IFactionService factionService)
         {
             _cmdRepo = characterRepository;
             _funds = characterFundsService;
@@ -32,6 +34,7 @@ namespace SkyHorizont.Infrastructure.DomainServices
             _planetRepo = planetRepo;
             _fleetRepo = fleetRepo;
             _decision = decisionService;
+            _factions = factionService;
         }
 
         /// <summary>
@@ -42,9 +45,9 @@ namespace SkyHorizont.Infrastructure.DomainServices
         public bool TryResolveRansom(Guid payerId, Guid captiveId, int amount)
         {
             if (!_decision.WillPayRansom(payerId, captiveId, amount))
-                return false;
+                return _factions.NegotiatePrisonerExchange(payerId, captiveId);
             if (!_funds.DeductCharacter(payerId, amount))
-                return false;
+                return _factions.NegotiatePrisonerExchange(payerId, captiveId);
             _funds.CreditCharacter(captiveId, amount);
             return true;
         }
