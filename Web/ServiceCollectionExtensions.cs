@@ -87,6 +87,7 @@ namespace SkyHorizont.Infrastructure.Configuration
             services.AddScoped<IPlanetService, PlanetService>();
             services.AddScoped<IPregnancyPolicy, DefaultPregnancyPolicy>();
             services.AddScoped<IRansomService, RansomService>();
+            services.AddScoped<IRansomDecisionService, RansomDecisionService>();
             services.AddScoped<IResearchService, ResearchService>();
             services.AddSingleton<IStarmapService>(_ => new StarmapService(Array.Empty<StarSystem>()));
             services.AddScoped<IRouteService, RouteService>();
