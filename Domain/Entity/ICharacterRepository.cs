@@ -17,5 +17,9 @@ namespace SkyHorizont.Domain.Entity
         /// Returns all family members linked to the specified character.
         /// </summary>
         IEnumerable<Character> GetFamilyMembers(Guid characterId);
+        /// <summary>
+        /// Returns all secret lovers linked to the specified character.
+        /// </summary>
+        IEnumerable<Character> GetSecretLovers(Guid characterId);
     }
 }
